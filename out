@@ -1,0 +1,168 @@
+/home/pijoules/.venvs/type_inference/lib/mypy/typeshed/stdlib/3/_importlib_modulespec.pyi
+  !! Any type around line 14
+  !! Any type around line 20
+  !! Any type around line 21
+  ** precision **
+  precise   33
+  imprecise 0
+  any       3
+  ** kinds **
+  simple    33
+  generic   0
+  function  0
+  tuple     0
+  TypeVar   0
+  complex   0
+  any       3
+/home/pijoules/.venvs/type_inference/lib/mypy/typeshed/stdlib/3/types.pyi
+  !! Any type around line 17
+  !! Imprecise type around line 20
+  !! Imprecise type around line 22
+  !! Imprecise type around line 23
+  !! Imprecise type around line 24
+  !! Any type around line 26
+  !! Any type around line 26
+  !! Any type around line 26
+  !! Imprecise type around line 38
+  !! Imprecise type around line 39
+  !! Imprecise type around line 40
+  !! Imprecise type around line 45
+  !! Imprecise type around line 46
+  !! Imprecise type around line 47
+  !! Imprecise type around line 47
+  !! Imprecise type around line 47
+  !! Imprecise type around line 47
+  !! Imprecise type around line 47
+  !! Any type around line 79
+  !! Any type around line 81
+  !! Any type around line 81
+  !! Any type around line 83
+  !! Any type around line 85
+  !! Any type around line 88
+  !! Any type around line 93
+  !! Any type around line 93
+  !! Any type around line 95
+  !! Any type around line 97
+  !! Any type around line 102
+  !! Any type around line 102
+  !! Any type around line 102
+  !! Imprecise type around line 104
+  !! Any type around line 105
+  !! Any type around line 105
+  !! Any type around line 105
+  !! Imprecise type around line 120
+  !! Imprecise type around line 122
+  !! Imprecise type around line 125
+  !! Any type around line 133
+  !! Any type around line 133
+  !! Any type around line 134
+  !! Any type around line 135
+  !! Any type around line 139
+  !! Any type around line 139
+  !! Any type around line 140
+  !! Any type around line 141
+  !! Imprecise type around line 143
+  !! Imprecise type around line 143
+  !! Imprecise type around line 143
+  !! Imprecise type around line 144
+  !! Imprecise type around line 144
+  !! Imprecise type around line 144
+  !! Imprecise type around line 147
+  !! Imprecise type around line 149
+  ** precision **
+  precise   104
+  imprecise 26
+  any       28
+  ** kinds **
+  simple    93
+  generic   21
+  function  6
+  tuple     0
+  TypeVar   2
+  complex   7
+  any       28
+/home/pijoules/.venvs/type_inference/lib/mypy/typeshed/stdlib/3/sys.pyi
+  !! Any type around line 22
+  !! Any type around line 23
+  !! Any type around line 28
+  !! Any type around line 29
+  !! Any type around line 30
+  !! Imprecise type around line 33
+  !! Imprecise type around line 34
+  !! Imprecise type around line 36
+  !! Imprecise type around line 37
+  !! Any type around line 53
+  !! Imprecise type around line 57
+  !! Imprecise type around line 114
+  !! Any type around line 114
+  !! Imprecise type around line 116
+  !! Any type around line 125
+  !! Any type around line 131
+  !! Any type around line 142
+  !! Any type around line 144
+  !! Any type around line 146
+  !! Any type around line 147
+  !! Any type around line 148
+  !! Any type around line 152
+  !! Any type around line 155
+  ** precision **
+  precise   106
+  imprecise 7
+  any       16
+  ** kinds **
+  simple    98
+  generic   9
+  function  1
+  tuple     3
+  TypeVar   1
+  complex   0
+  any       16
+/home/pijoules/.venvs/type_inference/lib/mypy/typeshed/stdlib/3/_random.pyi
+  !! Any type around line 8
+  !! Imprecise type around line 9
+  !! Imprecise type around line 10
+  ** precision **
+  precise   10
+  imprecise 2
+  any       1
+  ** kinds **
+  simple    10
+  generic   2
+  function  0
+  tuple     0
+  TypeVar   0
+  complex   0
+  any       1
+/home/pijoules/.venvs/type_inference/lib/mypy/typeshed/stdlib/3/random.pyi
+  !! Any type around line 17
+  !! Any type around line 18
+  !! Imprecise type around line 19
+  !! Imprecise type around line 20
+  !! Imprecise type around line 25
+  !! Any type around line 46
+  !! Imprecise type around line 53
+  ** precision **
+  precise   129
+  imprecise 4
+  any       3
+  ** kinds **
+  simple    119
+  generic   4
+  function  2
+  tuple     0
+  TypeVar   2
+  complex   4
+  any       3
+test.py
+  ** precision **
+  precise   0
+  imprecise 0
+  any       0
+  ** kinds **
+  simple    0
+  generic   0
+  function  0
+  tuple     0
+  TypeVar   0
+  complex   0
+  any       0
