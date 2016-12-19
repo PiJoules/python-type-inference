@@ -1,4 +1,4 @@
-import random
+#import random
 
 def test():
     if random.random() < 0.5:

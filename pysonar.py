@@ -58,7 +58,7 @@ def isDef(node):
 ##################################################################
 history = {}
 def putInfo(exp, item):
-    if history.has_key(exp):
+    if exp in history:
         seen = history[exp]
     else:
         seen = []
@@ -154,7 +154,7 @@ class TupleType(Type):
             if len(self.elts) != len(other.elts):
                 return False
             else:
-                for i in xrange(len(self.elts)):
+                for i in range(len(self.elts)):
                     if self.elts[i] != other.elts[i]:
                         return False
                 return True
@@ -174,7 +174,7 @@ class ListType(Type):
             if len(self.elts) != len(other.elts):
                 return False
             else:
-                for i in xrange(len(self.elts)):
+                for i in range(len(self.elts)):
                     if self.elts[i] != other.elts[i]:
                         return False
                 return True
@@ -330,7 +330,7 @@ def bind(target, value, env):
     # elif IS(target, Tuple) or IS(target, List):
     #     if IS(value, TupleType) or IS(value, List):
     #         if len(target.elts) == len(value.elts):
-    #             for i in xrange(len(value.elts)):
+    #             for i in range(len(value.elts)):
     #                 env = bind(target.elts[i], value.elts[i], env)
     #             return env
     #         elif len(target.elts) < len(value.elts):
@@ -380,7 +380,7 @@ def invoke1(call, clo, env, stk):
 
     # bind positionals first
     poslen = min(len(func.args.args), len(call.args))
-    for i in xrange(poslen):
+    for i in range(poslen):
         t = infer(call.args[i], env, stk)
         pos = bind(func.args.args[i], t, pos)
 
@@ -393,7 +393,7 @@ def invoke1(call, clo, env, stk):
             return [err]
         else:
             ts = []
-            for i in xrange(len(func.args.args), len(call.args)):
+            for i in range(len(func.args.args), len(call.args)):
                 t = infer(call.args[i], env, stk)
                 ts = ts + t
             pos = bind(func.args.vararg, ts, pos)
@@ -426,7 +426,7 @@ def invoke1(call, clo, env, stk):
     # types for defaults are already inferred when the function was defined
     i = len(func.args.args) - len(func.args.defaults)
     ndefaults = len(func.args.args)
-    for j in xrange(len(clo.defaults)):
+    for j in range(len(clo.defaults)):
         tloc = lookup(getId(func.args.args[i]), pos)
         if tloc == None:
             pos = bind(func.args.args[i], clo.defaults[j], pos)
@@ -539,6 +539,12 @@ def inferSeq(exp, env, stk):
     elif IS(e, Expr):
         t1 = infer(e.value, env, stk)
         return inferSeq(exp[1:], env, stk)
+
+    #elif IS(e, Import):
+    #    """
+    #    Not implemented for Imports
+    #    """
+    #    return [UnknownType(), UnknownType()]
 
     else:
         raise TypeError('recognized node in effect context', e)
@@ -712,7 +718,7 @@ def printAst(node):
         ret = '"' + str(node.s) + '"'
     elif (IS(node, Return)):
         ret = "return " + repr(node.value)
-    elif (IS(node, Print)):
+    elif sys.version_info[0] < 3 and IS(node, Print):
         ret = ("print(" + (str(node.dest)
                + ", " if (node.dest!=None) else "")
                + printList(node.values) + ")")
