@@ -174,7 +174,19 @@ class TypeInferer(object):
         types = MultiTypeType()
         for expr in lst.elts:
             types.update(self.infer_type(expr, env))
-        return types
+        return MultiType(Container(types))
+
+    def infer_dict_type(self, d, env):
+        """
+        Infer the contents of a dictionary.
+        """
+        key_types = MultiType()
+        for node in d.keys:
+            key_types.update(self.infer_type(node, env))
+        val_types = MultiType()
+        for node in d.values:
+            val_types.update(self.infer_type(node, env))
+        return MultiType(Mapping(key_types, val_types))
 
     def infer_name(self, name, env):
         """
@@ -242,7 +254,9 @@ class TypeInferer(object):
         elif isinstance(expr, ast.Bytes):
             return MultiType(BytesType())
         elif isinstance(expr, (ast.List, ast.Tuple, ast.Set)):
-            return self.infer_list_type(self, expr, env)
+            return self.infer_list_type(expr, env)
+        elif isinstance(expr, ast.Dict):
+            return self.infer_dict_type(expr, env)
         elif isinstance(expr, ast.NameConstant):
             if expr.value is None:
                 return MultiType(NoneType())
@@ -280,7 +294,9 @@ class TypeInferer(object):
                 raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t))
             env[var] = t
         else:
-            raise RuntimeError("Unknown type '{}'".format(t))
+            raise RuntimeError(
+                """All types added to the env must be another env or a
+                MultiType. Unknown type '{}' was added.""".format(type(t)))
 
     def parse_assign(self, asgn, env):
         targets = asgn.targets

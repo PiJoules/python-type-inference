@@ -19,6 +19,8 @@ y = 0.1
 y += x
 
 x = 0.1
+
+d = {}
 """))
         self.types = self.inferer.environment()
 
@@ -30,6 +32,11 @@ x = 0.1
         """Test augmented assignment."""
         self.assertSetEqual(self.types["y"].evaluate(),
                             {"int", "str", "float"})
+
+    def test_dict(self):
+        """Test dictionary contents."""
+        #self.assertEqual(self.types["d"].evaluate(),
+        #                 ())
 
 
 if __name__ == "__main__":
