@@ -20,7 +20,7 @@ y += x
 
 x = 0.1
 """))
-        self.types = self.inferer.types()
+        self.types = self.inferer.environment()
 
     def test_assignment(self):
         """Test variable assignment."""
