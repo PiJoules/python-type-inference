@@ -147,10 +147,17 @@ class TypeInferer(object):
         raise RuntimeError("Unable to determine type for expression '{}'".format(expr))
 
     def _update_type(self, env, var, t):
-        if var in env:
-            env[var].update(t)
-        else:
+        if isinstance(t, Type):
+            if var in env:
+                env[var].update(t)
+            else:
+                env[var] = t
+        elif isinstance(t, dict):
+            if var in env:
+                raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t))
             env[var] = t
+        else:
+            raise RuntimeError("Unknown type '{}'".format(t))
 
     def parse_assign(self, asgn, env):
         targets = asgn.targets
@@ -167,10 +174,22 @@ class TypeInferer(object):
         return env
 
     def parse_aug_assign(self, aug_asgn, env):
-        raise NotImplementedError
+        """
+        The types will be the combination of the existing types and the type
+        of what is being added.
+        """
+        self._update_type(env, aug_asgn.target.id,
+                          self.infer_type(aug_asgn.value, env))
+        return env
 
     def parse_func_def(self, func_def, env):
-        raise NotImplementedError
+        """
+        TODO: Check for global and nonlocal variables
+        """
+        func_env = {}.update(env)
+        #self._update_type(func_env, func_def.name, self.parse_sequence())
+        #env
+        return env
 
     def parse_class_def(self, cls_def, env):
         raise NotImplementedError

@@ -14,11 +14,22 @@ class TestTypeInference(unittest.TestCase):
 x = 2
 x = "str"
 x = 0
+
+y = 0.1
+y += x
+
+x = 0.1
 """))
         self.types = self.inferer.types()
 
     def test_assignment(self):
-        self.assertSetEqual(self.types["x"].evaluate(), {"int", "str"})
+        """Test variable assignment."""
+        self.assertSetEqual(self.types["x"].evaluate(), {"int", "str", "float"})
+
+    def test_augmented_assignment(self):
+        """Test augmented assignment."""
+        self.assertSetEqual(self.types["y"].evaluate(),
+                            {"int", "str", "float"})
 
 
 if __name__ == "__main__":

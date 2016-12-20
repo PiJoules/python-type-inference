@@ -1,3 +1,1 @@
-jedi
-mypy-lang
-lxml
+nose
