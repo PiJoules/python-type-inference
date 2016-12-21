@@ -1,190 +1,61 @@
 # -*- coding: utf-8 -*-
 
-import utils
+import ast_utils
+import class_utils
+import builtin_types as types
 import ast
 
 
-class Type(object):
-    def evaluate(self):
+class ArgumentsInfo(class_utils.SlotDefinedClass):
+    __slots__ = ("positional", "keyword", "vararg", "keyword_only", "kwarg",
+                 "keyword_defaults", "keyword_only_defaults")
+    __types__ = {
+        "positional": [str],
+        "keyword": {str: types.MultiType},
+        "vararg": class_utils.optional(str),
+        "keyword_only": {str: class_utils.optional(types.MultiType)},
+        "kwarg": class_utils.optional(str),
+    }
+
+    def environment(self):
         """
-        Return some delayed evaluation of what this type represents.
+        Treat the arguments as an environment and return it.
 
-        The result must be hashable.
-        """
-        raise NotImplementedError
-
-    def __str__(self):
-        return str(self.evaluate())
-
-    def __eq__(self, other):
-        return self.evaluate() == other.evaluate()
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def __hash__(self):
-        return hash(self.evaluate())
-
-    def clone(self):
-        raise NotImplementedError
-
-
-class BaseType(Type):
-    def __init__(self, base_type: str) -> None:
-        self.__base_type = base_type
-
-    def evaluate(self):
-        """
         Returns:
-            str
+            dict
         """
-        return self.__base_type
+        func_env = {}
+        for var in self.positional:
+            func_env[var] = types.MultiType()
 
-    def clone(self):
-        return BaseType(self.__base_type)
+        # Keyword args have type already given
+        func_env.update(self.keyword)
+        func_env.update(self.keyword_only)
 
+        # Vararg and kwarg are nothing for now
+        if self.vararg:
+            func_env[self.vararg] = types.Container()
+        if self.kwarg:
+            func_env[self.kwarg] = types.Mapping()
 
-class AnyType(BaseType):
-    def __init__(self):
-        super().__init__("Any")
-
-
-class BoolType(BaseType):
-    def __init__(self):
-        super().__init__("bool")
-
-
-class IntType(BaseType):
-    def __init__(self):
-        super().__init__("int")
+        return func_env
 
 
-class FloatType(BaseType):
-    def __init__(self):
-        super().__init__("float")
+class FunctionInfo(class_utils.SlotDefinedClass):
+    __slots__ = ("name", "body_env", "return_type", "arguments")
+    __types__ = {
+        "name": str,
+        "body_env": dict,
+        "return_type": types.MultiType,
+        "arguments": ArgumentsInfo,
+    }
 
 
-class ComplexType(BaseType):
-    def __init__(self):
-        super().__init__("complex")
-
-
-class StrType(BaseType):
-    def __init__(self):
-        super().__init__("str")
-
-
-class BytesType(BaseType):
-    def __init__(self):
-        super().__init__("bytes")
-
-
-class NoneType(BaseType):
-    def __init__(self):
-        super().__init__("None")
-
-
-class MultiType(Type):
-    """
-    Class for performing delayed evaluation of types.
-    This is a container of strings that is lazily evaluated.
-    """
-    def __init__(self, base_type=None):
-        """
-        Args:
-            base_type (Type): Another type that this type is equivalent to.
-        """
-        if base_type is None:
-            self.__types = []  # type: list[Type]
-        elif isinstance(base_type, list):
-            self.__types = base_type
-        else:
-            self.__types = [base_type]
-
-    def evaluate(self):
-        """
-        Returns:
-            frozenset[(str, Container, Mapping)]: Types of variables
-        """
-        if not self.__types:
-            return "Any"
-        elif len(self.__types) == 1:
-            return self.__types[0].evaluate()
-
-        types = set()
-        for t in self.__types:
-            if isinstance(t, MultiType):
-                evaluated_t = t.evaluate()
-                if isinstance(evaluated_t, frozenset):
-                    # Merge any multitypes
-                    types |= evaluated_t
-                else:
-                    types.add(evaluated_t)
-            elif isinstance(t, (BaseType, Container, Mapping)):
-                types.add(t.evaluate())
-            else:
-                raise RuntimeError("Unexpected type '{}'".format(type(t)))
-
-        if "Any" in types:
-            # Any type dominates the rest
-            return "Any"
-
-        return frozenset(types)
-
-    def update(self, other: Type):
-        """Update the types in this container."""
-        self.__types.append(other)
-
-    def replace(self, other):
-        """Replace all types in this container with another list of types."""
-        self.__types = other
-
-    def clone(self):
-        return MultiType([x for x in self.__types])
-
-
-class Container(Type):
-    def __init__(self, init_type:MultiType=None) -> None:
-        self.__content = init_type or MultiType()
-
-    def evaluate(self):
-        """
-        Returns:
-            tuple[MultiType]: Tuple of size 1 with the only element
-                representing the types of the contents.
-        """
-        return (self.__content.evaluate(), )
-
-    def add(self, t):
-        """Add a new type into the container."""
-        self.__content.update(t)
-
-    def clone(self):
-        return Container(self.__content)
-
-
-class Mapping(Type):
-    def __init__(self, init_key_type:MultiType=None, init_val_type:MultiType=None):
-        self.__key = init_key_type or MultiType()
-        self.__val = init_val_type or MultiType()
-
-    def evaluate(self):
-        """
-        Returns:
-            tuple[MultiType]: Tuple of size 2 with the first element
-                representing the key types and the second representing the
-                value types.
-        """
-        return (self.__key.evaluate(), self.__val.evaluate())
-
-    def add_key(self, key_type):
-        self.__key.update(key_type)
-
-    def add_val(self, val_type):
-        self.__val.update(val_type)
-
-    def clone(self):
-        return Mapping(self.__key, self.__val)
+class ClassInfo(class_utils.SlotDefinedClass):
+    __slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor_args")
+    __types__ = {
+        "name": str
+    }
 
 
 class TypeInferer(object):
@@ -194,28 +65,28 @@ class TypeInferer(object):
 
     @classmethod
     def from_code(cls, code, **kwargs):
-        return cls(utils.generate_ast(code), **kwargs)
+        return cls(ast_utils.generate_ast(code), **kwargs)
 
     def infer_list_type(self, lst, env):
         """
         Infer the contents of a list.
         """
-        types = MultiType()
+        contents = types.MultiType()
         for expr in lst.elts:
-            types.update(self.infer_type(expr, env))
-        return MultiType(Container(types))
+            contents.update(self.infer_type(expr, env))
+        return types.MultiType(types.Container(contents))
 
     def infer_dict_type(self, d, env):
         """
         Infer the contents of a dictionary.
         """
-        key_types = MultiType()
+        key_types = types.MultiType()
         for node in d.keys:
             key_types.update(self.infer_type(node, env))
-        val_types = MultiType()
+        val_types = types.MultiType()
         for node in d.values:
             val_types.update(self.infer_type(node, env))
-        return MultiType(Mapping(key_types, val_types))
+        return types.MultiType(types.Mapping(key_types, val_types))
 
     def infer_name(self, name, env):
         """
@@ -223,23 +94,23 @@ class TypeInferer(object):
         """
         if name.id in env:
             return env[name.id]
-        return MultiType(AnyType())
+        return types.MultiType(types.AnyType())
 
     def infer_unary_op(self, op, env):
         if isinstance(op.op, ast.Not):
             # If using Not, expression is always a boolean result
-            return MultiType(BoolType())
+            return types.MultiType(types.BoolType())
         elif isinstance(op.op, ast.Invert):
             # Inversions only work on ints and bools and return only integers
-            return MultiType(IntType())
+            return types.MultiType(types.IntType())
         else:
             # Otherwise, the return value is either an int or float
             inferred = self.infer_type(op.operand, env).evaluate()
-            t = MultiType()
+            t = types.MultiType()
             if "int" in inferred:
-                t.update(IntType())
+                t.update(types.IntType())
             if "float" in inferred:
-                t.update(FloatType())
+                t.update(types.FloatType())
             return t
 
     def infer_binary_op(self, op, env):
@@ -262,11 +133,11 @@ class TypeInferer(object):
 
     def infer_num(self, num, env):
         if isinstance(num.n, int):
-            return MultiType(IntType())
+            return types.MultiType(types.IntType())
         elif isinstance(num.n, float):
-            return MultiType(FloatType())
+            return types.MultiType(types.FloatType())
         else:
-            return MultiType(ComplexType())
+            return types.MultiType(types.ComplexType())
 
     def infer_bool_op(self, expr, env):
         """
@@ -275,15 +146,15 @@ class TypeInferer(object):
 
         x = var or call() or None
         """
-        t = MultiType()
+        t = types.MultiType()
         for node in expr.values:
             t.update(self.infer_type(node, env).clone())
         return t
 
     def infer_attr(self, attr, env):
         """
-        TODO: Will need to perform a search to find the type of an attribute
-        in an object.
+        Will need to initially have performed a search for determining
+        attribute type on an object.
         """
         raise NotImplementedError
 
@@ -297,17 +168,17 @@ class TypeInferer(object):
         if isinstance(expr, ast.Num):
             return self.infer_num(expr, env)
         elif isinstance(expr, ast.Str):
-            return MultiType(StrType())
+            return types.MultiType(types.StrType())
         elif isinstance(expr, ast.Bytes):
-            return MultiType(BytesType())
+            return types.MultiType(types.BytesType())
         elif isinstance(expr, (ast.List, ast.Tuple, ast.Set)):
             return self.infer_list_type(expr, env)
         elif isinstance(expr, ast.Dict):
             return self.infer_dict_type(expr, env)
         elif isinstance(expr, ast.NameConstant):
             if expr.value is None:
-                return MultiType(NoneType())
-            return MultiType(BoolType())
+                return types.MultiType(types.NoneType())
+            return types.MultiType(types.BoolType())
         elif isinstance(expr, ast.Name):
             return self.infer_name(expr, env)
         elif isinstance(expr, ast.Expr):
@@ -319,7 +190,7 @@ class TypeInferer(object):
         elif isinstance(expr, ast.BoolOp):
             return self.infer_bool_op(expr, env)
         elif isinstance(expr, ast.Compare):
-            return MultiType(BoolType())
+            return types.MultiType(types.BoolType())
         elif isinstance(expr, ast.Call):
             return self.infer_call(expr, env)
         elif isinstance(expr, ast.Attribute):
@@ -333,12 +204,12 @@ class TypeInferer(object):
 
         Functions and classes contain nested environments.
         """
-        if isinstance(t, MultiType):
+        if isinstance(t, types.MultiType):
             if var in env:
                 env[var].update(t)
             else:
                 env[var] = t
-        elif isinstance(t, dict):
+        elif isinstance(t, FunctionInfo):
             if var in env:
                 raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t))
             env[var] = t
@@ -389,16 +260,10 @@ class TypeInferer(object):
                         variables += [name.id for name in target.elts]
         return variables
 
-    def _split_args(self, args, env):
+    def create_arguments_info(self, args, env):
         """
         Extract the positional, keyword, and vararg and kwarg args from an
         arguments node.
-
-        Returns:
-            list[str]: Positional args
-            list[dict[str, Type]]: Keyword args and their types
-            (None, str): vararg (*args). None if not provided.
-            (None, str): kwarg (**kwargs). None if not provided.
         """
         if args.defaults:
             # To prevent indexing up to 0
@@ -406,6 +271,9 @@ class TypeInferer(object):
         else:
             positional_args = [arg.arg for arg in args.args]
         keyword_args = {}
+        keyword_defaults = {}  # maps str to ast node
+        keyword_only_args = {}
+        keyword_only_defaults = {}
         vararg = args.vararg.arg if args.vararg else None
         kwarg = args.kwarg.arg if args.kwarg else None
 
@@ -414,13 +282,26 @@ class TypeInferer(object):
         # positional arguments
         for i, arg in enumerate(args.args[len(args.args) - len(args.defaults):]):
             keyword_args[arg.arg] = self.infer_type(args.defaults[i], env)
+            keyword_defaults[arg.arg] = args.defaults[i]
 
         # Keyword only arguments
         for i, arg in enumerate(args.kwonlyargs):
             if args.kw_defaults[i] is not None:
-                keyword_args[arg.arg] = self.infer_type(args.kw_defaults[i], env)
+                keyword_only_args[arg.arg] = self.infer_type(args.kw_defaults[i], env)
+            else:
+                # This required keyword argument has no default type
+                keyword_only_args[arg.arg] = types.MultiType(types.AnyType())
+            keyword_only_defaults[arg.arg] = args.kw_defaults[i]
 
-        return positional_args, keyword_args, vararg, kwarg
+        return ArgumentsInfo(
+            positional=positional_args,
+            keyword=keyword_args,
+            vararg=vararg,
+            keyword_only=keyword_only_args,
+            kwarg=kwarg,
+            keyword_defaults=keyword_defaults,
+            keyword_only_defaults=keyword_only_defaults,
+        )
 
     def find_global_vars(self, seq):
         """
@@ -450,7 +331,7 @@ class TypeInferer(object):
         Returns:
             MultiType
         """
-        ret_type = MultiType()
+        ret_type = types.MultiType()
         found_type = False
         for node in body:
             if isinstance(node, ast.Return):
@@ -458,7 +339,7 @@ class TypeInferer(object):
                 found_type = True
         if not found_type:
             # Functions without a return return None by default
-            return MultiType(NoneType())
+            return types.MultiType(types.NoneType())
         return ret_type
 
     def parse_func_def(self, func_def, env):
@@ -504,30 +385,27 @@ class TypeInferer(object):
         # Find and merge with arguments
         # Any *args or **kwargs arguments are dictionaries that can hold
         # any type.
-        positional, keyword, vararg, kwarg = self._split_args(func_def.args, env)
+        args_info = self.create_arguments_info(func_def.args, env)
 
-        # Positional arguments will be no specified type for now
-        for var in positional:
-            func_env[var] = MultiType()
-
-        # Keyword args have type already given
-        func_env.update(keyword)
-
-        # Vararg and kwarg are nothing for now
-        if vararg:
-            func_env[vararg] = Container()
-        if kwarg:
-            func_env[kwarg] = Mapping()
+        func_env.update(args_info.environment())
 
         func_env = self.parse_sequence(func_def.body, func_env)
-        self._update_env(env, name, {
-            "body": func_env,
-            "return_type": self.infer_func_return_type(func_def.body, func_env)
-        })
+
+        func_info = FunctionInfo(
+            name=name,
+            body_env=func_env,
+            return_type=self.infer_func_return_type(func_def.body, func_env),
+            arguments=args_info,
+        )
+
+        self._update_env(env, name, func_info)
 
         return env
 
     def parse_class_def(self, cls_def, env):
+        """
+        Same rules as function, but will contain nested functions.
+        """
         raise NotImplementedError
 
     def parse(self, node, env=None):
@@ -541,7 +419,6 @@ class TypeInferer(object):
             dict
         """
         env = env or self.__global_env
-        types = {}
         if isinstance(node, ast.Assign):
             return self.parse_assign(node, env)
         elif isinstance(node, ast.AugAssign):
@@ -552,7 +429,7 @@ class TypeInferer(object):
             return self.parse_class_def(node, env)
         elif isinstance(node, ast.Module):
             return self.parse_module(node, env)
-        return types
+        return {}
 
     def parse_sequence(self, seq, env):
         """
@@ -564,11 +441,11 @@ class TypeInferer(object):
         Returns:
             dict
         """
-        types = {}
-        types.update(env)
+        contents = {}
+        contents.update(env)
         for node in seq:
-            types.update(self.parse(node, env))
-        return types
+            contents.update(self.parse(node, env))
+        return contents
 
     def parse_module(self, module, env):
         """
