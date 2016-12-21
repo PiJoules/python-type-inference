@@ -1,8 +1,6 @@
-#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 
-from utils import *
-
+import utils
 import ast
 
 
@@ -27,6 +25,9 @@ class Type(object):
     def __hash__(self):
         return hash(self.evaluate())
 
+    def clone(self):
+        raise NotImplementedError
+
 
 class BaseType(Type):
     def __init__(self, base_type: str) -> None:
@@ -38,6 +39,9 @@ class BaseType(Type):
             str
         """
         return self.__base_type
+
+    def clone(self):
+        return BaseType(self.__base_type)
 
 
 class AnyType(BaseType):
@@ -90,10 +94,12 @@ class MultiType(Type):
         Args:
             base_type (Type): Another type that this type is equivalent to.
         """
-        if base_type is not None:
-            self.__types = [base_type]  # type: list[Type]
+        if base_type is None:
+            self.__types = []  # type: list[Type]
+        elif isinstance(base_type, list):
+            self.__types = base_type
         else:
-            self.__types = []
+            self.__types = [base_type]
 
     def evaluate(self):
         """
@@ -101,18 +107,23 @@ class MultiType(Type):
             frozenset[(str, Container, Mapping)]: Types of variables
         """
         if not self.__types:
-            raise RuntimeError("No type provided")
+            return "Any"
+        elif len(self.__types) == 1:
+            return self.__types[0].evaluate()
 
         types = set()
         for t in self.__types:
-            if isinstance(t, BaseType):
+            if isinstance(t, MultiType):
+                evaluated_t = t.evaluate()
+                if isinstance(evaluated_t, frozenset):
+                    # Merge any multitypes
+                    types |= evaluated_t
+                else:
+                    types.add(evaluated_t)
+            elif isinstance(t, (BaseType, Container, Mapping)):
                 types.add(t.evaluate())
-            elif isinstance(t, MultiType):
-                types |= t.evaluate()
-            elif isinstance(t, (Container, Mapping)):
-                types.add(t)
             else:
-                raise RuntimeError("Unexpected type '{}'".format(t))
+                raise RuntimeError("Unexpected type '{}'".format(type(t)))
         return frozenset(types)
 
     def update(self, other: Type):
@@ -122,6 +133,9 @@ class MultiType(Type):
     def replace(self, other):
         """Replace all types in this container with another list of types."""
         self.__types = other
+
+    def clone(self):
+        return MultiType([x for x in self.__types])
 
 
 class Container(Type):
@@ -134,17 +148,20 @@ class Container(Type):
             tuple[MultiType]: Tuple of size 1 with the only element
                 representing the types of the contents.
         """
-        return (self.__content, )
+        return (self.__content.evaluate(), )
 
     def add(self, t):
         """Add a new type into the container."""
         self.__content.update(t)
 
+    def clone(self):
+        return Container(self.__content)
+
 
 class Mapping(Type):
     def __init__(self, init_key_type:MultiType=None, init_val_type:MultiType=None):
-        self.__key = init_key_type
-        self.__val = init_val_type
+        self.__key = init_key_type or MultiType()
+        self.__val = init_val_type or MultiType()
 
     def evaluate(self):
         """
@@ -153,7 +170,7 @@ class Mapping(Type):
                 representing the key types and the second representing the
                 value types.
         """
-        return (self.__key, self.__val)
+        return (self.__key.evaluate(), self.__val.evaluate())
 
     def add_key(self, key_type):
         self.__key.update(key_type)
@@ -161,17 +178,24 @@ class Mapping(Type):
     def add_val(self, val_type):
         self.__val.update(val_type)
 
+    def clone(self):
+        return Mapping(self.__key, self.__val)
+
 
 class TypeInferer(object):
     def __init__(self, node, init_types=None):
         self.__global_env = init_types or {}
         self.__global_env = self.parse(node)
 
+    @classmethod
+    def from_code(cls, code, **kwargs):
+        return cls(utils.generate_ast(code), **kwargs)
+
     def infer_list_type(self, lst, env):
         """
         Infer the contents of a list.
         """
-        types = MultiTypeType()
+        types = MultiType()
         for expr in lst.elts:
             types.update(self.infer_type(expr, env))
         return MultiType(Container(types))
@@ -194,18 +218,24 @@ class TypeInferer(object):
         """
         if name.id in env:
             return env[name.id]
-        return MultiTypeType(AnyType())
+        return MultiType(AnyType())
 
     def infer_unary_op(self, op, env):
         if isinstance(op.op, ast.Not):
             # If using Not, expression is always a boolean result
             return MultiType(BoolType())
         elif isinstance(op.op, ast.Invert):
-            # Inversions only work on and return integers
+            # Inversions only work on ints and bools and return only integers
             return MultiType(IntType())
         else:
             # Otherwise, the return value is either an int or float
-            return self.infer_type(op.operand, env)
+            inferred = self.infer_type(op.operand, env).evaluate()
+            t = MultiType()
+            if "int" in inferred:
+                t.update(IntType())
+            if "float" in inferred:
+                t.update(FloatType())
+            return t
 
     def infer_binary_op(self, op, env):
         """
@@ -218,7 +248,9 @@ class TypeInferer(object):
         Returns:
             MultiType
         """
-        return self.infer_type(op.left, env).update(self.infer_type(op.right, env))
+        left_t = self.infer_type(op.left, env).clone()
+        left_t.update(self.infer_type(op.right, env))
+        return left_t
 
     def infer_call(self, call, env):
         return self.infer_name(call.func.name, env)
@@ -243,10 +275,10 @@ class TypeInferer(object):
         Infer the types of a variable
 
         Returns:
-            set[str]: Set of the types
+            MultiType
         """
         if expr is None:
-            return None
+            return MultiType(NoneType())
         elif isinstance(expr, ast.Num):
             return self.infer_num(expr, env)
         elif isinstance(expr, ast.Str):
@@ -351,13 +383,19 @@ class TypeInferer(object):
             (None, str): vararg (*args). None if not provided.
             (None, str): kwarg (**kwargs). None if not provided.
         """
-        positional_args = list(arg.arg for arg in args.args[:-len(args.defaults)])
+        if args.defaults:
+            # To prevent indexing up to 0
+            positional_args = list(arg.arg for arg in args.args[:-len(args.defaults)])
+        else:
+            positional_args = args.args
         keyword_args = {}
-        vararg = args.vararg.arg
-        kwarg = args.kwarg.arg
+        vararg = args.vararg.arg if args.vararg else None
+        kwarg = args.kwarg.arg if args.kwarg else None
 
         # Regular keyword arguments
-        for i, arg in enumerate(args.args[-len(args.defaults)]):
+        # Defaults are the default values for the last len(args.defaults)
+        # positional arguments
+        for i, arg in enumerate(args.args[-len(args.defaults):]):
             keyword_args[arg.arg] = self.infer_type(args.defaults[i], env)
 
         # Keyword only arguments
@@ -373,8 +411,8 @@ class TypeInferer(object):
         Returns:
             set[str]
         """
-        return {name for node in seq for name in node.names
-                if isinstance(node, ast.Global)}
+        return {name for node in seq if isinstance(node, ast.Global)
+                for name in node.names}
 
     def find_nonlocal_vars(self, seq):
         """
@@ -383,8 +421,27 @@ class TypeInferer(object):
         Returns:
             set[str]
         """
-        return {name for node in seq for name in node.names
-                if isinstance(node, ast.Nonlocal)}
+        return {name for node in seq if isinstance(node, ast.Nonlocal)
+                for name in node.names}
+
+    def infer_func_return_type(self, body, func_env):
+        """
+        Determine the function return type from the function body and
+        environment.
+
+        Returns:
+            MultiType
+        """
+        ret_type = MultiType()
+        found_type = False
+        for node in body:
+            if isinstance(node, ast.Return):
+                ret_type.update(self.infer_type(node.value, func_env))
+                found_type = True
+        if not found_type:
+            # Functions without a return return None by default
+            return MultiType(NoneType())
+        return ret_type
 
     def parse_func_def(self, func_def, env):
         """
@@ -427,20 +484,30 @@ class TypeInferer(object):
             func_env[var] = env[var]
 
         # Find and merge with arguments
-        positional, keyword, vararg, kwarg = self._split_args(func_def.args, env)
-
         # Any *args or **kwargs arguments are dictionaries that can hold
         # any type.
-        raise NotImplementedError
+        positional, keyword, vararg, kwarg = self._split_args(func_def.args, env)
 
-        func_env = self.parse_func_body(func_def.body, func_env)
+        # Positional arguments will be no specified type for now
+        for var in positional:
+            func_env[var] = MultiType()
+
+        # Keyword args have type already given
+        func_env.update(keyword)
+
+        # Vararg and kwarg are nothing for now
+        if vararg:
+            func_env[vararg] = Container()
+        if kwarg:
+            func_env[kwarg] = Mapping()
+
+        func_env = self.parse_sequence(func_def.body, func_env)
+        self._update_env(env, name, {
+            "body": func_env,
+            "return_type": self.infer_func_return_type(func_def.body, func_env)
+        })
 
         return env
-
-    def parse_func_body(self, body, env):
-        """
-        """
-        raise NotImplementedError
 
     def parse_class_def(self, cls_def, env):
         raise NotImplementedError
@@ -480,6 +547,7 @@ class TypeInferer(object):
             dict
         """
         types = {}
+        types.update(env)
         for node in seq:
             types.update(self.parse(node, env))
         return types
@@ -499,22 +567,4 @@ class TypeInferer(object):
     def environment(self):
         return self.__global_env
 
-
-
-def main():
-    sample = """
-x = 2
-x = "str"
-    """
-
-    tree = generate_ast(sample)
-    prettyparseprint(sample)
-    inferer = TypeInferer(tree)
-    print(inferer.environment())
-
-    return 0
-
-
-if __name__ == "__main__":
-    main()
 
