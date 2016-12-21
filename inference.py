@@ -124,6 +124,11 @@ class MultiType(Type):
                 types.add(t.evaluate())
             else:
                 raise RuntimeError("Unexpected type '{}'".format(type(t)))
+
+        if "Any" in types:
+            # Any type dominates the rest
+            return "Any"
+
         return frozenset(types)
 
     def update(self, other: Type):
@@ -263,6 +268,18 @@ class TypeInferer(object):
         else:
             return MultiType(ComplexType())
 
+    def infer_bool_op(self, expr, env):
+        """
+        Infer type of a boolean expression.
+        The return type is whatever the result of any of these expressions are.
+
+        x = var or call() or None
+        """
+        t = MultiType()
+        for node in expr.values:
+            t.update(self.infer_type(node, env).clone())
+        return t
+
     def infer_attr(self, attr, env):
         """
         TODO: Will need to perform a search to find the type of an attribute
@@ -277,9 +294,7 @@ class TypeInferer(object):
         Returns:
             MultiType
         """
-        if expr is None:
-            return MultiType(NoneType())
-        elif isinstance(expr, ast.Num):
+        if isinstance(expr, ast.Num):
             return self.infer_num(expr, env)
         elif isinstance(expr, ast.Str):
             return MultiType(StrType())
@@ -301,7 +316,9 @@ class TypeInferer(object):
             return self.infer_unary_op(expr, env)
         elif isinstance(expr, ast.BinOp):
             return self.infer_binary_op(expr, env)
-        elif isinstance(expr, (ast.BoolOp, ast.Compare)):
+        elif isinstance(expr, ast.BoolOp):
+            return self.infer_bool_op(expr, env)
+        elif isinstance(expr, ast.Compare):
             return MultiType(BoolType())
         elif isinstance(expr, ast.Call):
             return self.infer_call(expr, env)
@@ -385,9 +402,9 @@ class TypeInferer(object):
         """
         if args.defaults:
             # To prevent indexing up to 0
-            positional_args = list(arg.arg for arg in args.args[:-len(args.defaults)])
+            positional_args = [arg.arg for arg in args.args[:-len(args.defaults)]]
         else:
-            positional_args = args.args
+            positional_args = [arg.arg for arg in args.args]
         keyword_args = {}
         vararg = args.vararg.arg if args.vararg else None
         kwarg = args.kwarg.arg if args.kwarg else None
@@ -395,12 +412,13 @@ class TypeInferer(object):
         # Regular keyword arguments
         # Defaults are the default values for the last len(args.defaults)
         # positional arguments
-        for i, arg in enumerate(args.args[-len(args.defaults):]):
+        for i, arg in enumerate(args.args[len(args.args) - len(args.defaults):]):
             keyword_args[arg.arg] = self.infer_type(args.defaults[i], env)
 
         # Keyword only arguments
         for i, arg in enumerate(args.kwonlyargs):
-            keyword_args[arg.arg] = self.infer_type(args.kw_defaults[i], env)
+            if args.kw_defaults[i] is not None:
+                keyword_args[arg.arg] = self.infer_type(args.kw_defaults[i], env)
 
         return positional_args, keyword_args, vararg, kwarg
 

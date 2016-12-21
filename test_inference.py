@@ -47,6 +47,53 @@ def func2():
 x2 = 2
 def func3():
     return x2
+
+def func4():
+    x2 = "some str"
+    return x2
+
+x3 = 5
+def func5():
+    global x3
+    x3 = 1.0
+    return x3
+
+x4 = 1
+def func6():
+    x4 = 1.0
+    def inner():
+        nonlocal x4
+        x4 = "str"
+        return x4
+    return x4
+
+def func7(arg1):
+    pass
+
+def func8(arg1):
+    return arg1
+
+def func9(kwarg1=1):
+    return kwarg1
+
+def func10(kwarg1=None):
+    kwarg1 = kwarg1 or "str"
+    return kwarg1
+
+def func11(arg1, kwarg1=None):
+    return arg1 or kwarg1
+
+def func12(a, b=1, *c, d, e=2, **f):
+    return c
+
+def func13(a, b=1, *c, d, e=2, **f):
+    return f
+
+def func14(a, b=1, *c, d, e=2, **f):
+    return d
+
+def func15(a, b=1, *c, d, e=2, **f):
+    return e
 """)
         self.types = self.inferer.environment()
 
@@ -101,11 +148,65 @@ def func3():
         self.assertSetEqual(self.types["a"].evaluate(),
                             frozenset([(frozenset(["int", "float"]), ), "float"]))
 
-    def test_function(self):
-        """Test function return types and environments."""
+    def test_function_return(self):
+        """Test function return types."""
         self.assertEqual(self.types["func"]["return_type"].evaluate(), "None")
         self.assertEqual(self.types["func2"]["return_type"].evaluate(), "int")
         self.assertEqual(self.types["func3"]["return_type"], self.types["x2"])
+        self.assertEqual(self.types["func4"]["return_type"].evaluate(), "str")
+
+
+    def test_function_body_env(self):
+        """Test the function body environment."""
+        self.assertEqual(self.types["func4"]["body"]["x2"].evaluate(), "str")
+
+    def test_global(self):
+        """Test handling of global variables."""
+        self.assertSetEqual(self.types["func5"]["return_type"].evaluate(),
+                            {"int", "float"})
+        self.assertSetEqual(self.types["func5"]["body"]["x3"].evaluate(),
+                            {"int", "float"})
+        self.assertSetEqual(self.types["x3"].evaluate(),
+                            {"int", "float"})
+
+    def test_nonlocal(self):
+        """Test handling of nonlocal variables."""
+        self.assertSetEqual(self.types["func6"]["return_type"].evaluate(),
+                            {"str", "float"})
+        self.assertEqual(self.types["func6"]["return_type"],
+                         self.types["func6"]["body"]["inner"]["return_type"])
+
+        # The nonlocal variable should remain untouched
+        self.assertEqual(self.types["x4"].evaluate(), "int")
+
+    def test_positional_args(self):
+        """Test positional argument handling."""
+        self.assertEqual(self.types["func7"]["return_type"].evaluate(), "None")
+        self.assertEqual(self.types["func7"]["body"]["arg1"].evaluate(), "Any")
+        self.assertEqual(self.types["func8"]["return_type"].evaluate(), "Any")
+
+    def test_keyword_args(self):
+        """Test keyword arguments."""
+        self.assertEqual(self.types["func9"]["return_type"].evaluate(), "int")
+        self.assertEqual(self.types["func9"]["body"]["kwarg1"].evaluate(), "int")
+        self.assertSetEqual(self.types["func10"]["return_type"].evaluate(),
+                            {"None", "str"})
+        self.assertSetEqual(self.types["func10"]["body"]["kwarg1"].evaluate(),
+                            {"None", "str"})
+        self.assertEqual(self.types["func11"]["return_type"].evaluate(), "Any")
+        self.assertEqual(self.types["func14"]["return_type"].evaluate(),
+                         ("Any", "Any"))
+        self.assertEqual(self.types["func15"]["return_type"].evaluate(), "int")
+
+    def test_vararg(self):
+        """Test variable positional arguments."""
+        self.assertEqual(self.types["func12"]["return_type"].evaluate(),
+                         ("Any", ))
+
+    def test_variable_keyword_args(self):
+        """Test variable keyword arguments."""
+        self.assertEqual(self.types["func13"]["return_type"].evaluate(),
+                         ("Any", "Any"))
 
 
 if __name__ == "__main__":
