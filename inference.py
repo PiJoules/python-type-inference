@@ -8,13 +8,22 @@ import ast
 
 class ArgumentsInfo(class_utils.SlotDefinedClass):
     __slots__ = ("positional", "keyword", "vararg", "keyword_only", "kwarg",
-                 "keyword_defaults", "keyword_only_defaults")
+                 "keyword_defaults", "keyword_only_defaults", "is_method",
+                 "cls_info")
     __types__ = {
         "positional": [str],
         "keyword": {str: types.MultiType},
         "vararg": class_utils.optional(str),
         "keyword_only": {str: class_utils.optional(types.MultiType)},
         "kwarg": class_utils.optional(str),
+        "is_method": bool,
+    }
+
+    __defaults__ = {
+        "vararg": None,
+        "kwarg": None,
+        "is_method": False,
+        "cls_info": None,
     }
 
     def environment(self):
@@ -25,7 +34,13 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
             dict
         """
         func_env = {}
-        for var in self.positional:
+
+        if self.is_method:
+            start = 1
+            func_env[self.positional[0]] = BaseType(self.cls_info.name)
+        else:
+            start = 0
+        for var in self.positional[start:]:
             func_env[var] = types.MultiType()
 
         # Keyword args have type already given
@@ -42,26 +57,40 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
 
 
 class FunctionInfo(class_utils.SlotDefinedClass):
-    __slots__ = ("name", "body_env", "return_type", "arguments")
+    __slots__ = ("name", "body_env", "return_type", "arguments", "returns_class",
+                 "class_info")
     __types__ = {
         "name": str,
         "body_env": dict,
         "return_type": types.MultiType,
         "arguments": ArgumentsInfo,
+        "returns_class": bool,
+    }
+
+    __defaults__ = {
+        "returns_class": False,
+        "class_info": None
     }
 
 
 class ClassInfo(class_utils.SlotDefinedClass):
-    __slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor_args")
+    __slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor",
+                 "object_properties")
     __types__ = {
-        "name": str
+        "name": str,
+        "parents": [types.MultiType],
+        "methods": {str: FunctionInfo},
+        "classes": dict,  # Nested classes; available to class and instance
+        "class_properties": {str: types.MultiType},  # Avaialble to the class and instance
+        "object_properties": {str: types.MultiType},  # Available to the instance only
+        "constructor": FunctionInfo,
     }
 
 
 class TypeInferer(object):
     def __init__(self, node, init_types=None):
         self.__global_env = init_types or {}
-        self.__global_env = self.parse(node)
+        self.__global_env = self.parse_module(node, self.__global_env)
 
     @classmethod
     def from_code(cls, code, **kwargs):
@@ -94,7 +123,7 @@ class TypeInferer(object):
         """
         if name.id in env:
             return env[name.id]
-        return types.MultiType(types.AnyType())
+        raise RuntimeError("Variable '{}' not previously declared in scope.".format(name.id))
 
     def infer_unary_op(self, op, env):
         if isinstance(op.op, ast.Not):
@@ -128,8 +157,16 @@ class TypeInferer(object):
         left_t.update(self.infer_type(op.right, env))
         return left_t
 
+    def determine_expr_name(self, expr):
+        """
+        Find the name of an expression. This essentially only works on names,
+        attributes
+        """
+        pass
+
     def infer_call(self, call, env):
-        return self.infer_name(call.func.name, env)
+        #return self.infer_name(call.func.name, env)
+        raise NotImplementedError
 
     def infer_num(self, num, env):
         if isinstance(num.n, int):
@@ -156,7 +193,7 @@ class TypeInferer(object):
         Will need to initially have performed a search for determining
         attribute type on an object.
         """
-        raise NotImplementedError
+        return self.parse(attr.value, env)[attr.attr]
 
     def infer_type(self, expr, env):
         """
@@ -209,7 +246,7 @@ class TypeInferer(object):
                 env[var].update(t)
             else:
                 env[var] = t
-        elif isinstance(t, FunctionInfo):
+        elif isinstance(t, (ClassInfo, FunctionInfo)):
             if var in env:
                 raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t))
             env[var] = t
@@ -260,7 +297,7 @@ class TypeInferer(object):
                         variables += [name.id for name in target.elts]
         return variables
 
-    def create_arguments_info(self, args, env):
+    def create_arguments_info(self, args, env, is_method=False, cls_info=None):
         """
         Extract the positional, keyword, and vararg and kwarg args from an
         arguments node.
@@ -301,6 +338,8 @@ class TypeInferer(object):
             kwarg=kwarg,
             keyword_defaults=keyword_defaults,
             keyword_only_defaults=keyword_only_defaults,
+            is_method=is_method,
+            cls_info=cls_info
         )
 
     def find_global_vars(self, seq):
@@ -342,7 +381,7 @@ class TypeInferer(object):
             return types.MultiType(types.NoneType())
         return ret_type
 
-    def parse_func_def(self, func_def, env):
+    def parse_func_def(self, func_def, env, is_method=False, cls_info=None):
         """
         Will need to account for globals and nonlocals.
 
@@ -362,12 +401,25 @@ class TypeInferer(object):
            The new types of global variables are the types in the global scope,
            and the types on nonlocal ones are the types passed from the
            previous env.
+
+        TODO: Handle decorators, especially, @classmethod, @property, and @staticmethod
+
+        Args:
+            func_def (ast.FunctionDef)
+            env (dict)
+            is_method (bool): Flag indicating the current function is an object method.
+            cls_info (ClassInfo): The type of the first argument in this method if
+                is_method is True
         """
         name = func_def.name
 
         # Create the new env to pass down
         func_env = {}
         func_env.update(env)
+
+        # Add the class type to the environment
+        if is_method:
+            self._update_env(func_env, cls_info.name, cls_info)
 
         # Find all variable definitions and remove them
         declared_vars = self.find_declared_vars(func_def.body)  # type: list[str]
@@ -385,7 +437,8 @@ class TypeInferer(object):
         # Find and merge with arguments
         # Any *args or **kwargs arguments are dictionaries that can hold
         # any type.
-        args_info = self.create_arguments_info(func_def.args, env)
+        args_info = self.create_arguments_info(func_def.args, env, is_method=is_method,
+                                               cls_info=cls_info)
 
         func_env.update(args_info.environment())
 
@@ -405,15 +458,34 @@ class TypeInferer(object):
     def parse_class_def(self, cls_def, env):
         """
         Same rules as function, but will contain nested functions.
-        """
-        raise NotImplementedError
 
-    def parse(self, node, env=None):
+        TODO: Handle decorators and keyword arguments in parents
+        """
+        name = cls_def.name
+
+        parents = [self.infer_type(base, env) for base in cls_def.bases]
+
+        cls_body = cls_def.body
+        cls_env = {}
+        cls_env.update(env)
+
+        # This class itself is not availble in the body of its definition,
+        # but it is available in the methods.
+        cls_type = BaseType(name)
+        cls_env.update(self.parse_sequence(cls_body, cls_env, is_cls_body=True,
+                                           cls_info=cls_type))
+
+        return env
+
+    def parse(self, node, env=None, is_cls_body=False, cls_info=None):
         """
         Wrapper for parsing all misceanious nodes.
 
         Args:
             node (ast.AST)
+            env (dict)
+            is_cls_body (bool): Flag indicating this statement is inside a class definition
+            cls_info (BaseType): The type of this object if inside a class definition body
 
         Returns:
             dict
@@ -424,19 +496,21 @@ class TypeInferer(object):
         elif isinstance(node, ast.AugAssign):
             return self.parse_aug_assign(node, env)
         elif isinstance(node, ast.FunctionDef):
-            return self.parse_func_def(node, env)
+            return self.parse_func_def(node, env, is_method=is_cls_body,
+                                       cls_info=cls_info)
         elif isinstance(node, ast.ClassDef):
             return self.parse_class_def(node, env)
-        elif isinstance(node, ast.Module):
-            return self.parse_module(node, env)
         return {}
 
-    def parse_sequence(self, seq, env):
+    def parse_sequence(self, seq, env, is_cls_body=False, cls_info=None):
         """
         Parse nodes in a sequence of nodes.
 
         Args:
             seq (list[ast.AST])
+            env (dict)
+            is_cls_body (bool): Flag indicating this statement is inside a class definition
+            cls_info (BaseType): The type of this object if inside a class definition body
 
         Returns:
             dict
@@ -444,7 +518,8 @@ class TypeInferer(object):
         contents = {}
         contents.update(env)
         for node in seq:
-            contents.update(self.parse(node, env))
+            contents.update(self.parse(node, env, is_cls_body=is_cls_body,
+                                       cls_info=cls_info))
         return contents
 
     def parse_module(self, module, env):
