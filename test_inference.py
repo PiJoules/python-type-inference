@@ -94,8 +94,8 @@ def func14(a, b=1, *c, d, e=2, **f):
 def func15(a, b=1, *c, d, e=2, **f):
     return e
 
-#def func16():
-#    return func16()
+def func16():
+    return func16()
 """)
         self.types = self.inferer.environment()
 

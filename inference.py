@@ -81,10 +81,16 @@ class ClassInfo(class_utils.SlotDefinedClass):
         "parents": [types.MultiType],
         "methods": {str: FunctionInfo},
         "classes": dict,  # Nested classes; available to class and instance
-        "class_properties": {str: types.MultiType},  # Avaialble to the class and instance
+        "class_properties": dict,  # Avaialble to the class and instance
         "object_properties": {str: types.MultiType},  # Available to the instance only
         "constructor": FunctionInfo,
     }
+
+    def environment(self):
+        env = {}
+        env.update(self.methods)
+        env.update(self.classes)
+        return env
 
 
 class TypeInferer(object):
@@ -157,16 +163,11 @@ class TypeInferer(object):
         left_t.update(self.infer_type(op.right, env))
         return left_t
 
-    def determine_expr_name(self, expr):
-        """
-        Find the name of an expression. This essentially only works on names,
-        attributes
-        """
-        pass
-
     def infer_call(self, call, env):
-        #return self.infer_name(call.func.name, env)
-        raise NotImplementedError
+        """
+        The func in the return type must be a function.
+        """
+        return self.infer_type(call.func, env).return_type
 
     def infer_num(self, num, env):
         if isinstance(num.n, int):
@@ -193,7 +194,8 @@ class TypeInferer(object):
         Will need to initially have performed a search for determining
         attribute type on an object.
         """
-        return self.parse(attr.value, env)[attr.attr]
+        #return self.parse(attr.value, env)[attr.attr]
+        raise NotImplementedError
 
     def infer_type(self, expr, env):
         """
@@ -420,6 +422,9 @@ class TypeInferer(object):
         # Add the class type to the environment
         if is_method:
             self._update_env(func_env, cls_info.name, cls_info)
+
+        # Initially add self to env
+        func_env.update({name: types.MultiType()})
 
         # Find all variable definitions and remove them
         declared_vars = self.find_declared_vars(func_def.body)  # type: list[str]
