@@ -2,6 +2,7 @@
 
 import class_utils
 import ast
+import ast_utils
 
 
 class Type(object):
@@ -166,6 +167,15 @@ class MultiType(Type):
 
     def clone(self):
         return MultiType([x for x in self.__types])
+
+    def contains(self, t):
+        """Check if this type contains another type."""
+        for other_t in self.__types:
+            if isinstance(other_t, MultiType):
+                return other_t.contains(t)
+            elif other_t == t:
+                return True
+        return False
 
 
 class Container(Type):
@@ -408,13 +418,14 @@ class FunctionType(CallableType):
         for var in global_vars:
             func_env[var] = global_inferer.environment()[var]
         nonlocal_vars = inferer.find_nonlocal_vars(func_def.body)
-        for var in nonlocal_vars:
-            func_env[var] = env[var]
+        #for var in nonlocal_vars:
+        #    func_env[var] = inferer.environment()[var]
 
         # Merge args
         func_env.update(self.arguments().environment())
 
-
+        # The func env passed to this contains the arguments and the function
+        # itself
         func_env = inferer.parse_sequence(func_def.body, func_env)
         return func_env
 

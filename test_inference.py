@@ -58,15 +58,6 @@ def func5():
     x3 = 1.0
     return x3
 
-x4 = 1
-def func6():
-    x4 = 1.0
-    def inner():
-        nonlocal x4
-        x4 = "str"
-        return x4
-    return x4
-
 def func7(arg1):
     pass
 
@@ -170,17 +161,6 @@ def func15(a, b=1, *c, d, e=2, **f):
                             {"int", "float"})
         self.assertSetEqual(self.types["x3"].type(),
                             {"int", "float"})
-
-    def test_nonlocal(self):
-        """Test handling of nonlocal variables."""
-        print(self.types["func6"].callable_return_type().type())
-        self.assertSetEqual(self.types["func6"].callable_return_type().type(),
-                            {"str", "float"})
-        self.assertEqual(self.types["func6"].callable_return_type(),
-                         self.types["func6"].environment()["inner"].callable_return_type())
-
-        # The nonlocal variable should remain untouched
-        self.assertEqual(self.types["x4"].type(), "int")
 
     def test_positional_args(self):
         """Test positional argument handling."""

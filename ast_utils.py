@@ -14,7 +14,10 @@ def prettyparsetext(code, spaces=4):
     Args:
         spaces (int): Number of spaces per indentation.
     """
-    node = ast.parse(code)
+    if isinstance(code, str):
+        node = ast.parse(code)
+    else:
+        node = code
     text = ast.dump(node)
     indent_count = 0
     i = 0

@@ -57,11 +57,11 @@ class TypeInferer(object):
             return types.MultiType(types.IntType())
         else:
             # Otherwise, the return value is either an int or float
-            inferred = self.infer_type(op.operand, env).type()
             t = types.MultiType()
-            if "int" in inferred:
+            inferred = self.infer_type(op.operand, env)
+            if inferred.contains(types.IntType()):
                 t.update(types.IntType())
-            if "float" in inferred:
+            if inferred.contains(types.FloatType()):
                 t.update(types.FloatType())
             return t
 
@@ -175,7 +175,10 @@ class TypeInferer(object):
                 env[var] = t
         elif isinstance(t, (types.ClassType, types.FunctionType)):
             if var in env:
-                raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t.name()))
+                raise RuntimeError("""
+Redefining variable '{}' with a function or class '{}'. Was initially
+{}, and is redefined as {}.
+""".format(var, t.name(), env[var], t.type()))
             env[var] = t
         else:
             raise RuntimeError(
