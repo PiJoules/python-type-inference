@@ -11,10 +11,11 @@ class TypeInferer(object):
     Class that returns environments for given nodes.
     """
 
-    def __init__(self, node, init_types=None):
+    def __init__(self, node, init_types=None, init_call_stack=None):
         self.__outer_node = node
         self.__global_env = init_types
-        self.__call_stack = set()
+        # Inline if expression to keep reference to a previously passed stack
+        self.__call_stack = set() if init_call_stack is None else init_call_stack
 
     @classmethod
     def from_code(cls, code, **kwargs):
@@ -46,7 +47,7 @@ class TypeInferer(object):
         Infer the type of a variable.
         """
         if name.id in env:
-            return env[name.id]
+            return env[name.id].clone()
         raise RuntimeError("Variable '{}' not previously declared in environment.".format(name.id))
 
     def infer_unary_op(self, op, env):
@@ -88,10 +89,11 @@ class TypeInferer(object):
         func = self.infer_type(call.func, env)
         if func.name() in self.__call_stack:
             return types.RecursionType()
-        self.__call_stack.add(func.name())
 
+        self.__call_stack.add(func.name())
         ret_type = func.callable_return_type()
         self.__call_stack.remove(func.name())
+
         return ret_type
 
     def infer_num(self, num, env):
@@ -193,7 +195,7 @@ class TypeInferer(object):
                 env[var].update(t)
             else:
                 env[var] = t
-        elif isinstance(t, (types.ClassType, types.FunctionType)):
+        elif isinstance(t, (types.ClassType, types.FunctionType, types.InstanceType)):
             if var in env:
                 raise RuntimeError("""
 Redefining variable '{}' with a function or class '{}'. Was initially
@@ -215,8 +217,7 @@ Redefining variable '{}' with a function or class '{}'. Was initially
             # TODO: Implement logic for assignment to other types (starred,
             # dicts, lists, etc.)
             if isinstance(target, ast.Tuple):
-                for elem in target:
-                    self.update_env(elem.id, val_type, env)
+                raise RuntimeError("Unpacking of multiple variables not yet implemented.")
             else:
                 self.update_env(target.id, val_type, env)
         return env
@@ -309,20 +310,23 @@ Redefining variable '{}' with a function or class '{}'. Was initially
 
         TODO: Handle decorators and keyword arguments in parents
         """
-        name = cls_def.name
+        #name = cls_def.name
 
-        parents = [self.infer_type(base, env) for base in cls_def.bases]
+        #parents = [self.infer_type(base, env) for base in cls_def.bases]
 
-        cls_body = cls_def.body
-        cls_env = {}
-        cls_env.update(env)
+        #cls_body = cls_def.body
+        #cls_env = {}
+        #cls_env.update(env)
 
-        # This class itself is not availble in the body of its definition,
-        # but it is available in the methods.
-        cls_type = BaseType(name)
-        cls_env.update(self.parse_sequence(cls_body, cls_env, is_cls_body=True,
-                                           cls_info=cls_type))
+        ## This class itself is not availble in the body of its definition,
+        ## but it is available in the methods.
+        #cls_type = BaseType(name)
+        #cls_env.update(self.parse_sequence(cls_body, cls_env, is_cls_body=True,
+        #                                   cls_info=cls_type))
 
+        #return env
+        cls = types.ClassType(cls_def, self)
+        self.update_env(cls_def.name, cls, env)
         return env
 
     def parse_if(self, node, env):
@@ -343,6 +347,9 @@ Redefining variable '{}' with a function or class '{}'. Was initially
         """
         Contains more fields than an if or while node, but has the same
         relevant fields.
+
+        TODO: Update the type of the target to whatever the return value of the
+        iterator yields.
         """
         return self.parse_if(node, env)
 
@@ -443,7 +450,9 @@ handled for now.""".format(item.context_expr))
         Returns:
             dict
         """
-        return self.parse_sequence(module.body, env)
+        env = self.parse_sequence(module.body, env)
+        assert not self.__call_stack
+        return env
 
     def environment(self):
         if self.__global_env is None:
@@ -457,9 +466,9 @@ handled for now.""".format(item.context_expr))
             self.update_env(var, val, force=True)
 
     def clone(self):
-        #env = {}
-        #env.update(self.__global_env)
-        #return TypeInferer(self.__outer_node, env)
-        return TypeInferer(self.__outer_node, self.__global_env)
+        return TypeInferer(self.__outer_node, init_types=self.__global_env,
+                           init_call_stack=self.__call_stack)
 
+    def call_stack(self):
+        return self.__call_stack
 

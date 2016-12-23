@@ -29,12 +29,18 @@ class Type(object):
         Return some delayed evaluation of what this type represents.
 
         The result must be hashable.
+
+        Returns:
+            some hashable representation of this type (str, tuple, etc.)
         """
         raise NotImplementedError
 
     def callable_return_type(self):
         """
         The type this type would return if it was called.
+
+        Returns:
+            MultiType
         """
         raise NotImplementedError
 
@@ -51,7 +57,7 @@ class Type(object):
         return hash(self.type())
 
     def clone(self):
-        raise NotImplementedError
+        raise NotImplementedError("Clone not implemented for cls {}".format(type(self)))
 
 
 class BaseType(Type):
@@ -386,6 +392,12 @@ class FunctionType(CallableType):
         # Clone
         self.__inferer = inferer.clone()
 
+    def clone(self):
+        return FunctionType(
+            self.__func_def, self.__inferer, is_method=self.__is_method,
+            owner=self.__owner, global_inferer=self.__global_inferer
+        )
+
     def name(self):
         return self.__name
 
@@ -396,7 +408,7 @@ class FunctionType(CallableType):
         return self.__inferer
 
     def type(self):
-        return BaseType("function")
+        return "function"
 
     def arguments(self):
         return ArgumentsInfo.from_arguments_node(
@@ -497,17 +509,73 @@ class FunctionType(CallableType):
         return ret_type
 
 
-class ClassType(class_utils.SlotDefinedClass):
-    __slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor",
-                 "object_properties")
-    __types__ = {
-        "name": str,
-        "parents": [MultiType],
-        "methods": {str: FunctionType},
-        "classes": dict,  # Nested classes; available to class and instance
-        "class_properties": dict,  # Avaialble to the class and instance
-        "object_properties": {str: MultiType},  # Available to the instance only
-        "constructor": FunctionType,
-    }
+class ClassType(CallableType):
+    #__slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor",
+    #             "object_properties")
+    #__types__ = {
+    #    "name": str,
+    #    "parents": [MultiType],
+    #    "methods": {str: FunctionType},
+    #    "classes": dict,  # Nested classes; available to class and instance
+    #    "class_properties": dict,  # Avaialble to the class and instance
+    #    "object_properties": {str: MultiType},  # Available to the instance only
+    #    "constructor": FunctionType,
+    #}
+
+    def __init__(self, cls_def, inferer):
+        self.__name = cls_def.name
+        self.__cls_def = cls_def
+        self.__inferer = inferer
+
+    def clone(self):
+        return ClassType(self.__cls_def, self.__inferer)
+
+    def type(self):
+        return "type"
+
+    def callable_return_type(self):
+        return MultiType(InstanceType(self.__cls_def, self.__inferer))
+
+    def name(self):
+        return self.__name
+
+    def attrs(self):
+        """
+        Returns:
+            dict[str, FunctionType]: Mapping of string to functions
+        """
+        raise NotImplementedError
+
+    def environment(self):
+        raise NotImplementedError
+
+
+class InstanceType(CallableType):
+    def __init__(self, cls_def, inferer):
+        self.__name = cls_def.name
+        self.__cls_def = cls_def
+        self.__inferer = inferer
+
+    def clone(self):
+        return InstanceType(self.__cls_def, self.__inferer)
+
+    def type(self):
+        return self.__name
+
+    def callable_return_type(self):
+        raise NotImplementedError
+
+    def name(self):
+        return self.__name
+
+    def attrs(self):
+        """
+        Returns:
+            dict[str, FunctionType]: Mapping of string to functions
+        """
+        raise NotImplementedError
+
+    def environment(self):
+        raise NotImplementedError
 
 

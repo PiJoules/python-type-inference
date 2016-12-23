@@ -331,6 +331,40 @@ with 2.0 as n5:
         self.assertSetEqual(self.types["func25"].callable_return_type().type(),
                             {"int", "float"})
 
+    def test_func_assignment(self):
+        """Test function assignment and calling."""
+        env = TypeInferer.from_code("""
+def func():
+    return 2
+
+x = func
+y = func()
+""").environment()
+        self.assertEqual(env["func"].callable_return_type().type(), "int")
+        self.assertEqual(env["x"].type(), "function")
+        self.assertEqual(env["y"].type(), "int")
+
+    def test_class_def(self):
+        """Test class definitions."""
+        env = TypeInferer.from_code("""
+class A:
+    pass
+x = A()
+
+y = x
+y = 2
+z = A
+a = z()
+""").environment()
+        self.assertEqual(env["x"].type(), "A")
+
+        # Multiple class definition
+        self.assertSetEqual(env["y"].type(), {"A", "int"})
+
+        # Class assignment and calling
+        self.assertEqual(env["z"].type(), "type")
+        self.assertEqual(env["a"].type(), "A")
+
 
 if __name__ == "__main__":
     unittest.main()
