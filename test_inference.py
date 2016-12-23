@@ -86,8 +86,17 @@ def func14(a, b=1, *c, d, e=2, **f):
 def func15(a, b=1, *c, d, e=2, **f):
     return e
 
-#def func16():
-#    return func16()
+def func16():
+    return func9()
+
+def func17():
+    return func16() or "string"
+
+def func18():
+    return func18()
+
+def func19():
+    return func19() or 5
 """)
         self.types = self.inferer.environment()
 
@@ -189,6 +198,17 @@ def func15(a, b=1, *c, d, e=2, **f):
         """Test variable keyword arguments."""
         self.assertEqual(self.types["func13"].callable_return_type().type(),
                          ("Any", "Any"))
+
+    def test_call(self):
+        """Test function calls."""
+        self.assertEqual(self.types["func16"].callable_return_type().type(), "int")
+        self.assertSetEqual(self.types["func17"].callable_return_type().type(),
+                            {"int", "str"})
+
+    def test_recursive_call(self):
+        """Test return types for recursive functions."""
+        #self.assertEqual(self.types["func18"].callable_return_type().type(), "Any")
+        self.assertEqual(self.types["func19"].callable_return_type().type(), "int")
 
 
 if __name__ == "__main__":

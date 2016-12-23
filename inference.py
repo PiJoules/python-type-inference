@@ -14,6 +14,7 @@ class TypeInferer(object):
     def __init__(self, node, init_types=None):
         self.__outer_node = node
         self.__global_env = init_types
+        self.__call_stack = set()
 
     @classmethod
     def from_code(cls, code, **kwargs):
@@ -84,7 +85,14 @@ class TypeInferer(object):
         """
         The func in the return type must be a function.
         """
-        return self.infer_type(call.func, env).callable_return_type()
+        func = self.infer_type(call.func, env)
+        if func.name() in self.__call_stack:
+            return types.RecursionType()
+        self.__call_stack.add(func.name())
+
+        ret_type = func.callable_return_type()
+        self.__call_stack.clear()
+        return ret_type
 
     def infer_num(self, num, env):
         if isinstance(num.n, int):
@@ -103,7 +111,8 @@ class TypeInferer(object):
         """
         t = types.MultiType()
         for node in expr.values:
-            t.update(self.infer_type(node, env).clone())
+            nested_t = self.infer_type(node, env).clone()
+            t.update(nested_t)
         return t
 
     def infer_attr(self, attr, env):
@@ -374,8 +383,9 @@ Redefining variable '{}' with a function or class '{}'. Was initially
             self.update_env(var, val, force=True)
 
     def clone(self):
-        env = {}
-        env.update(self.__global_env)
-        return TypeInferer(self.__outer_node, env)
+        #env = {}
+        #env.update(self.__global_env)
+        #return TypeInferer(self.__outer_node, env)
+        return TypeInferer(self.__outer_node, self.__global_env)
 
 

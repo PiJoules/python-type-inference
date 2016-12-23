@@ -126,13 +126,14 @@ class MultiType(Type):
         else:
             self.__types = [base_type]
 
+    def empty(self):
+        return bool(self.__types)
+
     def type(self):
         """
         Returns:
             frozenset[(str, Container, Mapping)]: Types of variables
         """
-        if not self.__types:
-            return "Any"
 
         types = set()
         for t in self.__types:
@@ -148,7 +149,7 @@ class MultiType(Type):
             else:
                 raise RuntimeError("Unexpected type '{}'".format(type(t)))
 
-        if "Any" in types:
+        if not types or "Any" in types:
             # Any type dominates the rest
             return "Any"
 
@@ -176,6 +177,37 @@ class MultiType(Type):
             elif other_t == t:
                 return True
         return False
+
+
+class RecursionType(MultiType):
+    """
+    A class meant to indicate that the callable return type of a function
+    is dependent on the return type of the function itself.
+
+    Example:
+    def fib(n):
+        if n < 2:
+            return n
+        return fib(n-1) + fib(n-2)
+
+    In this example, the return type could be whatever the type of n is (which
+    is Any for now until backtracking function calls shows more about the type)
+    or whatever the return values for fib(n-1) and fib(n-2) are.
+    Determining the return values of these recursive calls requires knowing
+    the return value of the functions again which could go on forever when
+    really the return value should just be tied to whatever the type of n is.
+
+    This will be aleviated by having this type return an empty set as its type()
+    and having this be the return type for calls to functions that call
+    themselves. This will allow for any MultiTypes that have these added to it
+    treat these as empty sets.
+    """
+
+    def type(self):
+        return frozenset()
+
+    def clone(self):
+        return RecursionType()
 
 
 class Container(Type):
@@ -433,10 +465,12 @@ class FunctionType(CallableType):
 
         ret_type = MultiType()
         found_type = False
+        # TODO: Do deeper search for returns within control flow statements
         for node in self.__func_def.body:
             if isinstance(node, ast.Return):
                 ret_type.update(inferer.infer_type(node.value, func_env))
                 found_type = True
+
         if not found_type:
             # Functions without a return return None by default
             return MultiType(NoneType())
