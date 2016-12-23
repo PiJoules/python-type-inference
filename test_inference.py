@@ -26,6 +26,7 @@ d4 = d3
 
 l = []
 s = {1, 1.0}
+s = {2.0, 2}  # multiple assignment of same type for collection
 t = ("str", )
 l2 = [s, t]
 s2 = {1}
@@ -94,32 +95,31 @@ def func14(a, b=1, *c, d, e=2, **f):
 def func15(a, b=1, *c, d, e=2, **f):
     return e
 
-def func16():
-    return func16()
+#def func16():
+#    return func16()
 """)
         self.types = self.inferer.environment()
 
     def test_assignment(self):
         """Test variable assignment."""
-        self.assertSetEqual(self.types["x"].evaluate(), {"int", "str"})
+        self.assertSetEqual(self.types["x"].type(), {"int", "str"})
         self.assertEqual(self.types["z"], self.types["x"])
 
     def test_augmented_assignment(self):
         """Test augmented assignment."""
-        print(self.types["y"].evaluate())
-        self.assertSetEqual(self.types["y"].evaluate(),
+        self.assertSetEqual(self.types["y"].type(),
                             {"int", "str", "float"})
 
     def test_dict_literal(self):
         """Test literal dictionary contents."""
-        self.assertEqual(self.types["d"].evaluate(),
+        self.assertEqual(self.types["d"].type(),
                          ("Any", "Any"))
-        self.assertEqual(self.types["d2"].evaluate(),
+        self.assertEqual(self.types["d2"].type(),
                          ("int", "str"))
-        self.assertEqual(self.types["d3"].evaluate(),
+        self.assertEqual(self.types["d3"].type(),
                          (frozenset({"int", "str"}),
                           frozenset({"int", "float", "str"})))
-        self.assertSetEqual(self.types["d4"].evaluate(),
+        self.assertSetEqual(self.types["d4"].type(),
                          frozenset([
                              (
                                  frozenset({"int", "str"}),
@@ -130,83 +130,84 @@ def func16():
 
     def test_container(self):
         """Test literal container (list, set, tuple) contents."""
-        self.assertEqual(self.types["l"].evaluate(), ("Any", ))
-        self.assertEqual(self.types["s"].evaluate(), (frozenset(["int", "float"]), ))
-        self.assertEqual(self.types["t"].evaluate(), ("str", ))
-        self.assertEqual(self.types["l2"].evaluate(),
+        self.assertEqual(self.types["l"].type(), ("Any", ))
+        self.assertEqual(self.types["s"].type(), (frozenset(["int", "float"]), ))
+        self.assertEqual(self.types["t"].type(), ("str", ))
+        self.assertEqual(self.types["l2"].type(),
                          (frozenset([("str", ), (frozenset(["int", "float"]), )]), ))
-        self.assertEqual(self.types["s2"].evaluate(),
+        self.assertEqual(self.types["s2"].type(),
                          frozenset([("int", ), ("float", )]))
 
     def test_unary_op(self):
         """Test unary operations."""
-        self.assertEqual(self.types["b"].evaluate(), "bool")
-        self.assertEqual(self.types["c"].evaluate(), "int")
-        self.assertEqual(self.types["e"].evaluate(), "int")
-        self.assertSetEqual(self.types["f"].evaluate(), {"int", "float"})
+        self.assertEqual(self.types["b"].type(), "bool")
+        self.assertEqual(self.types["c"].type(), "int")
+        self.assertEqual(self.types["e"].type(), "int")
+        self.assertSetEqual(self.types["f"].type(), {"int", "float"})
 
     def test_bin_op(self):
         """Test binary operation."""
-        self.assertSetEqual(self.types["a"].evaluate(),
+        self.assertSetEqual(self.types["a"].type(),
                             frozenset([(frozenset(["int", "float"]), ), "float"]))
 
     def test_function_return(self):
         """Test function return types."""
-        self.assertEqual(self.types["func"].return_type.evaluate(), "None")
-        self.assertEqual(self.types["func2"].return_type.evaluate(), "int")
-        self.assertEqual(self.types["func3"].return_type, self.types["x2"])
-        self.assertEqual(self.types["func4"].return_type.evaluate(), "str")
+        self.assertEqual(self.types["func"].callable_return_type().type(), "None")
+        self.assertEqual(self.types["func2"].callable_return_type().type(), "int")
+        self.assertEqual(self.types["func3"].callable_return_type(), self.types["x2"])
+        self.assertEqual(self.types["func4"].callable_return_type().type(), "str")
 
 
     def test_function_body_env(self):
         """Test the function body environment."""
-        self.assertEqual(self.types["func4"].body_env["x2"].evaluate(), "str")
+        self.assertEqual(self.types["func4"].environment()["x2"].type(), "str")
 
     def test_global(self):
         """Test handling of global variables."""
-        self.assertSetEqual(self.types["func5"].return_type.evaluate(),
+        self.assertSetEqual(self.types["func5"].callable_return_type().type(),
                             {"int", "float"})
-        self.assertSetEqual(self.types["func5"].body_env["x3"].evaluate(),
+        self.assertSetEqual(self.types["func5"].environment()["x3"].type(),
                             {"int", "float"})
-        self.assertSetEqual(self.types["x3"].evaluate(),
+        self.assertSetEqual(self.types["x3"].type(),
                             {"int", "float"})
 
     def test_nonlocal(self):
         """Test handling of nonlocal variables."""
-        self.assertSetEqual(self.types["func6"].return_type.evaluate(),
+        print(self.types["func6"].callable_return_type().type())
+        self.assertSetEqual(self.types["func6"].callable_return_type().type(),
                             {"str", "float"})
-        self.assertEqual(self.types["func6"].return_type,
-                         self.types["func6"].body_env["inner"].return_type)
+        self.assertEqual(self.types["func6"].callable_return_type(),
+                         self.types["func6"].environment()["inner"].callable_return_type())
 
         # The nonlocal variable should remain untouched
-        self.assertEqual(self.types["x4"].evaluate(), "int")
+        self.assertEqual(self.types["x4"].type(), "int")
 
     def test_positional_args(self):
         """Test positional argument handling."""
-        self.assertEqual(self.types["func7"].return_type.evaluate(), "None")
-        self.assertEqual(self.types["func7"].body_env["arg1"].evaluate(), "Any")
-        self.assertEqual(self.types["func8"].return_type.evaluate(), "Any")
+        self.assertEqual(self.types["func7"].callable_return_type().type(), "None")
+        self.assertEqual(self.types["func7"].environment()["arg1"].type(), "Any")
+        self.assertEqual(self.types["func8"].callable_return_type().type(), "Any")
 
     def test_keyword_args(self):
         """Test keyword arguments."""
-        self.assertEqual(self.types["func9"].return_type.evaluate(), "int")
-        self.assertEqual(self.types["func9"].body_env["kwarg1"].evaluate(), "int")
-        self.assertSetEqual(self.types["func10"].return_type.evaluate(),
+        self.assertEqual(self.types["func9"].callable_return_type().type(), "int")
+        self.assertEqual(self.types["func9"].environment()["kwarg1"].type(), "int")
+        self.assertSetEqual(self.types["func10"].callable_return_type().type(),
                             {"None", "str"})
-        self.assertSetEqual(self.types["func10"].body_env["kwarg1"].evaluate(),
+        self.assertSetEqual(self.types["func10"].environment()["kwarg1"].type(),
                             {"None", "str"})
-        self.assertEqual(self.types["func11"].return_type.evaluate(), "Any")
-        self.assertEqual(self.types["func14"].return_type.evaluate(), "Any")
-        self.assertEqual(self.types["func15"].return_type.evaluate(), "int")
+        self.assertEqual(self.types["func11"].callable_return_type().type(), "Any")
+        self.assertEqual(self.types["func14"].callable_return_type().type(), "Any")
+        self.assertEqual(self.types["func15"].callable_return_type().type(), "int")
 
     def test_vararg(self):
         """Test variable positional arguments."""
-        self.assertEqual(self.types["func12"].return_type.evaluate(),
+        self.assertEqual(self.types["func12"].callable_return_type().type(),
                          ("Any", ))
 
     def test_variable_keyword_args(self):
         """Test variable keyword arguments."""
-        self.assertEqual(self.types["func13"].return_type.evaluate(),
+        self.assertEqual(self.types["func13"].callable_return_type().type(),
                          ("Any", "Any"))
 
 

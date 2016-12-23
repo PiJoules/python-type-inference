@@ -6,97 +6,14 @@ import builtin_types as types
 import ast
 
 
-class ArgumentsInfo(class_utils.SlotDefinedClass):
-    __slots__ = ("positional", "keyword", "vararg", "keyword_only", "kwarg",
-                 "keyword_defaults", "keyword_only_defaults", "is_method",
-                 "cls_info")
-    __types__ = {
-        "positional": [str],
-        "keyword": {str: types.MultiType},
-        "vararg": class_utils.optional(str),
-        "keyword_only": {str: class_utils.optional(types.MultiType)},
-        "kwarg": class_utils.optional(str),
-        "is_method": bool,
-    }
-
-    __defaults__ = {
-        "vararg": None,
-        "kwarg": None,
-        "is_method": False,
-        "cls_info": None,
-    }
-
-    def environment(self):
-        """
-        Treat the arguments as an environment and return it.
-
-        Returns:
-            dict
-        """
-        func_env = {}
-
-        if self.is_method:
-            start = 1
-            func_env[self.positional[0]] = BaseType(self.cls_info.name)
-        else:
-            start = 0
-        for var in self.positional[start:]:
-            func_env[var] = types.MultiType()
-
-        # Keyword args have type already given
-        func_env.update(self.keyword)
-        func_env.update(self.keyword_only)
-
-        # Vararg and kwarg are nothing for now
-        if self.vararg:
-            func_env[self.vararg] = types.Container()
-        if self.kwarg:
-            func_env[self.kwarg] = types.Mapping()
-
-        return func_env
-
-
-class FunctionInfo(class_utils.SlotDefinedClass):
-    __slots__ = ("name", "body_env", "return_type", "arguments", "returns_class",
-                 "class_info")
-    __types__ = {
-        "name": str,
-        "body_env": dict,
-        "return_type": types.MultiType,
-        "arguments": ArgumentsInfo,
-        "returns_class": bool,
-    }
-
-    __defaults__ = {
-        "returns_class": False,
-        "class_info": None
-    }
-
-
-class ClassInfo(class_utils.SlotDefinedClass):
-    __slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor",
-                 "object_properties")
-    __types__ = {
-        "name": str,
-        "parents": [types.MultiType],
-        "methods": {str: FunctionInfo},
-        "classes": dict,  # Nested classes; available to class and instance
-        "class_properties": dict,  # Avaialble to the class and instance
-        "object_properties": {str: types.MultiType},  # Available to the instance only
-        "constructor": FunctionInfo,
-    }
-
-    def environment(self):
-        env = {}
-        env.update(self.methods)
-        env.update(self.classes)
-        return env
-
-
 class TypeInferer(object):
+    """
+    Class that returns environments for given nodes.
+    """
+
     def __init__(self, node, init_types=None):
-        self.__global_env = init_types or {}
-        self.__global_env = self.parse_module(node, self.__global_env)
+        self.__outer_node = node
+        self.__global_env = init_types
 
     @classmethod
     def from_code(cls, code, **kwargs):
@@ -129,7 +46,7 @@ class TypeInferer(object):
         """
         if name.id in env:
             return env[name.id]
-        raise RuntimeError("Variable '{}' not previously declared in scope.".format(name.id))
+        raise RuntimeError("Variable '{}' not previously declared in environment.".format(name.id))
 
     def infer_unary_op(self, op, env):
         if isinstance(op.op, ast.Not):
@@ -140,7 +57,7 @@ class TypeInferer(object):
             return types.MultiType(types.IntType())
         else:
             # Otherwise, the return value is either an int or float
-            inferred = self.infer_type(op.operand, env).evaluate()
+            inferred = self.infer_type(op.operand, env).type()
             t = types.MultiType()
             if "int" in inferred:
                 t.update(types.IntType())
@@ -167,7 +84,7 @@ class TypeInferer(object):
         """
         The func in the return type must be a function.
         """
-        return self.infer_type(call.func, env).return_type
+        return self.infer_type(call.func, env).callable_return_type()
 
     def infer_num(self, num, env):
         if isinstance(num.n, int):
@@ -194,16 +111,17 @@ class TypeInferer(object):
         Will need to initially have performed a search for determining
         attribute type on an object.
         """
-        #return self.parse(attr.value, env)[attr.attr]
-        raise NotImplementedError
+        return self.parse(attr.value, env).attrs()[attr.attr]
 
-    def infer_type(self, expr, env):
+    def infer_type(self, expr, env=None):
         """
         Infer the types of a variable
 
         Returns:
             MultiType
         """
+        if env is None:
+            env = self.__global_env
         if isinstance(expr, ast.Num):
             return self.infer_num(expr, env)
         elif isinstance(expr, ast.Str):
@@ -237,20 +155,27 @@ class TypeInferer(object):
 
         raise RuntimeError("Unable to determine type for expression '{}'".format(expr))
 
-    def _update_env(self, env, var, t):
+    def update_env(self, var, t, env=None, force=False):
         """
         Update the type of a variable in an environment.
 
         Functions and classes contain nested environments.
         """
+        if env is None:
+            env = self.__global_env
+
+        if force:
+            env[var] = t
+            return
+
         if isinstance(t, types.MultiType):
             if var in env:
                 env[var].update(t)
             else:
                 env[var] = t
-        elif isinstance(t, (ClassInfo, FunctionInfo)):
+        elif isinstance(t, (types.ClassType, types.FunctionType)):
             if var in env:
-                raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t))
+                raise RuntimeError("Redefining variable '{}' with a function or class '{}'".format(var, t.name()))
             env[var] = t
         else:
             raise RuntimeError(
@@ -268,9 +193,9 @@ class TypeInferer(object):
             # dicts, lists, etc.)
             if isinstance(target, ast.Tuple):
                 for elem in target:
-                    self._update_env(env, elem.id, val_type)
+                    self.update_env(elem.id, val_type, env)
             else:
-                self._update_env(env, target.id, val_type)
+                self.update_env(target.id, val_type, env)
         return env
 
     def parse_aug_assign(self, aug_asgn, env):
@@ -278,8 +203,8 @@ class TypeInferer(object):
         The types will be the combination of the existing types and the type
         of what is being added.
         """
-        self._update_env(env, aug_asgn.target.id,
-                          self.infer_type(aug_asgn.value, env))
+        self.update_env(aug_asgn.target.id,
+                        self.infer_type(aug_asgn.value, env), env)
         return env
 
     def find_declared_vars(self, body):
@@ -298,51 +223,6 @@ class TypeInferer(object):
                         # Handle unpacking of tuple
                         variables += [name.id for name in target.elts]
         return variables
-
-    def create_arguments_info(self, args, env, is_method=False, cls_info=None):
-        """
-        Extract the positional, keyword, and vararg and kwarg args from an
-        arguments node.
-        """
-        if args.defaults:
-            # To prevent indexing up to 0
-            positional_args = [arg.arg for arg in args.args[:-len(args.defaults)]]
-        else:
-            positional_args = [arg.arg for arg in args.args]
-        keyword_args = {}
-        keyword_defaults = {}  # maps str to ast node
-        keyword_only_args = {}
-        keyword_only_defaults = {}
-        vararg = args.vararg.arg if args.vararg else None
-        kwarg = args.kwarg.arg if args.kwarg else None
-
-        # Regular keyword arguments
-        # Defaults are the default values for the last len(args.defaults)
-        # positional arguments
-        for i, arg in enumerate(args.args[len(args.args) - len(args.defaults):]):
-            keyword_args[arg.arg] = self.infer_type(args.defaults[i], env)
-            keyword_defaults[arg.arg] = args.defaults[i]
-
-        # Keyword only arguments
-        for i, arg in enumerate(args.kwonlyargs):
-            if args.kw_defaults[i] is not None:
-                keyword_only_args[arg.arg] = self.infer_type(args.kw_defaults[i], env)
-            else:
-                # This required keyword argument has no default type
-                keyword_only_args[arg.arg] = types.MultiType(types.AnyType())
-            keyword_only_defaults[arg.arg] = args.kw_defaults[i]
-
-        return ArgumentsInfo(
-            positional=positional_args,
-            keyword=keyword_args,
-            vararg=vararg,
-            keyword_only=keyword_only_args,
-            kwarg=kwarg,
-            keyword_defaults=keyword_defaults,
-            keyword_only_defaults=keyword_only_defaults,
-            is_method=is_method,
-            cls_info=cls_info
-        )
 
     def find_global_vars(self, seq):
         """
@@ -410,55 +290,60 @@ class TypeInferer(object):
             func_def (ast.FunctionDef)
             env (dict)
             is_method (bool): Flag indicating the current function is an object method.
-            cls_info (ClassInfo): The type of the first argument in this method if
+            cls_info (types.ClassType): The type of the first argument in this method if
                 is_method is True
         """
-        name = func_def.name
-
-        # Create the new env to pass down
-        func_env = {}
-        func_env.update(env)
-
-        # Add the class type to the environment
-        if is_method:
-            self._update_env(func_env, cls_info.name, cls_info)
-
-        # Initially add self to env
-        func_env.update({name: types.MultiType()})
-
-        # Find all variable definitions and remove them
-        declared_vars = self.find_declared_vars(func_def.body)  # type: list[str]
-        for var in declared_vars:
-            func_env.pop(var, None)
-
-        # Keep ones that are global/nonlocal
-        global_vars = self.find_global_vars(func_def.body)  # type: list[str]
-        for var in global_vars:
-            func_env[var] = self.__global_env[var]
-        nonlocal_vars = self.find_nonlocal_vars(func_def.body)
-        for var in nonlocal_vars:
-            func_env[var] = env[var]
-
-        # Find and merge with arguments
-        # Any *args or **kwargs arguments are dictionaries that can hold
-        # any type.
-        args_info = self.create_arguments_info(func_def.args, env, is_method=is_method,
-                                               cls_info=cls_info)
-
-        func_env.update(args_info.environment())
-
-        func_env = self.parse_sequence(func_def.body, func_env)
-
-        func_info = FunctionInfo(
-            name=name,
-            body_env=func_env,
-            return_type=self.infer_func_return_type(func_def.body, func_env),
-            arguments=args_info,
-        )
-
-        self._update_env(env, name, func_info)
-
+        func = types.FunctionType(
+                func_def, self, is_method=is_method, owner=cls_info,
+                global_inferer=self)
+        self.update_env(func_def.name, func, env)
         return env
+        #name = func_def.name
+
+        ## Create the new env to pass down
+        #func_env = {}
+        #func_env.update(env)
+
+        ## Add the class type to the environment
+        #if is_method:
+        #    self.update_env(cls_info.name, cls_info, func_env)
+
+        ## Initially add self to env
+        #func_env.update({name: types.MultiType()})
+
+        ## Find all variable definitions and remove them
+        #declared_vars = self.find_declared_vars(func_def.body)  # type: list[str]
+        #for var in declared_vars:
+        #    func_env.pop(var, None)
+
+        ## Keep ones that are global/nonlocal
+        #global_vars = self.find_global_vars(func_def.body)  # type: list[str]
+        #for var in global_vars:
+        #    func_env[var] = self.__global_env[var]
+        #nonlocal_vars = self.find_nonlocal_vars(func_def.body)
+        #for var in nonlocal_vars:
+        #    func_env[var] = env[var]
+
+        ## Find and merge with arguments
+        ## Any *args or **kwargs arguments are dictionaries that can hold
+        ## any type.
+        #args_info = types.ArgumentsInfo.from_arguments_node(
+        #    func_def.args, self, is_method=is_method, cls_info=cls_info)
+
+        #func_env.update(args_info.environment())
+
+        #func_env = self.parse_sequence(func_def.body, func_env)
+
+        #func_info = types.FunctionType(
+        #    name=name,
+        #    body_env=func_env,
+        #    return_type=self.infer_func_return_type(func_def.body, func_env),
+        #    arguments=args_info,
+        #)
+
+        #self.update_env(name, func_info, env)
+
+        #return env
 
     def parse_class_def(self, cls_def, env):
         """
@@ -540,6 +425,19 @@ class TypeInferer(object):
         return self.parse_sequence(module.body, env)
 
     def environment(self):
+        if self.__global_env is None:
+            self.__global_env = {}
+            self.__global_env = self.parse_module(
+                self.__outer_node, self.__global_env)
         return self.__global_env
+
+    def merge_env(self, env):
+        for var, val in env.items():
+            self.update_env(var, val, force=True)
+
+    def clone(self):
+        env = {}
+        env.update(self.__global_env)
+        return TypeInferer(self.__outer_node, env)
 
 
