@@ -97,6 +97,80 @@ def func18():
 
 def func19():
     return func19() or 5
+
+def func20():
+    return func19() and func20()
+
+def fib(n):
+    return n if n < 2 else fib(n-1) + fib(n-2)
+
+def func21(n):
+    if n < 10:
+        return 2
+    else:
+        return "a"
+
+if x:
+    n = 4
+else:
+    n = 1.0
+
+def func22(n):
+    while n < 10:
+        return 2
+    else:
+        return "a"
+
+while x:
+    n2 = 4
+else:
+    n2 = 1.0
+
+def func23(n):
+    for i in range(4):
+        return 2
+    else:
+        return "a"
+
+for i in range(4):
+    n3 = 4
+else:
+    n3 = 1.0
+
+def func24():
+    try:
+        return 1
+    except OSError as e:
+        return 1.0
+    except ValueError:
+        return "1"
+    except:
+        return 2j
+    else:
+        return None
+    finally:
+        return -1.0
+
+try:
+    n4 = 1
+except OSError as e:
+    n4 = 1.0
+except ValueError:
+    n4 = "1"
+except:
+    n4 = 2j
+else:
+    n4 = None
+finally:
+    n4 = -1.0
+
+def func25():
+    with 2 as x:
+        return x
+    return 1.0
+
+with 2.0 as n5:
+    n5 = 1
 """)
         self.types = self.inferer.environment()
 
@@ -207,8 +281,55 @@ def func19():
 
     def test_recursive_call(self):
         """Test return types for recursive functions."""
-        #self.assertEqual(self.types["func18"].callable_return_type().type(), "Any")
+        self.assertEqual(self.types["func18"].callable_return_type().type(), "Any")
         self.assertEqual(self.types["func19"].callable_return_type().type(), "int")
+        self.assertEqual(self.types["func20"].callable_return_type().type(), "int")
+        self.assertEqual(self.types["fib"].callable_return_type().type(), "Any")
+
+    def test_if_statement(self):
+        """Test if statement."""
+        self.assertSetEqual(self.types["n"].type(), {"int", "float"})
+
+    def test_func_if_statement(self):
+        """Test if statements in a function."""
+        self.assertSetEqual(self.types["func21"].callable_return_type().type(),
+                            {"int", "str"})
+
+    def test_while_statement(self):
+        """Test while statement."""
+        self.assertSetEqual(self.types["n2"].type(), {"int", "float"})
+
+    def test_func_while_statement(self):
+        """Test while statements in a function."""
+        self.assertSetEqual(self.types["func22"].callable_return_type().type(),
+                            {"int", "str"})
+
+    def test_for_statement(self):
+        """Test for statement."""
+        self.assertSetEqual(self.types["n3"].type(), {"int", "float"})
+
+    def test_func_for_statement(self):
+        """Test for statements in a function."""
+        self.assertSetEqual(self.types["func23"].callable_return_type().type(),
+                            {"int", "str"})
+
+    def test_try_statement(self):
+        """Test try statement."""
+        self.assertSetEqual(self.types["n4"].type(), {"int", "float", "complex", "str", "None"})
+
+    def test_func_try_statement(self):
+        """Test try statements in a function."""
+        self.assertSetEqual(self.types["func24"].callable_return_type().type(),
+                            {"int", "float", "complex", "str", "None"})
+
+    def test_with_statement(self):
+        """Test with statement."""
+        self.assertSetEqual(self.types["n5"].type(), {"int", "float"})
+
+    def test_func_with_statement(self):
+        """Test with statements in a function."""
+        self.assertSetEqual(self.types["func25"].callable_return_type().type(),
+                            {"int", "float"})
 
 
 if __name__ == "__main__":

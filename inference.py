@@ -91,7 +91,7 @@ class TypeInferer(object):
         self.__call_stack.add(func.name())
 
         ret_type = func.callable_return_type()
-        self.__call_stack.clear()
+        self.__call_stack.remove(func.name())
         return ret_type
 
     def infer_num(self, num, env):
@@ -121,6 +121,15 @@ class TypeInferer(object):
         attribute type on an object.
         """
         return self.parse(attr.value, env).attrs()[attr.attr]
+
+    def infer_ifexp(self, expr, env):
+        """
+        Inline if statement
+        """
+        t = types.MultiType()
+        t.update(self.infer_type(expr.body, env))
+        t.update(self.infer_type(expr.orelse, env))
+        return t
 
     def infer_type(self, expr, env=None):
         """
@@ -160,7 +169,9 @@ class TypeInferer(object):
         elif isinstance(expr, ast.Call):
             return self.infer_call(expr, env)
         elif isinstance(expr, ast.Attribute):
-            return self.infer_attr(expr)
+            return self.infer_attr(expr, env)
+        elif isinstance(expr, ast.IfExp):
+            return self.infer_ifexp(expr, env)
 
         raise RuntimeError("Unable to determine type for expression '{}'".format(expr))
 
@@ -314,6 +325,59 @@ Redefining variable '{}' with a function or class '{}'. Was initially
 
         return env
 
+    def parse_if(self, node, env):
+        """
+        Since variables defined inside an if statment persist outside of it,
+        the envs can be merged.
+        """
+        contents = {}
+        contents.update(self.parse_sequence(node.body, env))
+        contents.update(self.parse_sequence(node.orelse, env))
+        return contents
+
+    def parse_while(self, node, env):
+        """A while node contains the same elements as an if node."""
+        return self.parse_if(node, env)
+
+    def parse_for(self, node, env):
+        """
+        Contains more fields than an if or while node, but has the same
+        relevant fields.
+        """
+        return self.parse_if(node, env)
+
+    def parse_try(self, node, env):
+        contents = {}
+        contents.update(self.parse_sequence(node.body, env))
+        contents.update(self.parse_sequence(node.orelse, env))
+        contents.update(self.parse_sequence(node.finalbody, env))
+        for handler in node.handlers:
+            contents.update(self.parse_sequence(handler.body, env))
+        return contents
+
+    def parse_with(self, node, env):
+        """
+        Need to overwrite the item in the with statement.
+        """
+        contents = {}
+
+        for item in node.items:
+            if item.optional_vars:
+                if isinstance(item.optional_vars, ast.Name):
+                    self.update_env(
+                        item.optional_vars.id,
+                        self.infer_type(item.context_expr, env),
+                        env,
+                        force=True
+                    )
+                else:
+                    raise RuntimeError("""
+Unable to handle with statement with {} as target. Only Name targets are
+handled for now.""".format(item.context_expr))
+        contents.update(self.parse_sequence(node.body, env))
+
+        return contents
+
     def parse(self, node, env=None, is_cls_body=False, cls_info=None):
         """
         Wrapper for parsing all misceanious nodes.
@@ -337,6 +401,16 @@ Redefining variable '{}' with a function or class '{}'. Was initially
                                        cls_info=cls_info)
         elif isinstance(node, ast.ClassDef):
             return self.parse_class_def(node, env)
+        elif isinstance(node, ast.If):
+            return self.parse_if(node, env)
+        elif isinstance(node, ast.While):
+            return self.parse_while(node, env)
+        elif isinstance(node, ast.For):
+            return self.parse_for(node, env)
+        elif isinstance(node, ast.Try):
+            return self.parse_try(node, env)
+        elif isinstance(node, ast.With):
+            return self.parse_with(node, env)
         return {}
 
     def parse_sequence(self, seq, env, is_cls_body=False, cls_info=None):

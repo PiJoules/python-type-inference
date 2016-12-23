@@ -229,6 +229,9 @@ class Container(Type):
     def clone(self):
         return Container(self.__content)
 
+    def content(self):
+        return self.__content
+
 
 class Mapping(Type):
     def __init__(self, init_key_type:MultiType=None, init_val_type:MultiType=None):
@@ -252,6 +255,12 @@ class Mapping(Type):
 
     def clone(self):
         return Mapping(self.__key, self.__val)
+
+    def key(self):
+        return self.__key
+
+    def value(self):
+        return self.__val
 
 
 class ArgumentsInfo(class_utils.SlotDefinedClass):
@@ -465,11 +474,21 @@ class FunctionType(CallableType):
 
         ret_type = MultiType()
         found_type = False
-        # TODO: Do deeper search for returns within control flow statements
-        for node in self.__func_def.body:
+
+        stack = list(self.__func_def.body)
+        while stack:
+            node = stack.pop()
             if isinstance(node, ast.Return):
                 ret_type.update(inferer.infer_type(node.value, func_env))
                 found_type = True
+            elif isinstance(node, (ast.If, ast.While, ast.For)):
+                stack += node.body + node.orelse
+            elif isinstance(node, ast.Try):
+                stack += node.body + node.orelse + node.finalbody
+                for handler in node.handlers:
+                    stack += handler.body
+            elif isinstance(node, ast.With):
+                stack += node.body
 
         if not found_type:
             # Functions without a return return None by default
