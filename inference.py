@@ -247,25 +247,6 @@ Redefining variable '{}' with a function or class '{}'. Was initially
         return {name for node in seq if isinstance(node, ast.Nonlocal)
                 for name in node.names}
 
-    def infer_func_return_type(self, body, func_env):
-        """
-        Determine the function return type from the function body and
-        environment.
-
-        Returns:
-            MultiType
-        """
-        ret_type = types.MultiType()
-        found_type = False
-        for node in body:
-            if isinstance(node, ast.Return):
-                ret_type.update(self.infer_type(node.value, func_env))
-                found_type = True
-        if not found_type:
-            # Functions without a return return None by default
-            return types.MultiType(types.NoneType())
-        return ret_type
-
     def parse_func_def(self, func_def, env, is_method=False, cls_info=None):
         """
         Will need to account for globals and nonlocals.
@@ -301,52 +282,6 @@ Redefining variable '{}' with a function or class '{}'. Was initially
                 global_inferer=self)
         self.update_env(func_def.name, func, env)
         return env
-        #name = func_def.name
-
-        ## Create the new env to pass down
-        #func_env = {}
-        #func_env.update(env)
-
-        ## Add the class type to the environment
-        #if is_method:
-        #    self.update_env(cls_info.name, cls_info, func_env)
-
-        ## Initially add self to env
-        #func_env.update({name: types.MultiType()})
-
-        ## Find all variable definitions and remove them
-        #declared_vars = self.find_declared_vars(func_def.body)  # type: list[str]
-        #for var in declared_vars:
-        #    func_env.pop(var, None)
-
-        ## Keep ones that are global/nonlocal
-        #global_vars = self.find_global_vars(func_def.body)  # type: list[str]
-        #for var in global_vars:
-        #    func_env[var] = self.__global_env[var]
-        #nonlocal_vars = self.find_nonlocal_vars(func_def.body)
-        #for var in nonlocal_vars:
-        #    func_env[var] = env[var]
-
-        ## Find and merge with arguments
-        ## Any *args or **kwargs arguments are dictionaries that can hold
-        ## any type.
-        #args_info = types.ArgumentsInfo.from_arguments_node(
-        #    func_def.args, self, is_method=is_method, cls_info=cls_info)
-
-        #func_env.update(args_info.environment())
-
-        #func_env = self.parse_sequence(func_def.body, func_env)
-
-        #func_info = types.FunctionType(
-        #    name=name,
-        #    body_env=func_env,
-        #    return_type=self.infer_func_return_type(func_def.body, func_env),
-        #    arguments=args_info,
-        #)
-
-        #self.update_env(name, func_info, env)
-
-        #return env
 
     def parse_class_def(self, cls_def, env):
         """

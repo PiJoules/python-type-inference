@@ -413,13 +413,11 @@ class FunctionType(CallableType):
         for var in declared_vars:
             func_env.pop(var, None)
 
-        # Keep ones that are global/nonlocal
+        # Keep ones that are global
+        # TODO: Add logic for handling nonlocal vars
         global_vars = inferer.find_global_vars(func_def.body)  # type: list[str]
         for var in global_vars:
             func_env[var] = global_inferer.environment()[var]
-        nonlocal_vars = inferer.find_nonlocal_vars(func_def.body)
-        #for var in nonlocal_vars:
-        #    func_env[var] = inferer.environment()[var]
 
         # Merge args
         func_env.update(self.arguments().environment())
