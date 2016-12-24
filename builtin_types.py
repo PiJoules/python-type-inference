@@ -219,9 +219,10 @@ class MultiType(Type):
 
         return frozenset(types)
 
-    def update(self, other: Type):
+    def update(self, other):
         """Update the types in this container."""
-        self.__types.append(other)
+        if not isinstance(other, RecursionType):
+            self.__types.append(other)
 
     def replace(self, other):
         """Replace all types in this container with another list of types."""
@@ -454,6 +455,8 @@ class FunctionType(CallableType):
 
         # Clone
         self.__inferer = inferer.clone()
+        self.__envionment = None
+        self.__return_type = None
 
     def clone(self):
         return FunctionType(
@@ -509,68 +512,77 @@ class FunctionType(CallableType):
             cls_info (types.ClassType): The type of the first argument in this method if
                 is_method is True
         """
-        inferer = self.__inferer
-        func_def = self.__func_def
-        is_method = self.__is_method
-        owner = self.__owner
-        global_inferer = self.__global_inferer
+        if self.__envionment is None:
+            inferer = self.__inferer
+            func_def = self.__func_def
+            is_method = self.__is_method
+            owner = self.__owner
+            global_inferer = self.__global_inferer
 
-        # Create new env to pass down
-        func_env = {}
-        func_env.update(inferer.environment())
+            # Create new env to pass down
+            func_env = {}
+            func_env.update(inferer.environment())
 
-        # Add class type to environment if provided
-        if is_method:
-            inferer.update_env(owner.name, owner, func_env)
+            # Add class type to environment if provided
+            if is_method:
+                inferer.update_env(owner.name, owner, func_env)
 
-        # Self was already added to inferer in the parse_func_def func
+            # Self was already added to inferer in the parse_func_def func
 
-        # Find all variable definitions and remove them
-        declared_vars = inferer.find_declared_vars(func_def.body)  # type: list[str]
-        for var in declared_vars:
-            func_env.pop(var, None)
+            # Find all variable definitions and remove them
+            declared_vars = inferer.find_declared_vars(func_def.body)  # type: list[str]
+            for var in declared_vars:
+                func_env.pop(var, None)
 
-        # Keep ones that are global
-        # TODO: Add logic for handling nonlocal vars
-        global_vars = inferer.find_global_vars(func_def.body)  # type: list[str]
-        for var in global_vars:
-            func_env[var] = global_inferer.environment()[var]
+            # Keep ones that are global
+            # TODO: Add logic for handling nonlocal vars
+            global_vars = inferer.find_global_vars(func_def.body)  # type: list[str]
+            for var in global_vars:
+                func_env[var] = global_inferer.environment()[var]
 
-        # Merge args
-        func_env.update(self.arguments().environment())
+            # Merge args
+            func_env.update(self.arguments().environment())
 
-        # The func env passed to this contains the arguments and the function
-        # itself
-        func_env = inferer.parse_sequence(func_def.body, func_env)
-        return func_env
+            # The func env passed to this contains the arguments and the function
+            # itself
+            func_env = inferer.parse_sequence(func_def.body, func_env)
+            #return func_env
+            self.__envionment = func_env
+        return self.__envionment
 
     def callable_return_type(self):
-        func_env = self.environment()
-        inferer = self.__inferer
+        if self.__return_type is None:
+            func_env = self.environment()
+            inferer = self.__inferer
 
-        ret_type = MultiType()
-        found_type = False
+            ret_type = MultiType()
+            found_type = False
 
-        stack = list(self.__func_def.body)
-        while stack:
-            node = stack.pop()
-            if isinstance(node, ast.Return):
-                ret_type.update(inferer.infer_type(node.value, func_env))
-                found_type = True
-            elif isinstance(node, (ast.If, ast.While, ast.For)):
-                stack += node.body + node.orelse
-            elif isinstance(node, ast.Try):
-                stack += node.body + node.orelse + node.finalbody
-                for handler in node.handlers:
-                    stack += handler.body
-            elif isinstance(node, ast.With):
-                stack += node.body
+            stack = list(self.__func_def.body)
+            while stack:
+                node = stack.pop()
+                if isinstance(node, ast.Return):
+                    print("node val:", node.value)
+                    t = inferer.infer_type(node.value, func_env)
+                    print("found type:", type(t), t)
+                    ret_type.update(t)
+                    found_type = True
+                elif isinstance(node, (ast.If, ast.While, ast.For)):
+                    stack += node.body + node.orelse
+                elif isinstance(node, ast.Try):
+                    stack += node.body + node.orelse + node.finalbody
+                    for handler in node.handlers:
+                        stack += handler.body
+                elif isinstance(node, ast.With):
+                    stack += node.body
 
-        if not found_type:
-            # Functions without a return return None by default
-            return MultiType(NoneType())
-
-        return ret_type
+            if not found_type:
+                # Functions without a return return None by default
+                ret_type = MultiType(NoneType())
+            #return ret_type
+            self.__return_type = ret_type
+        print("callable_return_type:", self.name(), self.__return_type)
+        return self.__return_type
 
 
 class ClassType(CallableType):
@@ -590,6 +602,9 @@ class ClassType(CallableType):
     def type(self):
         return "type"
 
+    def instance_name(self):
+        return self.__name + "_instance"
+
     def callable_return_type(self):
         """
         All instances will point to the same type so that changes in
@@ -597,7 +612,7 @@ class ClassType(CallableType):
         """
         env = self.__inferer.environment()
 
-        name = self.__name + "_instance"
+        name = self.instance_name()
 
         if name not in env:
             instance = MultiType(
@@ -696,9 +711,22 @@ class InstanceType(CallableType):
         Returns:
             dict[str, Type]: Mapping of string to functions
         """
-        raise NotImplementedError
+        inferer = self.__inferer
+        cls_def = self.__cls_def
+        global_inferer = self.__global_inferer
+
+        # Create new env to pass down
+        cls_env = {}
+        cls_env.update(inferer.environment())
+
+        # Class was already added to inferer in the parse_class_def func
+
+        # The func env passed to this contains the arguments and the function
+        # itself
+        cls_env = inferer.parse_sequence(cls_def.body, cls_env)
+        return cls_env
 
     def environment(self):
-        raise NotImplementedError
+        return self.attrs()
 
 

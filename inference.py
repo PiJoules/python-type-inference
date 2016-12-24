@@ -89,10 +89,13 @@ class TypeInferer(object):
         """
         func = self.infer_type(call.func, env)
         if func.name() in self.__call_stack:
+            print("stop", self.__call_stack)
             return types.RecursionType()
 
         self.__call_stack.add(func.name())
+        print("finding ret_type for func:", func.name(), self.__call_stack)
         ret_type = func.callable_return_type()
+        print("ret_type infer_call:", ret_type)
         self.__call_stack.remove(func.name())
 
         return ret_type
@@ -484,7 +487,12 @@ handled for now.""".format(item.context_expr))
                 self.__outer_node, self.__global_env)
 
             # Evaluate any more attributes for classes that were not declared
+            print("start evaluate object vars")
             self._evaluate_object_attrs(self.__global_env)
+            print("end evaluate object vars")
+            if "func2" in self.__global_env:
+                print("func2:", self.__global_env["func2"],
+                      self.__global_env["func2"].callable_return_type())
 
         return self.__global_env
 

@@ -339,6 +339,59 @@ x = 1.0
         self.assertSetEqual(self.types["func25"].callable_return_type().type(),
                             {"int", "float"})
 
+    def test_mutual_recursion(self):
+        """Test mutual recursion among multiple functions."""
+        env = TypeInferer.from_code("""
+def func():
+    return func2()
+
+def func2():
+    return func()
+""").environment()
+
+        self.assertEqual(env["func"].callable_return_type().type(), "Any")
+        self.assertEqual(env["func2"].callable_return_type().type(), "Any")
+
+    def test_nested_mutual_recursion(self):
+        """Test mutual recursion for nested functions."""
+        env = TypeInferer.from_code("""
+def func():
+    def nested():
+        return func()
+    return nested()
+""").environment()
+
+        self.assertEqual(env["func"].callable_return_type().type(), "Any")
+        self.assertEqual(env["func"].environment()["nested"].callable_return_type().type(), "Any")
+
+    def test_mutual_recursion_with_other_type(self):
+        """Allow for one possible return type to be another specified type in an expression."""
+        env = TypeInferer.from_code("""
+def func():
+    return func2() or 2
+
+def func2():
+    return func()
+
+#x = func2()
+""").environment()
+
+        #self.assertEqual(env["func"].callable_return_type().type(), "int")
+        raise NotImplementedError
+        #print(0)
+        #self.assertEqual(env["x"].type(), "int")
+        print("---")
+        #self.assertEqual(env["func2"].callable_return_type().type(), "int")
+
+    def test_local_vars(self):
+        """Local variables should not persist outside a function."""
+        env = TypeInferer.from_code("""
+def func():
+    x = 2
+""").environment()
+
+        self.assertNotIn("x", env)
+
     def test_func_assignment(self):
         """Test function assignment and calling."""
         env = TypeInferer.from_code("""
@@ -475,6 +528,18 @@ x = A()
 """).environment()
 
         self.assertSetEqual(env["x"].get_attr("a").type(), {"str", "float"})
+
+    def test_class_method(self):
+        """Test class method call."""
+        env = TypeInferer.from_code("""
+class A:
+    def func(arg=2):
+        return arg
+
+x = A.func()
+""").environment()
+
+        self.assertEqual(env["x"].type(), "int")
 
 
 
