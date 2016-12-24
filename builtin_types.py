@@ -23,6 +23,10 @@ class Type(object):
     # func has a type of function (that takes no args) and a callable return
     # type of function (that also takes no args)
     """
+    def __init__(self, init_attrs=None):
+        # Mapping of str to MultiType
+        # Use inline if expr to keep reference to a previously passed init_attrs
+        self.__attrs = {} if init_attrs is None else init_attrs
 
     def type(self):
         """
@@ -39,10 +43,40 @@ class Type(object):
         """
         The type this type would return if it was called.
 
+        This is called when an ast.Call node is found.
+
         Returns:
             MultiType
         """
         raise NotImplementedError
+
+    def attrs(self):
+        """
+        This is the type that would be returned when an attribute in it is
+        accessed.
+
+        Used when received an ast.Attribute node.
+
+        Returns:
+            dict[str, MultiType]
+        """
+        return self.__attrs
+
+    def get_attr(self, attr):
+        return self.__attrs[attr]
+
+    def add_attr(self, attr, val):
+        """
+        Args:
+            attr (str)
+            val (MultiType)
+        """
+        attrs = self.__attrs
+        if attr in attrs:
+            attrs[attr].update(val)
+        else:
+            assert isinstance(val, MultiType)
+            attrs[attr] = val
 
     def __str__(self):
         return str(self.type())
@@ -61,7 +95,8 @@ class Type(object):
 
 
 class BaseType(Type):
-    def __init__(self, base_type: str) -> None:
+    def __init__(self, base_type, init_attrs=None):
+        super().__init__(init_attrs=init_attrs)
         self.__base_type = base_type
 
     def type(self):
@@ -72,7 +107,7 @@ class BaseType(Type):
         return self.__base_type
 
     def clone(self):
-        return BaseType(self.__base_type)
+        return BaseType(self.__base_type, init_attrs=self.attrs())
 
 
 class AnyType(BaseType):
@@ -120,11 +155,12 @@ class MultiType(Type):
     Class for performing delayed evaluation of types.
     This is a container of strings that is lazily evaluated.
     """
-    def __init__(self, base_type=None):
+    def __init__(self, base_type=None, init_attrs=None):
         """
         Args:
             base_type (Type): Another type that this type is equivalent to.
         """
+        super().__init__(init_attrs=init_attrs)
         if base_type is None:
             self.__types = []  # type: list[Type]
         elif isinstance(base_type, list):
@@ -134,6 +170,15 @@ class MultiType(Type):
 
     def empty(self):
         return bool(self.__types)
+
+    #def attrs(self):
+    #    raise NotImplementedError
+
+    #def add_attr(self, attr, val):
+    #    raise NotImplementedError
+
+    #def get_attr(self, attr):
+    #    raise NotImplementedError
 
     def type(self):
         """
@@ -173,7 +218,7 @@ class MultiType(Type):
         self.__types = other
 
     def clone(self):
-        return MultiType([x for x in self.__types])
+        return MultiType(list(self.__types), init_attrs=self.attrs())
 
     def contains(self, t):
         """Check if this type contains another type."""
@@ -217,7 +262,8 @@ class RecursionType(MultiType):
 
 
 class Container(Type):
-    def __init__(self, init_type:MultiType=None) -> None:
+    def __init__(self, init_type=None, init_attrs=None):
+        super().__init__(init_attrs=init_attrs)
         self.__content = init_type or MultiType()
 
     def type(self):
@@ -233,14 +279,16 @@ class Container(Type):
         self.__content.update(t)
 
     def clone(self):
-        return Container(self.__content)
+        return Container(self.__content, init_attrs=self.attrs())
 
     def content(self):
         return self.__content
 
 
 class Mapping(Type):
-    def __init__(self, init_key_type:MultiType=None, init_val_type:MultiType=None):
+    def __init__(self, init_key_type=None, init_val_type=None,
+                 init_attrs=None):
+        super().__init__(init_attrs=init_attrs)
         self.__key = init_key_type or MultiType()
         self.__val = init_val_type or MultiType()
 
@@ -260,7 +308,7 @@ class Mapping(Type):
         self.__val.update(val_type)
 
     def clone(self):
-        return Mapping(self.__key, self.__val)
+        return Mapping(self.__key, self.__val, init_attrs=self.attrs())
 
     def key(self):
         return self.__key
@@ -366,6 +414,9 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
 
 
 class CallableType(Type):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
     def name(self):
         raise NotImplementedError
 
@@ -375,7 +426,7 @@ class CallableType(Type):
 
 class FunctionType(CallableType):
     def __init__(self, func_def, inferer, is_method=False, owner=None,
-                 global_inferer=None):
+                 global_inferer=None, init_attrs=None):
         """
         This function will contain its own inferer that will be extended
         to contain variables declared in this function body.
@@ -383,8 +434,10 @@ class FunctionType(CallableType):
         1. Parse arguments.
         2. Clone outer inferer env.
         """
+        super().__init__(init_attrs=init_attrs)
         self.__func_def = func_def
         self.__name = func_def.name
+        self.__inferer = inferer
         self.__global_inferer = global_inferer or inferer
         self.__is_method = is_method
         self.__owner = owner
@@ -395,7 +448,8 @@ class FunctionType(CallableType):
     def clone(self):
         return FunctionType(
             self.__func_def, self.__inferer, is_method=self.__is_method,
-            owner=self.__owner, global_inferer=self.__global_inferer
+            owner=self.__owner, global_inferer=self.__global_inferer,
+            init_attrs=self.attrs()
         )
 
     def name(self):
@@ -510,54 +564,94 @@ class FunctionType(CallableType):
 
 
 class ClassType(CallableType):
-    #__slots__ = ("name", "parents", "methods", "classes", "class_properties", "constructor",
-    #             "object_properties")
-    #__types__ = {
-    #    "name": str,
-    #    "parents": [MultiType],
-    #    "methods": {str: FunctionType},
-    #    "classes": dict,  # Nested classes; available to class and instance
-    #    "class_properties": dict,  # Avaialble to the class and instance
-    #    "object_properties": {str: MultiType},  # Available to the instance only
-    #    "constructor": FunctionType,
-    #}
-
-    def __init__(self, cls_def, inferer):
+    def __init__(self, cls_def, inferer, global_inferer=None,
+                 init_attrs=None):
+        super().__init__(init_attrs=init_attrs)
         self.__name = cls_def.name
         self.__cls_def = cls_def
         self.__inferer = inferer
+        self.__global_inferer = global_inferer or inferer
 
     def clone(self):
-        return ClassType(self.__cls_def, self.__inferer)
+        return ClassType(self.__cls_def, self.__inferer,
+                         global_inferer=self.__global_inferer,
+                         init_attrs=self.attrs())
 
     def type(self):
         return "type"
 
     def callable_return_type(self):
-        return MultiType(InstanceType(self.__cls_def, self.__inferer))
+        """
+        All instances will point to the same type so that changes in
+        attributes that affect one instance will affect all instances.
+        """
+        env = self.__inferer.environment()
+
+        name = self.__name + "_instance"
+
+        if name not in env:
+            instance = MultiType(
+                InstanceType(
+                    self.__cls_def, self.__inferer,
+                    global_inferer=self.__global_inferer,
+                    init_attrs=self.attrs(),
+                )
+            )
+            env[name] = instance
+        return env[name]
 
     def name(self):
         return self.__name
 
     def attrs(self):
         """
+        It is simpler to just think of a class as a namespace or a module.
+        All attributes can be treated and access normally as if the class
+        itself was another module by calling my_class.attr. All varibales
+        in the higher level env are brought and copied into this class' env.
+
         Returns:
-            dict[str, FunctionType]: Mapping of string to functions
+            dict[str, Type]: Mapping of string to functions
         """
-        raise NotImplementedError
+        return self.environment()
 
     def environment(self):
-        raise NotImplementedError
+        """
+        Rules for the environment available are analagous to a function that
+        does not have any arguments, and only the class itself is added to the
+        nested env.
+
+        Will also need to parse parents for values.
+        """
+        inferer = self.__inferer
+        cls_def = self.__cls_def
+        global_inferer = self.__global_inferer
+
+        # Create new env to pass down
+        cls_env = {}
+        cls_env.update(inferer.environment())
+
+        # Class was already added to inferer in the parse_class_def func
+
+        # The func env passed to this contains the arguments and the function
+        # itself
+        cls_env = inferer.parse_sequence(cls_def.body, cls_env)
+        return cls_env
 
 
 class InstanceType(CallableType):
-    def __init__(self, cls_def, inferer):
+    def __init__(self, cls_def, inferer, global_inferer=None,
+                 init_attrs=None):
+        super().__init__(init_attrs=init_attrs)
         self.__name = cls_def.name
         self.__cls_def = cls_def
         self.__inferer = inferer
+        self.__global_inferer = global_inferer or inferer
 
     def clone(self):
-        return InstanceType(self.__cls_def, self.__inferer)
+        return InstanceType(self.__cls_def, self.__inferer,
+                            global_inferer=self.__global_inferer,
+                            init_attrs=self.attrs())
 
     def type(self):
         return self.__name
@@ -570,8 +664,27 @@ class InstanceType(CallableType):
 
     def attrs(self):
         """
+        The attributes include all class attributes and ones set by self.___ = ...
+        Class attributes can be accessed with self., but can be overrided by
+        setting that attribute to another value somewhere. This requires
+        asjusting the parse_assign method to allowing setting of attributes.
+
+        Rules for handling functions and types in an instance as similar
+        to those handled in a class, but the default attributes in a class
+        are copied and propagated down to an instance. Changing an overwritten
+        instance type does not change a class type.
+
+        Methods in a class are also available to an instance, but during calls,
+        the first argument is automatically set to this instance type and any
+        calls to a method of an instance require all but th first argument in
+        the definition to be provided.
+
+        Example:
+        Calling obj.method(arg1) expands to obj.method(obj, arg1) where the
+        first argument in the obj.method represents the self.
+
         Returns:
-            dict[str, FunctionType]: Mapping of string to functions
+            dict[str, Type]: Mapping of string to functions
         """
         raise NotImplementedError
 

@@ -179,6 +179,14 @@ with 2.0 as n5:
         self.assertSetEqual(self.types["x"].type(), {"int", "str"})
         self.assertEqual(self.types["z"], self.types["x"])
 
+        env = TypeInferer.from_code("""
+x = 2
+y = x
+x = 1.0
+""").environment()
+        self.assertEqual(env["y"].type(), "int")
+        self.assertSetEqual(env["x"].type(), {"int", "float"})
+
     def test_augmented_assignment(self):
         """Test augmented assignment."""
         self.assertSetEqual(self.types["y"].type(),
@@ -344,6 +352,20 @@ y = func()
         self.assertEqual(env["x"].type(), "function")
         self.assertEqual(env["y"].type(), "int")
 
+    def test_local_func_vars(self):
+        """Test variables with same name declared in func do not affect vars outside of func."""
+        env = TypeInferer.from_code("""
+x = "str"
+
+def func():
+    x = 2
+
+x = 1.0
+""").environment()
+        self.assertEqual(env["func"].callable_return_type().type(), "None")
+        self.assertEqual(env["func"].environment()["x"].type(), "int")
+        self.assertSetEqual(env["x"].type(), {"str", "float"})
+
     def test_class_def(self):
         """Test class definitions."""
         env = TypeInferer.from_code("""
@@ -364,6 +386,93 @@ a = z()
         # Class assignment and calling
         self.assertEqual(env["z"].type(), "type")
         self.assertEqual(env["a"].type(), "A")
+
+    def test_attribute_assignment(self):
+        """Test assignments to attributes."""
+        env = TypeInferer.from_code("""
+x = 2
+x.attr = 1
+""").environment()
+        self.assertEqual(env["x"].type(), "int")
+        self.assertEqual(env["x"].get_attr("attr").type(), "int")
+
+        # Assignment to another variable
+        env = TypeInferer.from_code("""
+class A:
+    pass
+
+x = A()
+x.a = 1
+
+y = x
+""").environment()
+        self.assertEqual(env["x"].type(), "A")
+        self.assertEqual(env["x"].get_attr("a").type(), "int")
+        self.assertEqual(env["y"].type(), "A")
+        self.assertEqual(env["y"].get_attr("a").type(), "int")
+
+        # Creating a new object
+        env = TypeInferer.from_code("""
+class A:
+    pass
+
+x = A()
+x.a = 1
+
+y = A()
+y.b = "a"
+""").environment()
+        self.assertEqual(env["x"].type(), "A")
+        self.assertEqual(env["x"].get_attr("a").type(), "int")
+        self.assertEqual(env["y"].type(), "A")
+        self.assertEqual(env["y"].get_attr("a").type(), "int")
+        self.assertEqual(env["y"].get_attr("b").type(), "str")
+        self.assertEqual(env["x"].get_attr("b").type(), "str")
+
+        # Adding new type for attribute
+        env = TypeInferer.from_code("""
+class A:
+    pass
+
+x = A()
+x.a = 1
+
+y = A()
+y.a = "a"
+""").environment()
+        self.assertEqual(env["x"].get_attr("a").type(), {"int", "str"})
+        self.assertEqual(env["y"].get_attr("a").type(), {"int", "str"})
+
+    def test_nested_attributes(self):
+        """Test nested attrbute assignment."""
+        env = TypeInferer.from_code("""
+class A:
+    pass
+
+x = A()
+x.a = A()
+x.a.b = 2
+""").environment()
+
+        self.assertEqual(env["x"].type(), "A")
+        self.assertEqual(env["x"].get_attr("a").type(), "A")
+        self.assertEqual(env["x"].get_attr("a").get_attr("b").type(), "int")
+
+    def test_attribute_in_func(self):
+        """Test attribute assignment in functions."""
+        env = TypeInferer.from_code("""
+class A:
+    pass
+
+def func():
+    x = A()
+    x.a = "str"
+
+x = A()
+""").environment()
+
+        self.assertEqual(env["x"].get_attr("a").type(), "str")
+
 
 
 if __name__ == "__main__":

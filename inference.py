@@ -47,6 +47,7 @@ class TypeInferer(object):
         Infer the type of a variable.
         """
         if name.id in env:
+            item = env[name.id]
             return env[name.id].clone()
         raise RuntimeError("Variable '{}' not previously declared in environment.".format(name.id))
 
@@ -122,7 +123,7 @@ class TypeInferer(object):
         Will need to initially have performed a search for determining
         attribute type on an object.
         """
-        return self.parse(attr.value, env).attrs()[attr.attr]
+        return self.infer_type(attr.value, env).attrs()[attr.attr]
 
     def infer_ifexp(self, expr, env):
         """
@@ -208,6 +209,10 @@ Redefining variable '{}' with a function or class '{}'. Was initially
                 MultiType. Unknown type '{}' was added.""".format(type(t)))
 
     def parse_assign(self, asgn, env):
+        """
+        As far as I can tell, the target can be a tuple/list, name, or attribute.
+
+        """
         targets = asgn.targets
         value = asgn.value
         val_type = self.infer_type(value, env)
@@ -216,10 +221,15 @@ Redefining variable '{}' with a function or class '{}'. Was initially
             # Handle ast.Names as targets for now.
             # TODO: Implement logic for assignment to other types (starred,
             # dicts, lists, etc.)
-            if isinstance(target, ast.Tuple):
-                raise RuntimeError("Unpacking of multiple variables not yet implemented.")
-            else:
+            if isinstance(target, (ast.List, ast.Tuple)):
+                raise NotImplementedError("Unpacking of multiple variables not yet implemented.")
+            elif isinstance(target, ast.Name):
                 self.update_env(target.id, val_type, env)
+            elif isinstance(target, ast.Attribute):
+                target_type = self.infer_type(target.value, env)
+                target_type.add_attr(target.attr, val_type)
+            else:
+                raise RuntimeError("Unable to set value for node {}".format(target))
         return env
 
     def parse_aug_assign(self, aug_asgn, env):
@@ -310,22 +320,7 @@ Redefining variable '{}' with a function or class '{}'. Was initially
 
         TODO: Handle decorators and keyword arguments in parents
         """
-        #name = cls_def.name
-
-        #parents = [self.infer_type(base, env) for base in cls_def.bases]
-
-        #cls_body = cls_def.body
-        #cls_env = {}
-        #cls_env.update(env)
-
-        ## This class itself is not availble in the body of its definition,
-        ## but it is available in the methods.
-        #cls_type = BaseType(name)
-        #cls_env.update(self.parse_sequence(cls_body, cls_env, is_cls_body=True,
-        #                                   cls_info=cls_type))
-
-        #return env
-        cls = types.ClassType(cls_def, self)
+        cls = types.ClassType(cls_def, self, global_inferer=self)
         self.update_env(cls_def.name, cls, env)
         return env
 
