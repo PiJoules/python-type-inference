@@ -65,6 +65,16 @@ class Type(object):
     def get_attr(self, attr):
         return self.__attrs[attr]
 
+    def merge_attrs(self, other):
+        """
+        Update types of attributes.
+
+        Args:
+            other (dict[str, MultiType])
+        """
+        for attr, val in other.items():
+            self.add_attr(attr, val)
+
     def add_attr(self, attr, val):
         """
         Args:

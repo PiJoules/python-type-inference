@@ -415,6 +415,30 @@ handled for now.""".format(item.context_expr))
             return self.parse_with(node, env)
         return {}
 
+    def _evaluate_object_attrs(self, env):
+        """
+        Determine types for any more attributes that were set in class or
+        function definition bodies.
+
+        Find all the types in nested envs and merge any attributes in those
+        classes into the types in the global classes.
+        """
+        stack = [t for t in env.values() if isinstance(t, (types.FunctionType, types.ClassType))]
+        visited = set()
+        while stack:
+            t = stack.pop()
+            if t.name() not in visited:
+                visited.add(t.name())
+
+                # Evaluate the environment
+                nested_env = t.environment()
+
+                # Add any more nested envs
+                for nested_type in nested_env.values():
+                    if isinstance(nested_type, (types.FunctionType, types.ClassType)):
+                        if nested_type.name() not in visited:
+                            stack.append(nested_type)
+
     def parse_sequence(self, seq, env, is_cls_body=False, cls_info=None):
         """
         Parse nodes in a sequence of nodes.
@@ -433,6 +457,7 @@ handled for now.""".format(item.context_expr))
         for node in seq:
             contents.update(self.parse(node, env, is_cls_body=is_cls_body,
                                        cls_info=cls_info))
+
         return contents
 
     def parse_module(self, module, env):
@@ -446,7 +471,10 @@ handled for now.""".format(item.context_expr))
             dict
         """
         env = self.parse_sequence(module.body, env)
+
+        # Call stack should be empty
         assert not self.__call_stack
+
         return env
 
     def environment(self):
@@ -454,6 +482,10 @@ handled for now.""".format(item.context_expr))
             self.__global_env = {}
             self.__global_env = self.parse_module(
                 self.__outer_node, self.__global_env)
+
+            # Evaluate any more attributes for classes that were not declared
+            self._evaluate_object_attrs(self.__global_env)
+
         return self.__global_env
 
     def merge_env(self, env):

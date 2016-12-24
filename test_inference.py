@@ -465,13 +465,16 @@ class A:
     pass
 
 def func():
+    def func2():
+        x = A()
+        x.a = 1.0
     x = A()
     x.a = "str"
 
 x = A()
 """).environment()
 
-        self.assertEqual(env["x"].get_attr("a").type(), "str")
+        self.assertSetEqual(env["x"].get_attr("a").type(), {"str", "float"})
 
 
 
