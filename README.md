@@ -2,7 +2,7 @@
 
 ## TODO
 - Determine argument types from what is passed
-- Classes/attribute lookup
+- Method/attribute calls and method argument handling
 - Unpacking for nested tuples/lists
   - Requires implementing of a struct type that contains ordered types
 - Add logic for updating types in higher scopes that were declared as global or nonlocal in lower scopes
