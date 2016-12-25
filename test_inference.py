@@ -364,8 +364,8 @@ def func():
         self.assertEqual(env["func"].callable_return_type().type(), "Any")
         self.assertEqual(env["func"].environment()["nested"].callable_return_type().type(), "Any")
 
-    def test_mutual_recursion_with_other_type(self):
-        """Allow for one possible return type to be another specified type in an expression."""
+    def test_mutual_recursion_bool_operation(self):
+        """Allow for one possible return type to be given in a boolean expression."""
         env = TypeInferer.from_code("""
 def func():
     return func2() or 2
@@ -373,15 +373,28 @@ def func():
 def func2():
     return func()
 
-#x = func2()
+x = func2()
 """).environment()
 
-        #self.assertEqual(env["func"].callable_return_type().type(), "int")
-        raise NotImplementedError
-        #print(0)
-        #self.assertEqual(env["x"].type(), "int")
-        print("---")
-        #self.assertEqual(env["func2"].callable_return_type().type(), "int")
+        self.assertEqual(env["func"].callable_return_type().type(), "int")
+        self.assertEqual(env["x"].type(), "int")
+        self.assertEqual(env["func2"].callable_return_type().type(), "int")
+
+    def test_mutual_recursion_binary_operation(self):
+        """Allow for one possible return type to be given in a binary expression."""
+        env = TypeInferer.from_code("""
+def func2():
+    return func()
+
+def func():
+    return func2() + 2
+
+x = func2()
+""").environment()
+
+        self.assertEqual(env["func"].callable_return_type().type(), "int")
+        self.assertEqual(env["x"].type(), "int")
+        self.assertEqual(env["func2"].callable_return_type().type(), "int")
 
     def test_local_vars(self):
         """Local variables should not persist outside a function."""
@@ -540,6 +553,22 @@ x = A.func()
 """).environment()
 
         self.assertEqual(env["x"].type(), "int")
+
+    def test_instance_method(self):
+        """Test types of class instances."""
+        env = TypeInferer.from_code("""
+class A:
+    def func(self, arg=2):
+        return arg
+    def func2(self):
+        return self
+
+x = A()
+""").environment()
+
+        self.assertEqual(env["x"].type(), "A")
+        self.assertEqual(env["x"].environment()["func"].callable_return_type().type(), "int")
+        self.assertEqual(env["x"].environment()["func2"].callable_return_type().type(), "A")
 
 
 

@@ -11,7 +11,8 @@ class TypeInferer(object):
     Class that returns environments for given nodes.
     """
 
-    def __init__(self, node, init_types=None, init_call_stack=None):
+    def __init__(self, node, init_types=None, init_call_stack=None,
+                 is_method=False, owner=None):
         self.__outer_node = node
         self.__global_env = init_types
         # Inline if expression to keep reference to a previously passed stack
@@ -21,37 +22,37 @@ class TypeInferer(object):
     def from_code(cls, code, **kwargs):
         return cls(ast_utils.generate_ast(code), **kwargs)
 
-    def infer_list_type(self, lst, env):
+    def infer_list_type(self, lst, env, default=None):
         """
         Infer the contents of a list.
         """
         contents = types.MultiType()
         for expr in lst.elts:
-            contents.update(self.infer_type(expr, env))
+            contents.update(self.infer_type(expr, env, default=default))
         return types.MultiType(types.Container(contents))
 
-    def infer_dict_type(self, d, env):
+    def infer_dict_type(self, d, env, default=None):
         """
         Infer the contents of a dictionary.
         """
         key_types = types.MultiType()
         for node in d.keys:
-            key_types.update(self.infer_type(node, env))
+            key_types.update(self.infer_type(node, env, default=default))
         val_types = types.MultiType()
         for node in d.values:
-            val_types.update(self.infer_type(node, env))
+            val_types.update(self.infer_type(node, env, default=default))
         return types.MultiType(types.Mapping(key_types, val_types))
 
-    def infer_name(self, name, env):
+    def infer_name(self, name, env, default=None):
         """
         Infer the type of a variable.
         """
         if name.id in env:
             item = env[name.id]
-            return env[name.id].clone()
+            return item.clone()
         raise RuntimeError("Variable '{}' not previously declared in environment.".format(name.id))
 
-    def infer_unary_op(self, op, env):
+    def infer_unary_op(self, op, env, default=None):
         if isinstance(op.op, ast.Not):
             # If using Not, expression is always a boolean result
             return types.MultiType(types.BoolType())
@@ -61,14 +62,14 @@ class TypeInferer(object):
         else:
             # Otherwise, the return value is either an int or float
             t = types.MultiType()
-            inferred = self.infer_type(op.operand, env)
+            inferred = self.infer_type(op.operand, env, default=default)
             if inferred.contains(types.IntType()):
                 t.update(types.IntType())
             if inferred.contains(types.FloatType()):
                 t.update(types.FloatType())
             return t
 
-    def infer_binary_op(self, op, env):
+    def infer_binary_op(self, op, env, default=None):
         """
         This is tricky since these operations normally call magic methods
         which can be overriden in custom classes.
@@ -79,28 +80,36 @@ class TypeInferer(object):
         Returns:
             MultiType
         """
-        left_t = self.infer_type(op.left, env).clone()
-        left_t.update(self.infer_type(op.right, env))
-        return left_t
+        t = types.MultiType()
+        nodes = [op.left, op.right]
+        for node in nodes:
+            if not isinstance(node, ast.Call):
+                nested_t = self.infer_type(node, env, default=default)
+                t.update(nested_t)
+        for node in nodes:
+            if isinstance(node, ast.Call):
+                nested_t = self.infer_type(node, env, default=t.clone())
+                t.update(nested_t)
+        return t
 
-    def infer_call(self, call, env):
+    def infer_call(self, call, env, default=None):
         """
         The func in the return type must be a function.
+
+        If the call returns an expression that is a combination of other types.
+        Evaluate those types first before returning the RecursionType.
         """
-        func = self.infer_type(call.func, env)
+        func = self.infer_type(call.func, env, default=default)
         if func.name() in self.__call_stack:
-            print("stop", self.__call_stack)
-            return types.RecursionType()
+            return default or types.RecursionType()
 
         self.__call_stack.add(func.name())
-        print("finding ret_type for func:", func.name(), self.__call_stack)
-        ret_type = func.callable_return_type()
-        print("ret_type infer_call:", ret_type)
+        ret_type = func.callable_return_type() or default
         self.__call_stack.remove(func.name())
 
         return ret_type
 
-    def infer_num(self, num, env):
+    def infer_num(self, num, env, default=None):
         if isinstance(num.n, int):
             return types.MultiType(types.IntType())
         elif isinstance(num.n, float):
@@ -108,7 +117,7 @@ class TypeInferer(object):
         else:
             return types.MultiType(types.ComplexType())
 
-    def infer_bool_op(self, expr, env):
+    def infer_bool_op(self, expr, env, default=None):
         """
         Infer type of a boolean expression.
         The return type is whatever the result of any of these expressions are.
@@ -117,67 +126,74 @@ class TypeInferer(object):
         """
         t = types.MultiType()
         for node in expr.values:
-            nested_t = self.infer_type(node, env).clone()
-            t.update(nested_t)
+            if not isinstance(node, ast.Call):
+                nested_t = self.infer_type(node, env, default=default)
+                t.update(nested_t)
+        for node in expr.values:
+            if isinstance(node, ast.Call):
+                nested_t = self.infer_type(node, env, default=t.clone())
+                t.update(nested_t)
+
         return t
 
-    def infer_attr(self, attr, env):
+    def infer_attr(self, attr, env, default=None):
         """
         Will need to initially have performed a search for determining
         attribute type on an object.
         """
-        return self.infer_type(attr.value, env).attrs()[attr.attr]
+        return self.infer_type(attr.value, env, default=default).environment()[attr.attr]
 
-    def infer_ifexp(self, expr, env):
+    def infer_ifexp(self, expr, env, default=None):
         """
         Inline if statement
         """
         t = types.MultiType()
-        t.update(self.infer_type(expr.body, env))
-        t.update(self.infer_type(expr.orelse, env))
+        t.update(self.infer_type(expr.body, env, default=default))
+        t.update(self.infer_type(expr.orelse, env, default=default))
         return t
 
-    def infer_type(self, expr, env=None):
+    def infer_type(self, expr, env=None, default=None):
         """
         Infer the types of a variable
 
         Returns:
             MultiType
         """
+        default = default or types.MultiType()
         if env is None:
             env = self.__global_env
         if isinstance(expr, ast.Num):
-            return self.infer_num(expr, env)
+            return self.infer_num(expr, env, default=default)
         elif isinstance(expr, ast.Str):
             return types.MultiType(types.StrType())
         elif isinstance(expr, ast.Bytes):
             return types.MultiType(types.BytesType())
         elif isinstance(expr, (ast.List, ast.Tuple, ast.Set)):
-            return self.infer_list_type(expr, env)
+            return self.infer_list_type(expr, env, default=default)
         elif isinstance(expr, ast.Dict):
-            return self.infer_dict_type(expr, env)
+            return self.infer_dict_type(expr, env, default=default)
         elif isinstance(expr, ast.NameConstant):
             if expr.value is None:
                 return types.MultiType(types.NoneType())
             return types.MultiType(types.BoolType())
         elif isinstance(expr, ast.Name):
-            return self.infer_name(expr, env)
+            return self.infer_name(expr, env, default=default)
         elif isinstance(expr, ast.Expr):
-            return self.infer_type(expr.value, env)
+            return self.infer_type(expr.value, env, default=default)
         elif isinstance(expr, ast.UnaryOp):
-            return self.infer_unary_op(expr, env)
+            return self.infer_unary_op(expr, env, default=default)
         elif isinstance(expr, ast.BinOp):
-            return self.infer_binary_op(expr, env)
+            return self.infer_binary_op(expr, env, default=default)
         elif isinstance(expr, ast.BoolOp):
-            return self.infer_bool_op(expr, env)
+            return self.infer_bool_op(expr, env, default=default)
         elif isinstance(expr, ast.Compare):
             return types.MultiType(types.BoolType())
         elif isinstance(expr, ast.Call):
-            return self.infer_call(expr, env)
+            return self.infer_call(expr, env, default=default)
         elif isinstance(expr, ast.Attribute):
-            return self.infer_attr(expr, env)
+            return self.infer_attr(expr, env, default=default)
         elif isinstance(expr, ast.IfExp):
-            return self.infer_ifexp(expr, env)
+            return self.infer_ifexp(expr, env, default=default)
 
         raise RuntimeError("Unable to determine type for expression '{}'".format(expr))
 
@@ -281,7 +297,7 @@ Redefining variable '{}' with a function or class '{}'. Was initially
         return {name for node in seq if isinstance(node, ast.Nonlocal)
                 for name in node.names}
 
-    def parse_func_def(self, func_def, env, is_method=False, cls_info=None):
+    def parse_func_def(self, func_def, env, is_method=False, owner=None):
         """
         Will need to account for globals and nonlocals.
 
@@ -308,11 +324,11 @@ Redefining variable '{}' with a function or class '{}'. Was initially
             func_def (ast.FunctionDef)
             env (dict)
             is_method (bool): Flag indicating the current function is an object method.
-            cls_info (types.ClassType): The type of the first argument in this method if
+            owner (types.ClassType): The type of the first argument in this method if
                 is_method is True
         """
         func = types.FunctionType(
-                func_def, self, is_method=is_method, owner=cls_info,
+                func_def, self, is_method=is_method, owner=owner,
                 global_inferer=self)
         self.update_env(func_def.name, func, env)
         return env
@@ -383,15 +399,15 @@ handled for now.""".format(item.context_expr))
 
         return contents
 
-    def parse(self, node, env=None, is_cls_body=False, cls_info=None):
+    def parse(self, node, env=None, is_method=False, owner=None):
         """
         Wrapper for parsing all misceanious nodes.
 
         Args:
             node (ast.AST)
             env (dict)
-            is_cls_body (bool): Flag indicating this statement is inside a class definition
-            cls_info (BaseType): The type of this object if inside a class definition body
+            is_method (bool): Flag indicating this statement is inside a class definition
+            owner (BaseType): The type of this object if inside a class definition body
 
         Returns:
             dict
@@ -402,8 +418,8 @@ handled for now.""".format(item.context_expr))
         elif isinstance(node, ast.AugAssign):
             return self.parse_aug_assign(node, env)
         elif isinstance(node, ast.FunctionDef):
-            return self.parse_func_def(node, env, is_method=is_cls_body,
-                                       cls_info=cls_info)
+            return self.parse_func_def(node, env, is_method=is_method,
+                                       owner=owner)
         elif isinstance(node, ast.ClassDef):
             return self.parse_class_def(node, env)
         elif isinstance(node, ast.If):
@@ -442,15 +458,15 @@ handled for now.""".format(item.context_expr))
                         if nested_type.name() not in visited:
                             stack.append(nested_type)
 
-    def parse_sequence(self, seq, env, is_cls_body=False, cls_info=None):
+    def parse_sequence(self, seq, env, is_method=False, owner=None):
         """
         Parse nodes in a sequence of nodes.
 
         Args:
             seq (list[ast.AST])
             env (dict)
-            is_cls_body (bool): Flag indicating this statement is inside a class definition
-            cls_info (BaseType): The type of this object if inside a class definition body
+            is_method (bool): Flag indicating this statement is inside a class definition
+            owner (BaseType): The type of this object if inside a class definition body
 
         Returns:
             dict
@@ -458,8 +474,8 @@ handled for now.""".format(item.context_expr))
         contents = {}
         contents.update(env)
         for node in seq:
-            contents.update(self.parse(node, env, is_cls_body=is_cls_body,
-                                       cls_info=cls_info))
+            contents.update(self.parse(node, env, is_method=is_method,
+                                       owner=owner))
 
         return contents
 
@@ -487,22 +503,13 @@ handled for now.""".format(item.context_expr))
                 self.__outer_node, self.__global_env)
 
             # Evaluate any more attributes for classes that were not declared
-            print("start evaluate object vars")
             self._evaluate_object_attrs(self.__global_env)
-            print("end evaluate object vars")
-            if "func2" in self.__global_env:
-                print("func2:", self.__global_env["func2"],
-                      self.__global_env["func2"].callable_return_type())
 
         return self.__global_env
 
     def merge_env(self, env):
         for var, val in env.items():
             self.update_env(var, val, force=True)
-
-    def clone(self):
-        return TypeInferer(self.__outer_node, init_types=self.__global_env,
-                           init_call_stack=self.__call_stack)
 
     def call_stack(self):
         return self.__call_stack

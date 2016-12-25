@@ -50,7 +50,7 @@ class Type(object):
         """
         raise NotImplementedError
 
-    def attrs(self):
+    def environment(self):
         """
         This is the type that would be returned when an attribute in it is
         accessed.
@@ -117,7 +117,7 @@ class BaseType(Type):
         return self.__base_type
 
     def clone(self):
-        return BaseType(self.__base_type, init_attrs=self.attrs())
+        return BaseType(self.__base_type, init_attrs=self.environment())
 
 
 class AnyType(BaseType):
@@ -181,15 +181,6 @@ class MultiType(Type):
     def empty(self):
         return bool(self.__types)
 
-    #def attrs(self):
-    #    raise NotImplementedError
-
-    #def add_attr(self, attr, val):
-    #    raise NotImplementedError
-
-    #def get_attr(self, attr):
-    #    raise NotImplementedError
-
     def type(self):
         """
         Returns:
@@ -219,6 +210,15 @@ class MultiType(Type):
 
         return frozenset(types)
 
+    def __bool__(self):
+        for t in self.__types:
+            if isinstance(t, MultiType):
+                if bool(t):
+                    return True
+            else:
+                return True
+        return False
+
     def update(self, other):
         """Update the types in this container."""
         if not isinstance(other, RecursionType):
@@ -229,7 +229,7 @@ class MultiType(Type):
         self.__types = other
 
     def clone(self):
-        return MultiType(list(self.__types), init_attrs=self.attrs())
+        return MultiType(list(self.__types), init_attrs=self.environment())
 
     def contains(self, t):
         """Check if this type contains another type."""
@@ -239,6 +239,15 @@ class MultiType(Type):
             elif other_t == t:
                 return True
         return False
+
+    def contents(self):
+        return self.__types
+
+    def environment(self):
+        env = super().environment()
+        for t in self.__types:
+            env.update(t.environment())
+        return env
 
 
 class RecursionType(MultiType):
@@ -290,7 +299,7 @@ class Container(Type):
         self.__content.update(t)
 
     def clone(self):
-        return Container(self.__content, init_attrs=self.attrs())
+        return Container(self.__content, init_attrs=self.environment())
 
     def content(self):
         return self.__content
@@ -319,7 +328,7 @@ class Mapping(Type):
         self.__val.update(val_type)
 
     def clone(self):
-        return Mapping(self.__key, self.__val, init_attrs=self.attrs())
+        return Mapping(self.__key, self.__val, init_attrs=self.environment())
 
     def key(self):
         return self.__key
@@ -359,7 +368,7 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
 
         if self.is_method:
             start = 1
-            func_env[self.positional[0]] = MultiType(BaseType(self.cls_info.name))
+            func_env[self.positional[0]] = MultiType(BaseType(self.cls_info.name()))
         else:
             start = 0
         for var in self.positional[start:]:
@@ -454,7 +463,7 @@ class FunctionType(CallableType):
         self.__owner = owner
 
         # Clone
-        self.__inferer = inferer.clone()
+        self.__inferer = inferer
         self.__envionment = None
         self.__return_type = None
 
@@ -462,7 +471,7 @@ class FunctionType(CallableType):
         return FunctionType(
             self.__func_def, self.__inferer, is_method=self.__is_method,
             owner=self.__owner, global_inferer=self.__global_inferer,
-            init_attrs=self.attrs()
+            init_attrs=self.environment()
         )
 
     def name(self):
@@ -546,7 +555,6 @@ class FunctionType(CallableType):
             # The func env passed to this contains the arguments and the function
             # itself
             func_env = inferer.parse_sequence(func_def.body, func_env)
-            #return func_env
             self.__envionment = func_env
         return self.__envionment
 
@@ -562,9 +570,7 @@ class FunctionType(CallableType):
             while stack:
                 node = stack.pop()
                 if isinstance(node, ast.Return):
-                    print("node val:", node.value)
                     t = inferer.infer_type(node.value, func_env)
-                    print("found type:", type(t), t)
                     ret_type.update(t)
                     found_type = True
                 elif isinstance(node, (ast.If, ast.While, ast.For)):
@@ -579,9 +585,7 @@ class FunctionType(CallableType):
             if not found_type:
                 # Functions without a return return None by default
                 ret_type = MultiType(NoneType())
-            #return ret_type
             self.__return_type = ret_type
-        print("callable_return_type:", self.name(), self.__return_type)
         return self.__return_type
 
 
@@ -597,7 +601,7 @@ class ClassType(CallableType):
     def clone(self):
         return ClassType(self.__cls_def, self.__inferer,
                          global_inferer=self.__global_inferer,
-                         init_attrs=self.attrs())
+                         init_attrs=self.environment())
 
     def type(self):
         return "type"
@@ -619,7 +623,7 @@ class ClassType(CallableType):
                 InstanceType(
                     self.__cls_def, self.__inferer,
                     global_inferer=self.__global_inferer,
-                    init_attrs=self.attrs(),
+                    init_attrs=self.environment(),
                 )
             )
             env[name] = instance
@@ -627,18 +631,6 @@ class ClassType(CallableType):
 
     def name(self):
         return self.__name
-
-    def attrs(self):
-        """
-        It is simpler to just think of a class as a namespace or a module.
-        All attributes can be treated and access normally as if the class
-        itself was another module by calling my_class.attr. All varibales
-        in the higher level env are brought and copied into this class' env.
-
-        Returns:
-            dict[str, Type]: Mapping of string to functions
-        """
-        return self.environment()
 
     def environment(self):
         """
@@ -676,7 +668,7 @@ class InstanceType(CallableType):
     def clone(self):
         return InstanceType(self.__cls_def, self.__inferer,
                             global_inferer=self.__global_inferer,
-                            init_attrs=self.attrs())
+                            init_attrs=self.environment())
 
     def type(self):
         return self.__name
@@ -687,7 +679,7 @@ class InstanceType(CallableType):
     def name(self):
         return self.__name
 
-    def attrs(self):
+    def environment(self):
         """
         The attributes include all class attributes and ones set by self.___ = ...
         Class attributes can be accessed with self., but can be overrided by
@@ -723,10 +715,8 @@ class InstanceType(CallableType):
 
         # The func env passed to this contains the arguments and the function
         # itself
-        cls_env = inferer.parse_sequence(cls_def.body, cls_env)
+        cls_env = inferer.parse_sequence(
+            cls_def.body, cls_env, is_method=True, owner=self)
         return cls_env
-
-    def environment(self):
-        return self.attrs()
 
 
