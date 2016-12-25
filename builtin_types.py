@@ -50,6 +50,9 @@ class Type(object):
         """
         raise NotImplementedError
 
+    def attrs(self):
+        return self.__attrs
+
     def environment(self):
         """
         This is the type that would be returned when an attribute in it is
@@ -60,10 +63,10 @@ class Type(object):
         Returns:
             dict[str, MultiType]
         """
-        return self.__attrs
+        return self.attrs()
 
     def get_attr(self, attr):
-        return self.__attrs[attr]
+        return self.environment()[attr]
 
     def merge_attrs(self, other):
         """
@@ -85,8 +88,10 @@ class Type(object):
         if attr in attrs:
             attrs[attr].update(val)
         else:
-            assert isinstance(val, MultiType)
-            attrs[attr] = val
+            if isinstance(val, MultiType):
+                attrs[attr] = val
+            else:
+                attrs[attr] = MultiType(val)
 
     def __str__(self):
         return str(self.type())
@@ -189,6 +194,8 @@ class MultiType(Type):
 
         types = set()
         for t in self.__types:
+            if t is self:
+                continue
             if isinstance(t, MultiType):
                 evaluated_t = t.type()
                 if isinstance(evaluated_t, frozenset):
@@ -244,10 +251,22 @@ class MultiType(Type):
         return self.__types
 
     def environment(self):
-        env = super().environment()
+        env = super().attrs()
         for t in self.__types:
-            env.update(t.environment())
+            if t is not self:
+                env2 = t.environment()
+                env.update(env2)
         return env
+
+    def add_attr(self, attr, val):
+        """
+        Args:
+            attr (str)
+            val (MultiType)
+        """
+        for t in self.__types:
+            if t is not self:
+                t.add_attr(attr, val)
 
 
 class RecursionType(MultiType):
@@ -440,9 +459,6 @@ class CallableType(Type):
     def name(self):
         raise NotImplementedError
 
-    def environment(self):
-        raise NotImplementedError
-
 
 class FunctionType(CallableType):
     def __init__(self, func_def, inferer, is_method=False, owner=None,
@@ -464,14 +480,15 @@ class FunctionType(CallableType):
 
         # Clone
         self.__inferer = inferer
-        self.__envionment = None
+        self.__environment = None
         self.__return_type = None
 
     def clone(self):
         return FunctionType(
             self.__func_def, self.__inferer, is_method=self.__is_method,
             owner=self.__owner, global_inferer=self.__global_inferer,
-            init_attrs=self.environment()
+            #init_attrs=self.environment()
+            init_attrs=self.__inferer.environment()
         )
 
     def name(self):
@@ -521,7 +538,7 @@ class FunctionType(CallableType):
             cls_info (types.ClassType): The type of the first argument in this method if
                 is_method is True
         """
-        if self.__envionment is None:
+        if self.__environment is None:
             inferer = self.__inferer
             func_def = self.__func_def
             is_method = self.__is_method
@@ -534,7 +551,7 @@ class FunctionType(CallableType):
 
             # Add class type to environment if provided
             if is_method:
-                inferer.update_env(owner.name, owner, func_env)
+                inferer.update_env(owner.name(), owner, func_env)
 
             # Self was already added to inferer in the parse_func_def func
 
@@ -554,9 +571,12 @@ class FunctionType(CallableType):
 
             # The func env passed to this contains the arguments and the function
             # itself
-            func_env = inferer.parse_sequence(func_def.body, func_env)
-            self.__envionment = func_env
-        return self.__envionment
+            func_env = inferer.parse_sequence(
+                func_def.body, func_env, is_method=self.__is_method,
+                owner=self.__owner
+            )
+            self.__environment = func_env
+        return self.__environment
 
     def callable_return_type(self):
         if self.__return_type is None:
@@ -591,17 +611,24 @@ class FunctionType(CallableType):
 
 class ClassType(CallableType):
     def __init__(self, cls_def, inferer, global_inferer=None,
-                 init_attrs=None):
+                 init_attrs=None, is_method=False, owner=None):
         super().__init__(init_attrs=init_attrs)
         self.__name = cls_def.name
         self.__cls_def = cls_def
         self.__inferer = inferer
         self.__global_inferer = global_inferer or inferer
+        self.__environment = None
+        self.__return_type = None
+        self.__is_method = is_method
+        self.__owner = owner
 
     def clone(self):
         return ClassType(self.__cls_def, self.__inferer,
                          global_inferer=self.__global_inferer,
-                         init_attrs=self.environment())
+                         init_attrs=self.__inferer.environment(),
+                         is_method=self.__is_method,
+                         owner=self.__owner,
+                        )
 
     def type(self):
         return "type"
@@ -609,25 +636,26 @@ class ClassType(CallableType):
     def instance_name(self):
         return self.__name + "_instance"
 
+    def instance_type(self):
+        name = self.name()
+        inferer = self.__inferer
+        if name not in inferer.instances():
+            instance = InstanceType(
+                self.__cls_def, self.__inferer,
+                global_inferer=self.__global_inferer,
+                init_attrs=inferer.environment(),
+            )
+            inferer.add_instance(instance)
+        return inferer.instances()[name]
+
     def callable_return_type(self):
         """
         All instances will point to the same type so that changes in
         attributes that affect one instance will affect all instances.
         """
-        env = self.__inferer.environment()
-
-        name = self.instance_name()
-
-        if name not in env:
-            instance = MultiType(
-                InstanceType(
-                    self.__cls_def, self.__inferer,
-                    global_inferer=self.__global_inferer,
-                    init_attrs=self.environment(),
-                )
-            )
-            env[name] = instance
-        return env[name]
+        if self.__return_type is None:
+            self.__return_type = MultiType(self.instance_type())
+        return self.__return_type
 
     def name(self):
         return self.__name
@@ -640,20 +668,25 @@ class ClassType(CallableType):
 
         Will also need to parse parents for values.
         """
-        inferer = self.__inferer
-        cls_def = self.__cls_def
-        global_inferer = self.__global_inferer
+        if self.__environment is None:
+            inferer = self.__inferer
+            cls_def = self.__cls_def
+            global_inferer = self.__global_inferer
 
-        # Create new env to pass down
-        cls_env = {}
-        cls_env.update(inferer.environment())
+            # Create new env to pass down
+            cls_env = {}
+            cls_env.update(inferer.environment())
 
-        # Class was already added to inferer in the parse_class_def func
+            # Class was already added to inferer in the parse_class_def func
 
-        # The func env passed to this contains the arguments and the function
-        # itself
-        cls_env = inferer.parse_sequence(cls_def.body, cls_env)
-        return cls_env
+            # The func env passed to this contains the arguments and the function
+            # itself
+            cls_env = inferer.parse_sequence(
+                cls_def.body, cls_env, is_method=self.__is_method,
+                owner=self.instance_type()
+            )
+            self.__environment = cls_env
+        return self.__environment
 
 
 class InstanceType(CallableType):
@@ -717,6 +750,9 @@ class InstanceType(CallableType):
         # itself
         cls_env = inferer.parse_sequence(
             cls_def.body, cls_env, is_method=True, owner=self)
+
+        inferer.merge_env(self.attrs(), cls_env)
+
         return cls_env
 
 

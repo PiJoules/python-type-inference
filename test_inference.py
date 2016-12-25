@@ -489,8 +489,10 @@ y = A()
 y.b = "a"
 """).environment()
         self.assertEqual(env["x"].type(), "A")
+
         self.assertEqual(env["x"].get_attr("a").type(), "int")
         self.assertEqual(env["y"].type(), "A")
+
         self.assertEqual(env["y"].get_attr("a").type(), "int")
         self.assertEqual(env["y"].get_attr("b").type(), "str")
         self.assertEqual(env["x"].get_attr("b").type(), "str")
@@ -569,6 +571,35 @@ x = A()
         self.assertEqual(env["x"].type(), "A")
         self.assertEqual(env["x"].environment()["func"].callable_return_type().type(), "int")
         self.assertEqual(env["x"].environment()["func2"].callable_return_type().type(), "A")
+
+    def test_nested_instances(self):
+        """Test instances in another instance."""
+        env = TypeInferer.from_code("""
+class A:
+    def func(self):
+        class B:
+            def func2(self):
+                class C:
+                    def func3(self):
+                        return self
+                return C()
+        return B()
+
+x = A()
+y = x.func()
+z = y.func2()
+""").environment()
+
+        self.assertEqual(env["x"].type(), "A")
+        self.assertEqual(env["x"].environment()["func"].callable_return_type().type(), "B")
+        self.assertEqual(env["y"].type(), "B")
+        self.assertEqual(env["z"].type(), "C")
+        self.assertEqual(env["x"].environment()["func"].environment()["B"]
+                         .environment()["func2"].callable_return_type().type(), "C")
+        self.assertEqual(env["x"].environment()["func"].environment()["B"]
+                         .environment()["func2"].environment()["C"]
+                         .environment()["func3"]
+                         .callable_return_type().type(), "C")
 
 
 

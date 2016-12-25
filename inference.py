@@ -12,11 +12,12 @@ class TypeInferer(object):
     """
 
     def __init__(self, node, init_types=None, init_call_stack=None,
-                 is_method=False, owner=None):
+                 is_method=False, owner=None, init_instances=None):
         self.__outer_node = node
         self.__global_env = init_types
         # Inline if expression to keep reference to a previously passed stack
         self.__call_stack = set() if init_call_stack is None else init_call_stack
+        self.__instances = {} if init_instances is None else init_instances
 
     @classmethod
     def from_code(cls, code, **kwargs):
@@ -141,7 +142,8 @@ class TypeInferer(object):
         Will need to initially have performed a search for determining
         attribute type on an object.
         """
-        return self.infer_type(attr.value, env, default=default).environment()[attr.attr]
+        t = self.infer_type(attr.value, env, default=default)
+        return t.environment()[attr.attr]
 
     def infer_ifexp(self, expr, env, default=None):
         """
@@ -216,12 +218,13 @@ class TypeInferer(object):
             else:
                 env[var] = t
         elif isinstance(t, (types.ClassType, types.FunctionType, types.InstanceType)):
-            if var in env:
+            if var in env and env[var].name() != t.name():
                 raise RuntimeError("""
 Redefining variable '{}' with a function or class '{}'. Was initially
 {}, and is redefined as {}.
 """.format(var, t.name(), env[var], t.type()))
-            env[var] = t
+            if var not in env:
+                env[var] = t
         else:
             raise RuntimeError(
                 """All types added to the env must be another env or a
@@ -333,13 +336,15 @@ Redefining variable '{}' with a function or class '{}'. Was initially
         self.update_env(func_def.name, func, env)
         return env
 
-    def parse_class_def(self, cls_def, env):
+    def parse_class_def(self, cls_def, env, is_method=False, owner=False):
         """
         Same rules as function, but will contain nested functions.
 
         TODO: Handle decorators and keyword arguments in parents
         """
-        cls = types.ClassType(cls_def, self, global_inferer=self)
+        cls = types.ClassType(cls_def, self, global_inferer=self,
+                              is_method=is_method,
+                              owner=owner)
         self.update_env(cls_def.name, cls, env)
         return env
 
@@ -399,6 +404,18 @@ handled for now.""".format(item.context_expr))
 
         return contents
 
+    def parse_call(self, call, env, is_method=False, owner=None):
+        """
+        Arguments for functions can be inferred based on types passed to them.
+        """
+        func = self.infer_type(call.func, env)
+
+        # Positional
+
+        # Keyword
+
+        return env
+
     def parse(self, node, env=None, is_method=False, owner=None):
         """
         Wrapper for parsing all misceanious nodes.
@@ -421,7 +438,8 @@ handled for now.""".format(item.context_expr))
             return self.parse_func_def(node, env, is_method=is_method,
                                        owner=owner)
         elif isinstance(node, ast.ClassDef):
-            return self.parse_class_def(node, env)
+            return self.parse_class_def(node, env, is_method=is_method,
+                                        owner=owner)
         elif isinstance(node, ast.If):
             return self.parse_if(node, env)
         elif isinstance(node, ast.While):
@@ -432,6 +450,8 @@ handled for now.""".format(item.context_expr))
             return self.parse_try(node, env)
         elif isinstance(node, ast.With):
             return self.parse_with(node, env)
+        elif isinstance(node, ast.Call):
+            return self.parse_call(node, env)
         return {}
 
     def _evaluate_object_attrs(self, env):
@@ -507,10 +527,16 @@ handled for now.""".format(item.context_expr))
 
         return self.__global_env
 
-    def merge_env(self, env):
-        for var, val in env.items():
-            self.update_env(var, val, force=True)
+    def merge_env(self, source_env, target_env=None):
+        for var, val in source_env.items():
+            self.update_env(var, val, env=target_env)
 
     def call_stack(self):
         return self.__call_stack
+
+    def instances(self):
+        return self.__instances
+
+    def add_instance(self, inst):
+        self.__instances[inst.name()] = inst
 
