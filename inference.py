@@ -93,14 +93,18 @@ class TypeInferer(object):
                 t.update(nested_t)
         return t
 
-    def infer_call(self, call, env, default=None):
+    def infer_call(self, call, env, default=None, is_method=False, owner=None):
         """
         The func in the return type must be a function.
 
         If the call returns an expression that is a combination of other types.
         Evaluate those types first before returning the RecursionType.
         """
+        # First pase the call to infer more about the argument types
+        self.parse_call(call, env, is_method=is_method, owner=owner)
+
         func = self.infer_type(call.func, env, default=default)
+
         if func.name() in self.__call_stack:
             return default or types.RecursionType()
 
@@ -409,8 +413,19 @@ handled for now.""".format(item.context_expr))
         Arguments for functions can be inferred based on types passed to them.
         """
         func = self.infer_type(call.func, env)
+        print("parse_call for", func.name(), type(func))
 
         # Positional
+        # First argument is already handled
+        if is_method:
+            start = 1
+        else:
+            start = 0
+        for i, arg in enumerate(call.args[start:]):
+            t = self.infer_type(arg, env)
+            func.arguments().update_arg_type(i + start, t)
+        print(self.instances())
+        #print("args:", func.arguments().pos_arg_types)
 
         # Keyword
 
@@ -451,7 +466,8 @@ handled for now.""".format(item.context_expr))
         elif isinstance(node, ast.With):
             return self.parse_with(node, env)
         elif isinstance(node, ast.Call):
-            return self.parse_call(node, env)
+            return self.parse_call(node, env, is_method=is_method,
+                                   owner=owner)
         return {}
 
     def _evaluate_object_attrs(self, env):
@@ -538,5 +554,20 @@ handled for now.""".format(item.context_expr))
         return self.__instances
 
     def add_instance(self, inst):
-        self.__instances[inst.name()] = inst
+        self.__instances[inst.name() + "_inst"] = inst
+
+    def contains_instance(self, name):
+        return name + "_inst" in self.__instances
+
+    def get_instance(self, name):
+        return self.__instances[name + "_inst"]
+
+    def add_args(self, name, inst):
+        self.__instances[name + "_args"] = inst
+
+    def contains_args(self, name):
+        return name + "_args" in self.__instances
+
+    def get_args(self, name):
+        return self.__instances[name + "_args"]
 

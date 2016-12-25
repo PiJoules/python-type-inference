@@ -601,6 +601,26 @@ z = y.func2()
                          .environment()["func3"]
                          .callable_return_type().type(), "C")
 
+    def test_class_aattribute_assignment(self):
+        """Test assignment of attributes to classes."""
+        env = TypeInferer.from_code("""
+class A:
+    pass
+
+A.a = 1
+""").environment()
+
+        self.assertEqual(env["A"].environment()["a"].type(), "int")
+
+    def test_function_call(self):
+        """Check that the type of an argument is affected by what is passed to the function."""
+        env = TypeInferer.from_code("""
+def func(arg):
+    return arg
+x = func(2)
+""").environment()
+
+        self.assertEqual(env["x"].type(), "int")
 
 
 if __name__ == "__main__":

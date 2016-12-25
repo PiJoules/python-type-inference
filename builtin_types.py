@@ -359,7 +359,7 @@ class Mapping(Type):
 class ArgumentsInfo(class_utils.SlotDefinedClass):
     __slots__ = ("positional", "keyword", "vararg", "keyword_only", "kwarg",
                  "keyword_defaults", "keyword_only_defaults", "is_method",
-                 "cls_info")
+                 "owner", "inferer", "pos_arg_types")
     __types__ = {
         "positional": [str],
         "keyword": {str: MultiType},
@@ -373,8 +373,17 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
         "vararg": None,
         "kwarg": None,
         "is_method": False,
-        "cls_info": None,
+        "owner": None,
     }
+
+    def update_arg_type(self, arg_name, arg_type):
+        if arg_name in self.pos_arg_types:
+            self.pos_arg_types[arg_name].update(arg_type)
+        else:
+            if isinstance(arg_type, MultiType):
+                self.pos_arg_types[arg_name] = arg_type
+            else:
+                self.pos_arg_types[arg_name] = MultiType(arg_type)
 
     def environment(self):
         """
@@ -387,11 +396,13 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
 
         if self.is_method:
             start = 1
-            func_env[self.positional[0]] = MultiType(BaseType(self.cls_info.name()))
+            #func_env[self.positional[0]] = self.inferer.instances()[self.owner.name()]
+            func_env[self.positional[0]] = self.inferer.get_instance(self.owner.name())
         else:
             start = 0
-        for var in self.positional[start:]:
-            func_env[var] = MultiType()
+        for i, var in enumerate(self.positional[start:]):
+            #func_env[var] = MultiType()
+            func_env[var] = self.pos_arg_types.get(i + start, MultiType())
 
         # Keyword args have type already given
         func_env.update(self.keyword)
@@ -406,7 +417,7 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
         return func_env
 
     @classmethod
-    def from_arguments_node(cls, args, inferer, is_method=False, cls_info=None):
+    def from_arguments_node(cls, args, inferer, is_method=False, owner=None):
         """
         Extract the positional, keyword, and vararg and kwarg args from an
         arguments node.
@@ -448,7 +459,9 @@ class ArgumentsInfo(class_utils.SlotDefinedClass):
             keyword_defaults=keyword_defaults,
             keyword_only_defaults=keyword_only_defaults,
             is_method=is_method,
-            cls_info=cls_info
+            owner=owner,
+            inferer=inferer,
+            pos_arg_types={},
         )
 
 
@@ -483,11 +496,12 @@ class FunctionType(CallableType):
         self.__environment = None
         self.__return_type = None
 
+        self.__args = None
+
     def clone(self):
         return FunctionType(
             self.__func_def, self.__inferer, is_method=self.__is_method,
             owner=self.__owner, global_inferer=self.__global_inferer,
-            #init_attrs=self.environment()
             init_attrs=self.__inferer.environment()
         )
 
@@ -504,9 +518,14 @@ class FunctionType(CallableType):
         return "function"
 
     def arguments(self):
-        return ArgumentsInfo.from_arguments_node(
-            self.__func_def.args, self.__inferer, is_method=self.__is_method,
-            cls_info=self.__owner)
+        inferer = self.__inferer
+        if not inferer.contains_args(self.name()):
+            args = ArgumentsInfo.from_arguments_node(
+                self.__func_def.args, self.__inferer, is_method=self.__is_method,
+                owner=self.__owner)
+            inferer.add_args(self.name(), args)
+        args = inferer.get_args(self.name())
+        return args
 
     def environment(self):
         """
@@ -535,7 +554,7 @@ class FunctionType(CallableType):
             func_def (ast.FunctionDef)
             env (dict)
             is_method (bool): Flag indicating the current function is an object method.
-            cls_info (types.ClassType): The type of the first argument in this method if
+            owner (types.ClassType): The type of the first argument in this method if
                 is_method is True
         """
         if self.__environment is None:
@@ -567,7 +586,8 @@ class FunctionType(CallableType):
                 func_env[var] = global_inferer.environment()[var]
 
             # Merge args
-            func_env.update(self.arguments().environment())
+            args_env = self.arguments().environment()
+            func_env.update(args_env)
 
             # The func env passed to this contains the arguments and the function
             # itself
@@ -639,14 +659,14 @@ class ClassType(CallableType):
     def instance_type(self):
         name = self.name()
         inferer = self.__inferer
-        if name not in inferer.instances():
+        if not inferer.contains_instance(name):
             instance = InstanceType(
                 self.__cls_def, self.__inferer,
                 global_inferer=self.__global_inferer,
                 init_attrs=inferer.environment(),
             )
             inferer.add_instance(instance)
-        return inferer.instances()[name]
+        return inferer.get_instance(name)
 
     def callable_return_type(self):
         """
