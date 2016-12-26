@@ -132,16 +132,31 @@ the __init__ method.
 """
 
 
+class ArgumentsInfo(object):
+    pass
+
+
 class Type(object):
+    def __init__(self):
+        self.__attrs = {}  # dict[str, set[int]]
+
     def value(self):
         """
         A hashable representation of this type.
         """
         raise NotImplementedError
 
-    def return_type(self):
+    def return_type(self, args):
         """
         The type of variable returned if this type was called.
+
+        TODO: Check python version since args change between 3.4 and 3.5.
+
+        Args:
+            args (ArgumentsInfo)
+
+        Returns:
+            set[int]
         """
         raise NotImplementedError
 
@@ -149,7 +164,10 @@ class Type(object):
         """
         Attributes of this type.
         """
-        raise NotImplementedError
+        return self.__attrs
+
+    def add_attr(self, attr, val):
+        self.__attrs
 
     def environment(self):
         """
@@ -169,7 +187,54 @@ class Type(object):
 
 
 class FunctionType(Type):
-    pass
+    def __init__(self, node, env):
+        self.__node = node
+        self.__parent_env = env
+        self.__hash = self.__generate_hash(node)
+
+    def __generate_hash(self, node):
+        """
+        Generate the hash for this function once.
+
+        Args:
+            node (ast node)
+        """
+        return hash(astor.to_source(node))
+
+    def value(self):
+        return "function"
+
+    def return_type(self, args):
+        env = self.environment()
+
+        types = set()
+
+        # Find all return statements
+        found_type = False
+        stack = list(self.__node.body)
+        while stack:
+            node = stack.pop()
+            if isinstance(node, ast.Return):
+                t = env.infer_type(node.value)
+                types.add(t)
+                found_type = True
+            elif isinstance(node, (ast.If, ast.While, ast.For)):
+                stack += node.body + node.orelse
+            elif isinstance(node, ast.Try):
+                stack += node.body + node.orelse + node.finalbody
+                for handler in node.handlers:
+                    stack += handler.body
+            elif isinstance(node, ast.With):
+                stack += node.body
+
+        return types
+
+    @classmethod
+    def from_node(cls, node):
+        raise NotImplementedError
+
+    def __hash__(self):
+        return self.__hash
 
 
 class ClassType(Type):
@@ -208,17 +273,26 @@ def load_builtin_types():
 class Environment(object):
     required_types = ("int", "str")
 
-    def __init__(self, init_node=None, parent=None, required_types=None):
+    def __init__(self, init_node=None, parent_env=None, required_types=None,
+                 init_variables=None):
         """
         Args:
+            required_types (dict[str, Type])
             init_variables (dict[str, Type])
         """
         self.__special_types = {}
-        self.__parent = parent
+        self.__parent = parent_env
         self.__types = {}
         self.__variables = {}
 
         self.__initialize_special_types(required_types or load_builtin_types())
+
+        # Parse any initial variables passed through this env,
+        # like args passed to a function
+        init_variables = init_variables or {}
+        for var, t in init_variables:
+            type_id = self.__add_type(t)
+            self.__variables[var] = type_id
 
         if init_node:
             self.parse(init_node)
@@ -229,9 +303,9 @@ class Environment(object):
         evaluate the expression itself. These types must be made available to
         the environment always, but always point to the same reference.
         """
-        for t in self.required_types:
-            type_id = self.__add_type(types[t])
-            self.__special_types[t] = type_id
+        for type_name in self.required_types:
+            type_id = self.__add_type(types[type_name])
+            self.__special_types[type_name] = type_id
 
     def __add_type(self, t):
         """
@@ -259,14 +333,14 @@ class Environment(object):
         is used to keep types unique.
 
         Returns:
-            dict[str, list[Type]]
+            dict[str, set[Type]]
         """
         variables = {}
         for var, type_ids in self.__variables.items():
-            variables[var] = [self.__type_from_id(id) for id in type_ids]
+            variables[var] = {self.type_from_id(id) for id in type_ids}
         return variables
 
-    def parent(self):
+    def parent_env(self):
         """
         An environment that this one can borrow variables from.
 
@@ -285,7 +359,7 @@ class Environment(object):
             var (str): Variable name
 
         Returns:
-            list[Type]: The type of the variable if it exists. None if
+            set[Type]: The type of the variable if it exists. None if
                 not found.
         """
         variables = self.__variables
@@ -295,12 +369,12 @@ class Environment(object):
             type_ids = variables[var]
 
             # Type lookup from id
-            return [self.__type_from_id(id) for id in type_ids]
+            return {self.type_from_id(id) for id in type_ids}
 
-        # Check parent
-        parent = self.__parent
-        if parent:
-            return parent.lookup(var)
+        # Check parent_env
+        parent_env = self.__parent
+        if parent_env:
+            return parent_env.lookup(var)
 
         raise RuntimeError("The variable '{}' was not previously declared.".format(var))
 
@@ -308,7 +382,7 @@ class Environment(object):
         """
         The hashable representations of all types that a variable can be.
         """
-        return list(map(lambda x: x.value(), self.lookup(var)))
+        return {x.value() for x in self.lookup(var)}
 
     def __bind(self, var, type_id):
         """
@@ -327,7 +401,7 @@ class Environment(object):
         else:
             variables[var] = {type_id}
 
-    def __type_from_id(self, type_id):
+    def type_from_id(self, type_id):
         """
         Given an id for a type, find the actual reference to the type.
 
@@ -341,13 +415,13 @@ class Environment(object):
         if type_id in types:
             return types[type_id]
 
-        parent = self.__parent
-        if parent:
-            return parent.__type_from_id(type_id)
+        parent_env = self.__parent
+        if parent_env:
+            return parent_env.type_from_id(type_id)
 
         raise RuntimeError("A type with the id '{}' does not exist.".format(type_id))
 
-    def __infer_num(self, num):
+    def infer_name(self, num):
         """
         Returns:
             int
@@ -362,20 +436,20 @@ class Environment(object):
 
         raise RuntimeError("Cannot infer Num type '{}'.".format(num))
 
-    def __infer_type(self, node):
+    def infer_type(self, node):
         """
         Infer the type of an ast node.
 
-        Will need to look in parent types.
+        Will need to look in parent_env types.
 
         Args:
             node (ast node)
 
         Returns:
-            list[int]: All possible types that this expression could be
+            set[int]: All possible types that this expression could be
         """
         if isinstance(node, ast.Num):
-            return self.__infer_num(node)
+            return self.infer_name(node)
         elif isinstance(node, ast.Str):
             return self.__special_types["str"]
         raise NotImplementedError
@@ -387,7 +461,7 @@ class Environment(object):
         """
         targets = node.targets
         value = node.value
-        value_types = self.__infer_type(value)
+        value_types = self.infer_type(value)
 
         for target in targets:
             # Handle variables only for now.
@@ -400,6 +474,9 @@ class Environment(object):
         for node in nodes:
             self.parse(node)
 
+    def parse_func_def(self, node):
+        raise NotImplementedError
+
     def parse(self, node):
         """
         Parse an ast node to update the current environment.
@@ -407,10 +484,12 @@ class Environment(object):
         Returns:
             None
         """
-        if isinstance(node, ast.Assign):
-            self.parse_assign(node)
-        elif isinstance(node, ast.Module):
+        if isinstance(node, ast.Module):
             self.parse_sequence(node.body)
+        elif isinstance(node, ast.Assign):
+            self.parse_assign(node)
+        elif isinstance(node, ast.FunctionDef):
+            self.parse_func_def(node)
 
     @classmethod
     def from_code(cls, code, **kwargs):

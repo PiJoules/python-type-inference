@@ -13,17 +13,18 @@ x = 2
         """
         env = inference.Environment.from_code(code)
 
-        self.assertListEqual(env.lookup_values("x"), ["int"])
+        self.assertSetEqual(env.lookup_values("x"), {"int"})
 
     def test_multiple_assignment(self):
         """Test assignment of multiple types to the same variable."""
         code = """
 x = 2
 x = "string"
+x = 3
         """
         env = inference.Environment.from_code(code)
 
-        self.assertListEqual(env.lookup_values("x"), ["int", "str"])
+        self.assertSetEqual(env.lookup_values("x"), {"int", "str"})
 
 
 
