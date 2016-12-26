@@ -133,12 +133,82 @@ the __init__ method.
 
 
 class ArgumentsInfo(object):
-    pass
+    """
+    A container for handling argument types when calling functions.
+    """
+
+    def __init__(self, positional=None, keyword=None, vararg=None,
+                 kwargs=None, owner=None):
+        """
+        Args:
+            owner (Optional[Type]): For methods where the first arg refers
+                to the instance that owns this method.
+        """
+        self.__positional = positional
+        self.__keyword = keyword
+        self.__vararg = vararg
+        self.__kwargs = kwargs
+        self.__owner = owner
+
+    @classmethod
+    def from_call(self, node, env, owner=None):
+        """
+        Create an ArgumentsInfo from a call node.
+
+        This implementation is for 3.4.
+        """
+        positional = [owner] if owner is not None else []
+        positional += [env.infer_type(arg) for arg in node.args]
+        keyword = {kw.arg: env.infer_type(kw.value) for kw in node.keywords}
+        vararg = env.infer_type(node.starargs) if node.starargs else None
+        kwargs = env.infer_type(node.kwargs) if node.starargs else None
+        return cls(
+            positional=positional,
+            keyword=keyword,
+            vararg=vararg,
+            kwargs=kwargs,
+            owner=owner,
+        )
+
+    def positional_args(self):
+        """
+        Returns:
+            list[set[Type]]
+        """
+        return self.__positional or []
+
+    def keyword_args(self):
+        """
+        Returns:
+            dict[str, set[Type]]
+        """
+        return self.__keyword or {}
+
+    def varargs(self):
+        """
+        Returns:
+            (None, Tuple): Returns None if no *args exists
+        """
+        return self.__vararg
+
+    def kwargs(self):
+        """
+        Returns:
+            (None, Dict): Returns None if no **kwargs exists
+        """
+        return self.__kwargs
 
 
 class Type(object):
-    def __init__(self):
+    def __init__(self, owner=None):
+        """
+        Args:
+            owner (Optional[Type]): Provided if this type is a FunctionType
+                that represents a method of an argument. If so, the first
+                positional arg when this is called is always this owner.
+        """
         self.__attrs = {}  # dict[str, set[int]]
+        self.__owner = owner
 
     def value(self):
         """
@@ -146,66 +216,32 @@ class Type(object):
         """
         raise NotImplementedError
 
-    def return_type(self, args):
+    def return_type(self, node, ref_env):
         """
         The type of variable returned if this type was called.
 
         TODO: Check python version since args change between 3.4 and 3.5.
 
         Args:
-            args (ArgumentsInfo)
+            node (ast.Call)
+            ref_env (Environment)
 
         Returns:
             set[int]
         """
-        raise NotImplementedError
+        positional = [self.__owner] if self.__owner is not None else []
+        positional += [env.infer_type(arg) for arg in node.args]
+        keyword = {kw.arg: env.infer_type(kw.value) for kw in node.keywords}
+        vararg = env.infer_type(node.starargs) if node.starargs else None
+        kwargs = env.infer_type(node.kwargs) if node.starargs else None
 
-    def attrs(self):
-        """
-        Attributes of this type.
-        """
-        return self.__attrs
-
-    def add_attr(self, attr, val):
-        self.__attrs
-
-    def environment(self):
-        """
-        The environment of variables and types in this type if it contains
-        a body of statements.
-        """
-        raise NotImplementedError
-
-    def __hash__(self):
-        return hash(self.value())
-
-    def __eq__(self, other):
-        return hash(self) == hash(other)
-
-    def __ne__(self, other):
-        return not (self == other)
-
-
-class FunctionType(Type):
-    def __init__(self, node, env):
-        self.__node = node
-        self.__parent_env = env
-        self.__hash = self.__generate_hash(node)
-
-    def __generate_hash(self, node):
-        """
-        Generate the hash for this function once.
-
-        Args:
-            node (ast node)
-        """
-        return hash(astor.to_source(node))
-
-    def value(self):
-        return "function"
-
-    def return_type(self, args):
-        env = self.environment()
+        env = self.environment(
+            ref_env,
+            positional=positional,
+            keyword=keyword,
+            vararg=vararg,
+            kwargs=kwargs,
+        )
 
         types = set()
 
@@ -228,6 +264,55 @@ class FunctionType(Type):
                 stack += node.body
 
         return types
+
+    def attrs(self):
+        """
+        Attributes of this type.
+        """
+        return self.__attrs
+
+    def add_attr(self, attr, val):
+        self.__attrs
+
+    def environment(self, ref_env, positional=None, keyword=None, vararg=None,
+                    kwargs=None):
+        """
+        The environment of variables and types in this type if it contains
+        a body of statements.
+
+        Args:
+            args (ArgumentsInfo)
+        """
+        raise NotImplementedError
+
+    def __hash__(self):
+        return hash(self.value())
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
+    def __ne__(self, other):
+        return not (self == other)
+
+
+class FunctionType(Type):
+    def __init__(self, node, env):
+        super().__init__()
+        self.__node = node
+        self.__parent_env = env
+        self.__hash = self.__generate_hash(node)
+
+    def __generate_hash(self, node):
+        """
+        Generate the hash for this function once.
+
+        Args:
+            node (ast node)
+        """
+        return hash(astor.to_source(node))
+
+    def value(self):
+        return "function"
 
     @classmethod
     def from_node(cls, node):
@@ -283,16 +368,12 @@ class Environment(object):
         self.__special_types = {}
         self.__parent = parent_env
         self.__types = {}
-        self.__variables = {}
+        self.__variables = init_variables or {}
 
         self.__initialize_special_types(required_types or load_builtin_types())
 
         # Parse any initial variables passed through this env,
         # like args passed to a function
-        init_variables = init_variables or {}
-        for var, t in init_variables:
-            type_id = self.__add_type(t)
-            self.__variables[var] = type_id
 
         if init_node:
             self.parse(init_node)
@@ -304,28 +385,7 @@ class Environment(object):
         the environment always, but always point to the same reference.
         """
         for type_name in self.required_types:
-            type_id = self.__add_type(types[type_name])
-            self.__special_types[type_name] = type_id
-
-    def __add_type(self, t):
-        """
-        Add a type to the internal container for types and return a unique
-        id representing the type and return this id.
-        """
-        type_id = self.__generate_id(t)
-        if type_id in self.__types:
-            raise RuntimeError("Existing type_id already in used for type")
-        self.__types[type_id] = t
-        return type_id
-
-    def __generate_id(self, t):
-        """
-        Generate a unique id for a given type.
-
-        Returns:
-            int
-        """
-        return hash(t)
+            self.__special_types[type_name] = types[type_name]
 
     def variables(self):
         """
@@ -335,10 +395,7 @@ class Environment(object):
         Returns:
             dict[str, set[Type]]
         """
-        variables = {}
-        for var, type_ids in self.__variables.items():
-            variables[var] = {self.type_from_id(id) for id in type_ids}
-        return variables
+        return self.__variables
 
     def parent_env(self):
         """
@@ -364,12 +421,7 @@ class Environment(object):
         """
         variables = self.__variables
         if var in variables:
-            # Combine all types
-            # All ids of types this variable could be
-            type_ids = variables[var]
-
-            # Type lookup from id
-            return {self.type_from_id(id) for id in type_ids}
+            return variables[var]
 
         # Check parent_env
         parent_env = self.__parent
@@ -384,47 +436,27 @@ class Environment(object):
         """
         return {x.value() for x in self.lookup(var)}
 
-    def __bind(self, var, type_id):
+    def __bind(self, var, t):
         """
         Bind a variable to a type in the environment.
 
         Args:
             var (str): Variable name
-            type_id (int): Variable type
+            type_id (Type): Variable type
 
         Returns:
             None
         """
         variables = self.__variables
         if var in variables:
-            variables[var].add(type_id)
+            variables[var].add(t)
         else:
-            variables[var] = {type_id}
-
-    def type_from_id(self, type_id):
-        """
-        Given an id for a type, find the actual reference to the type.
-
-        Args:
-            type_id (int)
-
-        Returns:
-            Type
-        """
-        types = self.__types
-        if type_id in types:
-            return types[type_id]
-
-        parent_env = self.__parent
-        if parent_env:
-            return parent_env.type_from_id(type_id)
-
-        raise RuntimeError("A type with the id '{}' does not exist.".format(type_id))
+            variables[var] = {t}
 
     def infer_name(self, num):
         """
         Returns:
-            int
+            Type
         """
         val = num.n
         if isinstance(val, int):
@@ -446,7 +478,7 @@ class Environment(object):
             node (ast node)
 
         Returns:
-            set[int]: All possible types that this expression could be
+            set[Type]: All possible types that this expression could be
         """
         if isinstance(node, ast.Num):
             return self.infer_name(node)
