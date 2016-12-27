@@ -132,6 +132,16 @@ the __init__ method.
 """
 
 
+def simple(types):
+    """
+    If the container contains only 1 item, return that item instead of the
+    container. Otherwise, return the whole container.
+    """
+    if len(types) == 1:
+        return next(iter(types))
+    return types
+
+
 class Type(object):
     def __init__(self, ref_node=None, init_env=None):
         self.__attrs = {}  # dict[str, set[int]]
@@ -213,8 +223,6 @@ class Type(object):
 
         TODO: Handle decorators later
         """
-        if not self.__env:
-            raise RuntimeError("An initial environment is required when calling this type.")
         return self.__env
 
     def contents(self):
@@ -226,12 +234,6 @@ class Type(object):
 
     def __hash__(self):
         return hash(self.value())
-
-    def __eq__(self, other):
-        return hash(self) == hash(other)
-
-    def __ne__(self, other):
-        return not (self == other)
 
 
 class FunctionType(Type):
@@ -262,14 +264,16 @@ class FunctionType(Type):
         for i, arg in enumerate(pos_args[end:]):
             args_dict[arg.arg] = env.infer_type(args_node.defaults[i])
 
+        self.__positional = [a.arg for a in pos_args[start:]]  # list[str]
+
         # Keyword args
         keyword_args = args_node.kwonlyargs
         defaults = args_node.kw_defaults
         for i, kwarg in enumerate(keyword_args):
             if defaults[i] is None:
-                args_dict[kwarg.arg] = {env.special_types()["Any"]}
+                args_dict[kwarg.arg] = set()
             else:
-                args_dict[kwarg.arg] = defaults[i]
+                args_dict[kwarg.arg] = env.infer_type(defaults[i])
 
         # Vararg and kwargs
         if args_node.vararg:
@@ -282,6 +286,24 @@ class FunctionType(Type):
         super().__init__(ref_node=node, init_env=env)
 
         self.__hash = self.__generate_hash(node)
+
+    def apply_call_args(self, node):
+        """
+        Updatee the variables in an environment based on what is passed to
+        a call to this function.
+
+        Args:
+            node (ast.Call)
+        """
+        env = self.environment()
+
+        # Apply positional
+        for i, arg in enumerate(node.args):
+            env.bind(self.__positional[i], env.infer_type(arg))
+
+        # Apply keyword
+        for kwarg in node.keywords:
+            env.bind(kwarg.arg, env.infer_type(kwarg.value))
 
     def __generate_hash(self, node):
         """
@@ -317,6 +339,16 @@ Builtin types
 class IntType(Type):
     def value(self):
         return "int"
+
+
+class FloatType(Type):
+    def value(self):
+        return "float"
+
+
+class ComplexType(Type):
+    def value(self):
+        return "complex"
 
 
 class StrType(Type):
@@ -410,6 +442,8 @@ def load_builtin_types():
     any_type = AnyType()
     return {
         "int": IntType(),
+        "float": FloatType(),
+        "complex": ComplexType(),
         "str": StrType(),
         "Any": any_type,
         "tuple": TupleType(any_type),
@@ -418,7 +452,7 @@ def load_builtin_types():
 
 
 class Environment(object):
-    required_types = ("int", "str", "Any", "tuple", "dict")
+    required_types = tuple(load_builtin_types().keys())
 
     def __init__(self, init_node=None, parent_env=None, required_types=None,
                  init_variables=None):
@@ -507,30 +541,6 @@ class Environment(object):
 
         raise RuntimeError("The variable '{}' was not previously declared.".format(var))
 
-    def simple_lookup(self, var):
-        """
-        If a varibale contains only one type, it returns that type instead of
-        the whole set containing one item. Otherwise, it returns the whole set.
-
-        Meant for debugging purposes external to this class.
-        """
-        types = self.lookup(var)
-        if len(types) == 1:
-            return next(iter(types))
-        return types
-
-    def lookup_return_type_values(self, var):
-        """
-        Call .return_type() on each of the types a variable can be then
-        .value()
-        """
-        types = self.lookup(var)  # All types of this variable
-        ret_types = set()  # All return types of these types
-        for t in types:
-            ret_types |= t.return_type()
-        ret_type_vals = {t.value() for t in ret_types}
-        return ret_type_vals
-
     def lookup_values(self, var):
         """
         The hashable representations of all types that a variable can be.
@@ -539,7 +549,7 @@ class Environment(object):
         """
         return {x.value() for x in self.lookup(var)}
 
-    def __bind(self, var, t):
+    def bind(self, var, types):
         """
         Bind a variable to a type in the environment.
 
@@ -550,11 +560,14 @@ class Environment(object):
         Returns:
             None
         """
+        assert isinstance(types, set)
+        assert all(isinstance(t, Type) for t in types)
+
         variables = self.__variables
         if var in variables:
-            variables[var] |= t
+            variables[var] |= types
         else:
-            variables[var] = t
+            variables[var] = types
 
     def infer_num(self, num):
         """
@@ -577,6 +590,23 @@ class Environment(object):
         """
         return self.lookup(node.id)
 
+    def infer_call(self, node):
+        """
+        First change the function environment based on the argument,
+        then evaluate.
+
+        Returns:
+            set[Type]
+        """
+        self.parse_call(node)
+        ret_types = set()
+        types = self.infer_type(node.func)
+        for t in types:
+            if isinstance(t, FunctionType):
+                ret_types |= t.return_type()
+
+        return ret_types
+
     def infer_type(self, node):
         """
         Infer the type of an ast node.
@@ -595,8 +625,20 @@ class Environment(object):
             return {self.__special_types["str"]}
         elif isinstance(node, ast.Name):
             return self.infer_name(node)
+        elif isinstance(node, ast.Call):
+            return self.infer_call(node)
 
         raise NotImplementedError
+
+    def parse_call(self, node):
+        """
+        Edit the function env to update the types of the arguments based
+        on the types passed.
+        """
+        types = self.infer_type(node.func)
+        for t in types:
+            if isinstance(t, FunctionType):
+                t.apply_call_args(node)
 
     def parse_assign(self, node):
         """
@@ -612,7 +654,7 @@ class Environment(object):
             # TODO: Handle variable unpacking later
             if isinstance(target, ast.Name):
                 # Update the type of this variable in the env.
-                self.__bind(target.id, value_types)
+                self.bind(target.id, value_types)
 
     def parse_sequence(self, nodes):
         for node in nodes:
@@ -622,7 +664,14 @@ class Environment(object):
         """
         Create a new functiont type and add it to the env.
         """
-        self.__bind(node.name, {FunctionType(node, self)})
+        self.bind(node.name, {FunctionType(node, self)})
+
+    def parse_expr(self, node):
+        """
+        Will need to keep parsing expression to see if there are any function
+        calls.
+        """
+        raise NotImplementedError
 
     def parse(self, node):
         """
@@ -637,6 +686,10 @@ class Environment(object):
             self.parse_assign(node)
         elif isinstance(node, ast.FunctionDef):
             self.parse_func_def(node)
+        elif isinstance(node, ast.Call):
+            self.parse_call(node)
+        elif isinstance(node, ast.Expr):
+            self.parse_expr(node.value)
 
     @classmethod
     def from_code(cls, code, **kwargs):
