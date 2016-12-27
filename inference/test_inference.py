@@ -168,6 +168,40 @@ x = func(arg=2)
         """
         env = Environment.from_code(code)
 
+        # Saved value
+        self.assertSetEqual(
+            env.lookup_values("x"),
+            {"int", "float"}
+        )
+        # Argument
+        self.assertSetEqual(
+            simple(env.lookup("func")).environment().lookup_values("arg"),
+            {"int", "float"}
+        )
+        # Return types
+        self.assertSetEqual(
+            {t.value() for t in simple(env.lookup("func")).return_type()},
+            {"int", "float"}
+        )
+
+    def test_nested_functions(self):
+        """Test nested function calls."""
+        code = """
+def func():
+    def func():
+        def func():
+            return 2
+        return func()
+    return func()
+x = func()
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+
 
 
 if __name__ == "__main__":
