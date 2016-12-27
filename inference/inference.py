@@ -152,6 +152,12 @@ class Type(object):
         # parse_call env
         self.__env = init_env
 
+    def reference_node(self):
+        """
+        The ast node this type is based off od if any.
+        """
+        return self.__ref_node
+
     def value(self):
         """
         A hashable representation of this type.
@@ -194,6 +200,9 @@ class Type(object):
         # All types should be types
         assert all(isinstance(t, Type) for t in types)
 
+        if not found_type:
+            return {env.special_types()["None"]}
+
         return types
 
     def attrs(self):
@@ -234,6 +243,12 @@ class Type(object):
 
     def __hash__(self):
         return hash(self.value())
+
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and (hash(self) == hash(other))
+
+    def __ne__(self, other):
+        return not (self == other)
 
 
 class FunctionType(Type):
@@ -282,6 +297,7 @@ class FunctionType(Type):
             args_dict[args_node.kwarg.arg] = {env.special_types()["dict"]}
 
         env = Environment.from_env(env, init_variables=args_dict)
+        env.parse_sequence(node.body)
 
         super().__init__(ref_node=node, init_env=env)
 
@@ -304,6 +320,9 @@ class FunctionType(Type):
         # Apply keyword
         for kwarg in node.keywords:
             env.bind(kwarg.arg, env.infer_type(kwarg.value))
+
+        # Re-evaluate the body
+        env.parse_sequence(self.reference_node().body)
 
     def __generate_hash(self, node):
         """
@@ -359,6 +378,11 @@ class StrType(Type):
 class AnyType(Type):
     def value(self):
         return "Any"
+
+
+class NoneType(Type):
+    def value(self):
+        return "None"
 
 
 class TupleType(Type):
@@ -446,6 +470,7 @@ def load_builtin_types():
         "complex": ComplexType(),
         "str": StrType(),
         "Any": any_type,
+        "None": NoneType(),
         "tuple": TupleType(any_type),
         "dict": DictType(any_type, any_type),
     }

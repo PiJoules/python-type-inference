@@ -184,21 +184,85 @@ x = func(arg=2)
             {"int", "float"}
         )
 
+    def test_no_specified_return_type(self):
+        """A function with no explicit return statement should return None."""
+        code = """
+def func(arg=1.0):
+    pass
+
+x = func()
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "None"
+        )
+        # Return type
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "None"
+        )
+
+    def test_function_variable_redefinition(self):
+        """
+        Test that variables with same name as a variable in an outer type
+        contains different types if overwritten.
+        """
+        code = """
+x = 1
+
+def func():
+    x = 1.0
+
+x = "str"
+        """
+        env = Environment.from_code(code)
+
+        # Outer
+        self.assertSetEqual(
+            env.lookup_values("x"),
+            {"int", "str"}
+        )
+        # Inner
+        self.assertEqual(
+            simple(simple(env.lookup("func")).environment().lookup("x")).value(),
+            "float"
+        )
+
     def test_nested_functions(self):
         """Test nested function calls."""
         code = """
 def func():
     def func():
-        def func():
-            return 2
-        return func()
+        #def func():
+        #    return 2
+        #return func()
+        return 2
     return func()
 x = func()
         """
         env = Environment.from_code(code)
 
+        # Saved type
         self.assertEqual(
             simple(env.lookup("x")).value(),
+            "int"
+        )
+        # Outer
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "int"
+        )
+        # Inner (2nd)
+        self.assertEqual(
+            simple(simple(simple(env.lookup("func")).environment().lookup("func")).return_type()).value(),
+            "int"
+        )
+        # Inner most
+        self.assertEqual(
+            simple(simple(simple(simple(env.lookup("func")).environment().lookup("func")).environment().lookup("func")).return_type()).value(),
             "int"
         )
 
