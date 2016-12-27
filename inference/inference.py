@@ -132,83 +132,15 @@ the __init__ method.
 """
 
 
-class ArgumentsInfo(object):
-    """
-    A container for handling argument types when calling functions.
-    """
-
-    def __init__(self, positional=None, keyword=None, vararg=None,
-                 kwargs=None, owner=None):
-        """
-        Args:
-            owner (Optional[Type]): For methods where the first arg refers
-                to the instance that owns this method.
-        """
-        self.__positional = positional
-        self.__keyword = keyword
-        self.__vararg = vararg
-        self.__kwargs = kwargs
-        self.__owner = owner
-
-    @classmethod
-    def from_call(self, node, env, owner=None):
-        """
-        Create an ArgumentsInfo from a call node.
-
-        This implementation is for 3.4.
-        """
-        positional = [owner] if owner is not None else []
-        positional += [env.infer_type(arg) for arg in node.args]
-        keyword = {kw.arg: env.infer_type(kw.value) for kw in node.keywords}
-        vararg = env.infer_type(node.starargs) if node.starargs else None
-        kwargs = env.infer_type(node.kwargs) if node.starargs else None
-        return cls(
-            positional=positional,
-            keyword=keyword,
-            vararg=vararg,
-            kwargs=kwargs,
-            owner=owner,
-        )
-
-    def positional_args(self):
-        """
-        Returns:
-            list[set[Type]]
-        """
-        return self.__positional or []
-
-    def keyword_args(self):
-        """
-        Returns:
-            dict[str, set[Type]]
-        """
-        return self.__keyword or {}
-
-    def varargs(self):
-        """
-        Returns:
-            (None, Tuple): Returns None if no *args exists
-        """
-        return self.__vararg
-
-    def kwargs(self):
-        """
-        Returns:
-            (None, Dict): Returns None if no **kwargs exists
-        """
-        return self.__kwargs
-
-
 class Type(object):
-    def __init__(self, owner=None):
-        """
-        Args:
-            owner (Optional[Type]): Provided if this type is a FunctionType
-                that represents a method of an argument. If so, the first
-                positional arg when this is called is always this owner.
-        """
+    def __init__(self, ref_node=None, init_env=None):
         self.__attrs = {}  # dict[str, set[int]]
-        self.__owner = owner
+        self.__ref_node = ref_node
+
+        # Parse default arguments
+        # Arguments types are further infered in function calls in the
+        # parse_call env
+        self.__env = init_env
 
     def value(self):
         """
@@ -216,43 +148,29 @@ class Type(object):
         """
         raise NotImplementedError
 
-    def return_type(self, node, ref_env):
+    def return_type(self):
         """
         The type of variable returned if this type was called.
 
         TODO: Check python version since args change between 3.4 and 3.5.
 
-        Args:
-            node (ast.Call)
-            ref_env (Environment)
-
         Returns:
-            set[int]
+            set[Type]
         """
-        positional = [self.__owner] if self.__owner is not None else []
-        positional += [env.infer_type(arg) for arg in node.args]
-        keyword = {kw.arg: env.infer_type(kw.value) for kw in node.keywords}
-        vararg = env.infer_type(node.starargs) if node.starargs else None
-        kwargs = env.infer_type(node.kwargs) if node.starargs else None
-
-        env = self.environment(
-            ref_env,
-            positional=positional,
-            keyword=keyword,
-            vararg=vararg,
-            kwargs=kwargs,
-        )
+        if not self.__ref_node:
+            raise RuntimeError("An reference node is required when calling this type.")
+        env = self.environment()
 
         types = set()
 
         # Find all return statements
         found_type = False
-        stack = list(self.__node.body)
+        stack = list(self.__ref_node.body)
         while stack:
             node = stack.pop()
             if isinstance(node, ast.Return):
-                t = env.infer_type(node.value)
-                types.add(t)
+                types = env.infer_type(node.value)
+                types |= types
                 found_type = True
             elif isinstance(node, (ast.If, ast.While, ast.For)):
                 stack += node.body + node.orelse
@@ -263,6 +181,9 @@ class Type(object):
             elif isinstance(node, ast.With):
                 stack += node.body
 
+        # All types should be types
+        assert all(isinstance(t, Type) for t in types)
+
         return types
 
     def attrs(self):
@@ -272,16 +193,34 @@ class Type(object):
         return self.__attrs
 
     def add_attr(self, attr, val):
-        self.__attrs
+        """
+        Args:
+            attr (str)
+            val (set[Type])
+        """
+        if attr not in self.__attrs:
+            self.__attrs[attr] = val
+        else:
+            self.__attrs[attr] |= val
 
-    def environment(self, ref_env, positional=None, keyword=None, vararg=None,
-                    kwargs=None):
+    def environment(self):
         """
         The environment of variables and types in this type if it contains
         a body of statements.
 
-        Args:
-            args (ArgumentsInfo)
+        Can be called with or without a node. If the call node is provided,
+        more can be inferred about the types of the arguments.
+
+        TODO: Handle decorators later
+        """
+        if not self.__env:
+            raise RuntimeError("An initial environment is required when calling this type.")
+        return self.__env
+
+    def contents(self):
+        """
+        Returns:
+            set[Type]
         """
         raise NotImplementedError
 
@@ -296,10 +235,52 @@ class Type(object):
 
 
 class FunctionType(Type):
-    def __init__(self, node, env):
-        super().__init__()
-        self.__node = node
-        self.__parent_env = env
+    def __init__(self, node, env, owner=None):
+        """
+        Args:
+            node (ast.FunctionDef)
+            env (Environment): The parent environment containing this type.
+            owner (Optional[Type]): Provided if this type is a FunctionType
+                that represents a method of an argument. If so, the first
+                positional arg when this is called is always this owner.
+        """
+        args_dict = {}
+        args_node = node.args
+
+        # First argument refering to self
+        pos_args = args_node.args
+        if owner is None:
+            start = 0
+        else:
+            start = 1
+            args_dict[pos_args[0]] = owner
+        end = len(pos_args) - len(args_node.defaults)
+
+        # Positional args
+        for arg in pos_args[start:end]:
+            args_dict[arg.arg] = set()
+        for i, arg in enumerate(pos_args[end:]):
+            args_dict[arg.arg] = env.infer_type(args_node.defaults[i])
+
+        # Keyword args
+        keyword_args = args_node.kwonlyargs
+        defaults = args_node.kw_defaults
+        for i, kwarg in enumerate(keyword_args):
+            if defaults[i] is None:
+                args_dict[kwarg.arg] = {env.special_types()["Any"]}
+            else:
+                args_dict[kwarg.arg] = defaults[i]
+
+        # Vararg and kwargs
+        if args_node.vararg:
+            args_dict[args_node.vararg.arg] = {env.special_types()["tuple"]}
+        if args_node.kwarg:
+            args_dict[args_node.kwarg.arg] = {env.special_types()["dict"]}
+
+        env = Environment.from_env(env, init_variables=args_dict)
+
+        super().__init__(ref_node=node, init_env=env)
+
         self.__hash = self.__generate_hash(node)
 
     def __generate_hash(self, node):
@@ -337,9 +318,86 @@ class IntType(Type):
     def value(self):
         return "int"
 
+
 class StrType(Type):
     def value(self):
         return "str"
+
+
+class AnyType(Type):
+    def value(self):
+        return "Any"
+
+
+class TupleType(Type):
+    """
+    A type that can contain different types.
+    """
+    def __init__(self, default, content_types=None):
+        """
+        Args:
+            default (Type): The default type of the contents of this type
+                if this type does not contain anything.
+            content_types (Optional[set[type]])
+        """
+        super().__init__()
+        self.__contents = content_types or set()
+        self.__default = default
+
+    def contents(self):
+        """
+        Returns:
+            set[Type]
+        """
+        if self.__contents:
+            return self.__contents
+        else:
+            return {self.__default}
+
+    def value(self):
+        return "tuple"
+
+
+class DictType(ClassType):
+    """
+    A type that can contains a mapping of different types.
+    """
+    def __init__(self, key_default, value_default, key_contents=None,
+                 value_contents=None):
+        """
+        Args:
+            default (Type): The default type of the contents of this type
+                if this type does not contain anything.
+            content_types (Optional[set[type]])
+        """
+        super().__init__()
+        self.__key_contents = key_contents or set()
+        self.__value_contents = value_contents or set()
+        self.__key_def = key_default
+        self.__val_def = value_default
+
+    def key_contents(self):
+        """
+        Returns:
+            set[Type]
+        """
+        if self.__key_contents:
+            return self.__key_contents
+        else:
+            return {self.__key_def}
+
+    def value_contents(self):
+        """
+        Returns:
+            set[Type]
+        """
+        if self.__value_contents:
+            return self.__value_contents
+        else:
+            return {self.__val_def}
+
+    def value(self):
+        return "dict"
 
 
 def load_builtin_types():
@@ -349,21 +407,25 @@ def load_builtin_types():
     Returns:
         dict[str, Type]
     """
+    any_type = AnyType()
     return {
         "int": IntType(),
         "str": StrType(),
+        "Any": any_type,
+        "tuple": TupleType(any_type),
+        "dict": DictType(any_type, any_type),
     }
 
 
 class Environment(object):
-    required_types = ("int", "str")
+    required_types = ("int", "str", "Any", "tuple", "dict")
 
     def __init__(self, init_node=None, parent_env=None, required_types=None,
                  init_variables=None):
         """
         Args:
             required_types (dict[str, Type])
-            init_variables (dict[str, Type])
+            init_variables (dict[str, set[Type]])
         """
         self.__special_types = {}
         self.__parent = parent_env
@@ -372,11 +434,19 @@ class Environment(object):
 
         self.__initialize_special_types(required_types or load_builtin_types())
 
-        # Parse any initial variables passed through this env,
-        # like args passed to a function
-
         if init_node:
             self.parse(init_node)
+
+    @classmethod
+    def from_env(cls, env, **kwargs):
+        return cls(
+            parent_env=env,
+            required_types=env.special_types(),
+            **kwargs
+        )
+
+    def special_types(self):
+        return self.__special_types
 
     def __initialize_special_types(self, types):
         """
@@ -421,7 +491,14 @@ class Environment(object):
         """
         variables = self.__variables
         if var in variables:
-            return variables[var]
+            types = variables[var]
+            if not types:
+                # Empty set
+                # This is a result of positional args that weren't evaluated
+                # More with function calls.
+                return {self.__special_types["Any"]}
+            else:
+                return types
 
         # Check parent_env
         parent_env = self.__parent
@@ -430,9 +507,35 @@ class Environment(object):
 
         raise RuntimeError("The variable '{}' was not previously declared.".format(var))
 
+    def simple_lookup(self, var):
+        """
+        If a varibale contains only one type, it returns that type instead of
+        the whole set containing one item. Otherwise, it returns the whole set.
+
+        Meant for debugging purposes external to this class.
+        """
+        types = self.lookup(var)
+        if len(types) == 1:
+            return next(iter(types))
+        return types
+
+    def lookup_return_type_values(self, var):
+        """
+        Call .return_type() on each of the types a variable can be then
+        .value()
+        """
+        types = self.lookup(var)  # All types of this variable
+        ret_types = set()  # All return types of these types
+        for t in types:
+            ret_types |= t.return_type()
+        ret_type_vals = {t.value() for t in ret_types}
+        return ret_type_vals
+
     def lookup_values(self, var):
         """
         The hashable representations of all types that a variable can be.
+
+        Call .value() on each of the types a variable can be.
         """
         return {x.value() for x in self.lookup(var)}
 
@@ -442,31 +545,37 @@ class Environment(object):
 
         Args:
             var (str): Variable name
-            type_id (Type): Variable type
+            t (set[Type]): Variable types
 
         Returns:
             None
         """
         variables = self.__variables
         if var in variables:
-            variables[var].add(t)
+            variables[var] |= t
         else:
-            variables[var] = {t}
+            variables[var] = t
 
-    def infer_name(self, num):
+    def infer_num(self, num):
         """
         Returns:
-            Type
+            set[Type]
         """
         val = num.n
         if isinstance(val, int):
-            return self.__special_types["int"]
+            return {self.__special_types["int"]}
         elif isinstance(val, float):
-            return self.__special_types["float"]
+            return {self.__special_types["float"]}
         elif isinstance(val, complex):
-            return self.__special_types["complex"]
+            return {self.__special_types["complex"]}
 
         raise RuntimeError("Cannot infer Num type '{}'.".format(num))
+
+    def infer_name(self, node):
+        """
+        Essentially a variable lookup.
+        """
+        return self.lookup(node.id)
 
     def infer_type(self, node):
         """
@@ -481,9 +590,12 @@ class Environment(object):
             set[Type]: All possible types that this expression could be
         """
         if isinstance(node, ast.Num):
-            return self.infer_name(node)
+            return self.infer_num(node)
         elif isinstance(node, ast.Str):
-            return self.__special_types["str"]
+            return {self.__special_types["str"]}
+        elif isinstance(node, ast.Name):
+            return self.infer_name(node)
+
         raise NotImplementedError
 
     def parse_assign(self, node):
@@ -507,7 +619,10 @@ class Environment(object):
             self.parse(node)
 
     def parse_func_def(self, node):
-        raise NotImplementedError
+        """
+        Create a new functiont type and add it to the env.
+        """
+        self.__bind(node.name, {FunctionType(node, self)})
 
     def parse(self, node):
         """
