@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 
 import unittest
+import json
 from inference import Environment, simple
 
 
@@ -236,10 +237,9 @@ x = "str"
         code = """
 def func():
     def func():
-        #def func():
-        #    return 2
-        #return func()
-        return 2
+        def func():
+            return 2
+        return func()
     return func()
 x = func()
         """
@@ -247,25 +247,136 @@ x = func()
 
         # Saved type
         self.assertEqual(
-            simple(env.lookup("x")).value(),
+            simple(env.lookup("x", ignore_parent=True)).value(),
             "int"
         )
         # Outer
         self.assertEqual(
-            simple(simple(env.lookup("func")).return_type()).value(),
+            simple(simple(env.lookup("func", ignore_parent=True)).return_type()).value(),
             "int"
         )
         # Inner (2nd)
         self.assertEqual(
-            simple(simple(simple(env.lookup("func")).environment().lookup("func")).return_type()).value(),
+            simple(simple(simple(env.lookup("func", ignore_parent=True))
+            .environment().lookup("func", ignore_parent=True)).return_type()).value(),
             "int"
         )
         # Inner most
         self.assertEqual(
-            simple(simple(simple(simple(env.lookup("func")).environment().lookup("func")).environment().lookup("func")).return_type()).value(),
+            simple(simple(simple(simple(env.lookup("func", ignore_parent=True))
+            .environment().lookup("func", ignore_parent=True)).environment()
+            .lookup("func", ignore_parent=True)).return_type()).value(),
             "int"
         )
 
+    def test_class_definition(self):
+        """Test class definition."""
+        code = """
+class A:
+    x = 2
+
+x = A.x
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+
+        # Attribute
+        self.assertEqual(
+            simple(simple(env.lookup("A")).get_attr("x")).value(),
+            "int"
+        )
+
+    def test_class_method_definition(self):
+        """Test function defitnitions inside a class."""
+        code = """
+class A:
+    def func(arg):
+        return arg
+
+x = A.func(2)
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+
+        # Return type
+        self.assertEqual(
+            simple(simple(simple(env.lookup("A")).get_attr("func"))
+            .return_type()).value(),
+            "int"
+        )
+
+    def test_variable_reassignment(self):
+        """
+        Test that a change to a variable assigned from another variable
+        does not affect the first variable types.
+        """
+        code = """
+x = 1
+y = x
+x = 1.0
+y = 2j
+        """
+        env = Environment.from_code(code)
+
+        self.assertSetEqual(
+            env.lookup_values("x"),
+            {"int", "float"}
+        )
+        self.assertSetEqual(
+            env.lookup_values("y"),
+            {"int", "complex"}
+        )
+
+    def test_variable_attribute_assignment(self):
+        """
+        Test that copied types through variable assignment from another
+        variable still affect the same types when a new attribute is added.
+        """
+        code = """
+x = 1
+x.a = 5
+y = x
+y.a = 5.0
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+        self.assertEqual(
+            simple(env.lookup("y")).value(),
+            "int"
+        )
+        self.assertSetEqual(
+            {t.value() for t in simple(env.lookup("x")).get_attr("a")},
+            {"int", "float"}
+        )
+        self.assertSetEqual(
+            {t.value() for t in simple(env.lookup("y")).get_attr("a")},
+            {"int", "float"}
+        )
+
+    def test_attribute_reassignment(self):
+        """Tets attribute reassingment on a variable."""
+#        code = """
+#class A:
+#    def func(arg):
+#        return arg
+#
+#A.func = 2
+#        """
+#        env = Environment.from_code(code)
 
 
 if __name__ == "__main__":

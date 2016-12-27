@@ -152,6 +152,9 @@ class Type(object):
         # parse_call env
         self.__env = init_env
 
+    def json(self):
+        return self.value()
+
     def reference_node(self):
         """
         The ast node this type is based off od if any.
@@ -217,10 +220,20 @@ class Type(object):
             attr (str)
             val (set[Type])
         """
+        assert isinstance(val, set)
+        assert all(isinstance(t, Type) for t in val)
+
         if attr not in self.__attrs:
             self.__attrs[attr] = val
         else:
             self.__attrs[attr] |= val
+
+    def get_attr(self, attr):
+        """
+        Returns:
+            set[Type]
+        """
+        return self.__attrs.get(attr, set())
 
     def environment(self):
         """
@@ -303,6 +316,12 @@ class FunctionType(Type):
 
         self.__hash = self.__generate_hash(node)
 
+    def json(self):
+        return {
+            "value": self.value(),
+            "environment": self.environment().json(),
+        }
+
     def apply_call_args(self, node):
         """
         Updatee the variables in an environment based on what is passed to
@@ -345,11 +364,54 @@ class FunctionType(Type):
 
 
 class ClassType(Type):
-    pass
+    def __init__(self, node, env, owner=None):
+        """
+        All variables assigned in this env are attributes of this type and
+        its instance.
+        """
+        super().__init__(ref_node=node)
+        new_env = Environment.from_env(env)
+        new_env.parse_sequence(node.body)
+        for var, types in new_env.variables().items():
+            self.add_attr(var, types)
+
+        self.__instance = InstanceType(self)
+        self.__hash = self.__generate_hash(node)
+
+    def return_type(self):
+        return {self.__instance}
+
+    def __generate_hash(self, node):
+        """
+        Generate the hash for this function once.
+
+        Args:
+            node (ast node)
+        """
+        return hash(astor.to_source(node))
+
+    def __hash__(self):
+        return self.__hash
 
 
 class InstanceType(Type):
-    pass
+    def __init__(self, cls_type):
+        """
+        Create an instance from a class.
+        """
+        self.__hash = self.__generate_hash(cls_type.reference_node())
+
+    def __generate_hash(self, node):
+        """
+        Generate the hash for this function once.
+
+        Args:
+            node (ast node)
+        """
+        return hash(astor.to_source(node))
+
+    def __hash__(self):
+        return self.__hash
 
 
 """
@@ -414,7 +476,7 @@ class TupleType(Type):
         return "tuple"
 
 
-class DictType(ClassType):
+class DictType(Type):
     """
     A type that can contains a mapping of different types.
     """
@@ -489,7 +551,7 @@ class Environment(object):
         self.__special_types = {}
         self.__parent = parent_env
         self.__types = {}
-        self.__variables = init_variables or {}
+        self.__variables = dict(**(init_variables or {}))  # Copy the dict
 
         self.__initialize_special_types(required_types or load_builtin_types())
 
@@ -535,7 +597,7 @@ class Environment(object):
         """
         return self.__parent
 
-    def lookup(self, var):
+    def lookup(self, var, ignore_parent=False):
         """
         Check the type of a variable.
 
@@ -543,9 +605,11 @@ class Environment(object):
 
         Args:
             var (str): Variable name
+            ignore_parent (bool): If the parent env exists, do not check it if
+                the this is true and the variable is not in this env.
 
         Returns:
-            set[Type]: The type of the variable if it exists. None if
+            (None, set[Type]): The type of the variable if it exists. None if
                 not found.
         """
         variables = self.__variables
@@ -561,10 +625,10 @@ class Environment(object):
 
         # Check parent_env
         parent_env = self.__parent
-        if parent_env:
+        if parent_env and not ignore_parent:
             return parent_env.lookup(var)
 
-        raise RuntimeError("The variable '{}' was not previously declared.".format(var))
+        return None
 
     def lookup_values(self, var):
         """
@@ -612,8 +676,11 @@ class Environment(object):
     def infer_name(self, node):
         """
         Essentially a variable lookup.
+
+        Copy contents into a new set since variables assigned to variables
+        are unaffected by reassignments of the second variables.
         """
-        return self.lookup(node.id)
+        return set(self.lookup(node.id))
 
     def infer_call(self, node):
         """
@@ -631,6 +698,21 @@ class Environment(object):
                 ret_types |= t.return_type()
 
         return ret_types
+
+    def infer_attribute(self, node):
+        """
+        Returns:
+            set[Type]
+        """
+        value = node.value  # ast node
+        attr = node.attr  # str
+        attr_types = set()
+        value_types = self.infer_type(value)
+
+        for t in value_types:
+            attr_types |= t.get_attr(attr)
+
+        return attr_types
 
     def infer_type(self, node):
         """
@@ -652,8 +734,10 @@ class Environment(object):
             return self.infer_name(node)
         elif isinstance(node, ast.Call):
             return self.infer_call(node)
+        elif isinstance(node, ast.Attribute):
+            return self.infer_attribute(node)
 
-        raise NotImplementedError
+        raise RuntimeError("Unable to infer type for node '{}'".format(node))
 
     def parse_call(self, node):
         """
@@ -680,6 +764,10 @@ class Environment(object):
             if isinstance(target, ast.Name):
                 # Update the type of this variable in the env.
                 self.bind(target.id, value_types)
+            elif isinstance(target, ast.Attribute):
+                types = self.infer_type(target.value)
+                for t in types:
+                    t.add_attr(target.attr, value_types)
 
     def parse_sequence(self, nodes):
         for node in nodes:
@@ -687,9 +775,15 @@ class Environment(object):
 
     def parse_func_def(self, node):
         """
-        Create a new functiont type and add it to the env.
+        Create a new function type and add it to the env.
         """
         self.bind(node.name, {FunctionType(node, self)})
+
+    def parse_class_def(self, node):
+        """
+        Create a new class and instance type and add them to the env.
+        """
+        self.bind(node.name, {ClassType(node, self)})
 
     def parse_expr(self, node):
         """
@@ -715,9 +809,20 @@ class Environment(object):
             self.parse_call(node)
         elif isinstance(node, ast.Expr):
             self.parse_expr(node.value)
+        elif isinstance(node, ast.ClassDef):
+            self.parse_class_def(node)
 
     @classmethod
     def from_code(cls, code, **kwargs):
         return cls(init_node=ast.parse(code), **kwargs)
 
+    def json(self):
+        """
+        A json representation of this environment and nested envs for
+        debugging purposes.
+        """
+        d = {}
+        for var, types in self.variables().items():
+            d[var] = [t.json() for t in types]
+        return d
 
