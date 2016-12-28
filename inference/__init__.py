@@ -1,1 +1,1 @@
-from .inference import Environment, simple
+from .inference import *
