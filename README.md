@@ -1,5 +1,13 @@
 # Python Type Inference
 
+## Installation
+Inside a virtualenv, run
+```sh
+(venv) ./_setup.sh
+```
+This automatically installs the `inference` package into the venv for use.
+
+
 ## TODO
 - Determine argument types from what is passed
 - Method/attribute calls and method argument handling
