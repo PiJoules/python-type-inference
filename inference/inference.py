@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-import ast_utils
+from . import ast_utils
 import ast
 import astor
 
@@ -347,9 +347,6 @@ class FunctionType(Type):
             node (ast.Call)
         """
         env = self.environment()
-        print("apply_call_args:")
-        print("self.__positional:", self.__positional)
-        ast_utils.prettyparseprint(node)
 
         # Apply positional
         """

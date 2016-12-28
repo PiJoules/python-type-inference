@@ -2,627 +2,563 @@
 # -*- coding: utf-8 -*-
 
 import unittest
-
-from inference import TypeInferer
+import json
+from inference import Environment, simple
 
 
 class TestTypeInference(unittest.TestCase):
-    def setUp(self):
-        self.inferer = TypeInferer.from_code(
-"""
-x = 2
-x = "a"
-x = 0
-
-y = 0.1
-y += x
-z = x
-
-d = {}
-d2 = {2: "a"}
-d3 = {x: y}
-d4 = "a"
-d4 = d3
-
-l = []
-s = {1, 1.0}
-s = {2.0, 2}  # multiple assignment of same type for collection
-t = ("str", )
-l2 = [s, t]
-s2 = {1}
-s2 = {2.0}
-
-a = s + 0.2
-b = not a
-c = ~b
-e = +x
-f = -y
-
-def func():
-    pass
-
-def func2():
-    return 2
-
-x2 = 2
-def func3():
-    return x2
-
-def func4():
-    x2 = "some str"
-    return x2
-
-x3 = 5
-def func5():
-    global x3
-    x3 = 1.0
-    return x3
-
-def func7(arg1):
-    pass
-
-def func8(arg1):
-    return arg1
-
-def func9(kwarg1=1):
-    return kwarg1
-
-def func10(kwarg1=None):
-    kwarg1 = kwarg1 or "str"
-    return kwarg1
-
-def func11(arg1, kwarg1=None):
-    return arg1 or kwarg1
-
-def func12(a, b=1, *c, d, e=2, **f):
-    return c
-
-def func13(a, b=1, *c, d, e=2, **f):
-    return f
-
-def func14(a, b=1, *c, d, e=2, **f):
-    return d
-
-def func15(a, b=1, *c, d, e=2, **f):
-    return e
-
-def func16():
-    return func9()
-
-def func17():
-    return func16() or "string"
-
-def func18():
-    return func18()
-
-def func19():
-    return func19() or 5
-
-def func20():
-    return func19() and func20()
-
-def fib(n):
-    return n if n < 2 else fib(n-1) + fib(n-2)
-
-def func21(n):
-    if n < 10:
-        return 2
-    else:
-        return "a"
-
-if x:
-    n = 4
-else:
-    n = 1.0
-
-def func22(n):
-    while n < 10:
-        return 2
-    else:
-        return "a"
-
-while x:
-    n2 = 4
-else:
-    n2 = 1.0
-
-def func23(n):
-    for i in range(4):
-        return 2
-    else:
-        return "a"
-
-for i in range(4):
-    n3 = 4
-else:
-    n3 = 1.0
-
-def func24():
-    try:
-        return 1
-    except OSError as e:
-        return 1.0
-    except ValueError:
-        return "1"
-    except:
-        return 2j
-    else:
-        return None
-    finally:
-        return -1.0
-
-try:
-    n4 = 1
-except OSError as e:
-    n4 = 1.0
-except ValueError:
-    n4 = "1"
-except:
-    n4 = 2j
-else:
-    n4 = None
-finally:
-    n4 = -1.0
-
-def func25():
-    with 2 as x:
-        return x
-    return 1.0
-
-with 2.0 as n5:
-    n5 = 1
-""")
-        self.types = self.inferer.environment()
-
     def test_assignment(self):
         """Test variable assignment."""
-        self.assertSetEqual(self.types["x"].type(), {"int", "str"})
-        self.assertEqual(self.types["z"], self.types["x"])
-
-        env = TypeInferer.from_code("""
+        code = """
 x = 2
+        """
+        env = Environment.from_code(code)
+
+        self.assertSetEqual(env.lookup_values("x"), {"int"})
+
+    def test_multiple_assignment(self):
+        """Test assignment of multiple types to the same variable."""
+        code = """
+x = 2
+x = "string"
+x = 3
+        """
+        env = Environment.from_code(code)
+
+        self.assertSetEqual(env.lookup_values("x"), {"int", "str"})
+
+    def test_function_definition(self):
+        """Test function definitions."""
+        code = """
+def func():
+    return 2
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "int"
+        )
+
+    def test_func_def_default_args(self):
+        """
+        Test function definition with an argument and the function is not
+        called. There is no parseable type in this case.
+        """
+        code = """
+def func(arg):
+    return arg
+        """
+        env = Environment.from_code(code)
+
+        # Argument
+        self.assertEqual(
+            simple(env.lookup("func")).environment().lookup("arg"),
+            set()
+        )
+        # Return type
+        self.assertEqual(
+            simple(env.lookup("func")).return_type(),
+            set()
+        )
+
+    def test_func_def_keyword_args(self):
+        """Test function definition with default keyword arguments."""
+        code = """
+def func(arg=2):
+    return arg
+        """
+        env = Environment.from_code(code)
+
+        # Argument
+        self.assertEqual(
+            simple(simple(env.lookup("func")).environment().lookup("arg")).value(),
+            "int"
+        )
+        # Return type
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "int"
+        )
+
+    def test_func_def_varargs(self):
+        """Test function definition with variable arguments (*args)."""
+        code = """
+def func(*args):
+    return args
+        """
+        env = Environment.from_code(code)
+
+        # Argument
+        self.assertEqual(
+            simple(simple(env.lookup("func")).environment().lookup("args")).value(),
+            "tuple"
+        )
+        # Return type
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "tuple"
+        )
+        # Tuple contents
+        self.assertEqual(
+            simple(simple(simple(env.lookup("func")).environment().lookup("args"))
+            .contents()).value(),
+            "Any"
+        )
+
+    def test_func_def_kwargs(self):
+        """Test function definition with **kwargs."""
+        code = """
+def func(**kwargs):
+    return kwargs
+        """
+        env = Environment.from_code(code)
+
+        # Arguments
+        self.assertEqual(
+            simple(simple(env.lookup("func")).environment().lookup("kwargs")).value(),
+            "dict"
+        )
+        # Return type
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "dict"
+        )
+        # Dict contents
+        self.assertEqual(
+            simple(simple(simple(env.lookup("func")).environment().lookup("kwargs"))
+            .value_contents()).value(),
+            "Any"
+        )
+        self.assertEqual(
+            simple(simple(simple(env.lookup("func")).environment().lookup("kwargs"))
+            .key_contents()).value(),
+            "Any"
+        )
+
+    def test_func_call_positional(self):
+        """Test new argument types by function call arguments."""
+        code = """
+def func(arg):
+    return arg
+
+x = func(2)
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+        # Argument
+        self.assertEqual(
+            simple(simple(env.lookup("func")).environment().lookup("arg")).value(),
+            "int"
+        )
+        # Return value
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "int"
+        )
+
+    def test_func_call_keyword(self):
+        """Test new argument types by function call arguments with keyword arguments."""
+        code = """
+def func(arg=1.0):
+    return arg
+
+x = func(arg=2)
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertSetEqual(
+            env.lookup_values("x"),
+            {"int", "float"}
+        )
+        # Argument
+        self.assertSetEqual(
+            simple(env.lookup("func")).environment().lookup_values("arg"),
+            {"int", "float"}
+        )
+        # Return types
+        self.assertSetEqual(
+            {t.value() for t in simple(env.lookup("func")).return_type()},
+            {"int", "float"}
+        )
+
+    def test_no_specified_return_type(self):
+        """A function with no explicit return statement should return None."""
+        code = """
+def func(arg=1.0):
+    pass
+
+x = func()
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "None"
+        )
+        # Return type
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "None"
+        )
+
+    def test_function_variable_redefinition(self):
+        """
+        Test that variables with same name as a variable in an outer type
+        contains different types if overwritten.
+        """
+        code = """
+x = 1
+
+def func():
+    x = 1.0
+
+x = "str"
+        """
+        env = Environment.from_code(code)
+
+        # Outer
+        self.assertSetEqual(
+            env.lookup_values("x"),
+            {"int", "str"}
+        )
+        # Inner
+        self.assertEqual(
+            simple(simple(env.lookup("func")).environment().lookup("x")).value(),
+            "float"
+        )
+
+    def test_nested_functions(self):
+        """Test nested function calls."""
+        code = """
+def func():
+    def func():
+        def func():
+            return 2
+        return func()
+    return func()
+x = func()
+        """
+        env = Environment.from_code(code)
+
+        # Saved type
+        self.assertEqual(
+            simple(env.lookup("x", ignore_parent=True)).value(),
+            "int"
+        )
+        # Outer
+        self.assertEqual(
+            simple(simple(env.lookup("func", ignore_parent=True)).return_type()).value(),
+            "int"
+        )
+        # Inner (2nd)
+        self.assertEqual(
+            simple(simple(simple(env.lookup("func", ignore_parent=True))
+            .environment().lookup("func", ignore_parent=True)).return_type()).value(),
+            "int"
+        )
+        # Inner most
+        self.assertEqual(
+            simple(simple(simple(simple(env.lookup("func", ignore_parent=True))
+            .environment().lookup("func", ignore_parent=True)).environment()
+            .lookup("func", ignore_parent=True)).return_type()).value(),
+            "int"
+        )
+
+    def test_class_definition(self):
+        """Test class definition."""
+        code = """
+class A:
+    x = 2
+
+x = A.x
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+
+        # Attribute
+        self.assertEqual(
+            simple(simple(env.lookup("A")).get_attr("x")).value(),
+            "int"
+        )
+
+    def test_class_method_definition(self):
+        """Test function defitnitions inside a class."""
+        code = """
+class A:
+    def func(arg):
+        return arg
+
+x = A.func(2)
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+
+        # Return type
+        self.assertEqual(
+            simple(simple(simple(env.lookup("A")).get_attr("func"))
+            .return_type()).value(),
+            "int"
+        )
+
+    def test_variable_reassignment(self):
+        """
+        Test that a change to a variable assigned from another variable
+        does not affect the first variable types.
+        """
+        code = """
+x = 1
 y = x
 x = 1.0
-""").environment()
-        self.assertEqual(env["y"].type(), "int")
-        self.assertSetEqual(env["x"].type(), {"int", "float"})
+y = 2j
+        """
+        env = Environment.from_code(code)
 
-    def test_augmented_assignment(self):
-        """Test augmented assignment."""
-        self.assertSetEqual(self.types["y"].type(),
-                            {"int", "str", "float"})
+        self.assertSetEqual(
+            env.lookup_values("x"),
+            {"int", "float"}
+        )
+        self.assertSetEqual(
+            env.lookup_values("y"),
+            {"int", "complex"}
+        )
 
-    def test_dict_literal(self):
-        """Test literal dictionary contents."""
-        self.assertEqual(self.types["d"].type(),
-                         ("Any", "Any"))
-        self.assertEqual(self.types["d2"].type(),
-                         ("int", "str"))
-        self.assertEqual(self.types["d3"].type(),
-                         (frozenset({"int", "str"}),
-                          frozenset({"int", "float", "str"})))
-        self.assertSetEqual(self.types["d4"].type(),
-                         frozenset([
-                             (
-                                 frozenset({"int", "str"}),
-                                 frozenset({"int", "float", "str"})
-                             ),
-                             "str"
-                         ]))
+    def test_variable_attribute_assignment(self):
+        """
+        Test that copied types through variable assignment from another
+        variable still affect the same types when a new attribute is added.
+        """
+        code = """
+x = 1
+x.a = 5
+y = x
+y.a = 5.0
+        """
+        env = Environment.from_code(code)
 
-    def test_container(self):
-        """Test literal container (list, set, tuple) contents."""
-        self.assertEqual(self.types["l"].type(), ("Any", ))
-        self.assertEqual(self.types["s"].type(), (frozenset(["int", "float"]), ))
-        self.assertEqual(self.types["t"].type(), ("str", ))
-        self.assertEqual(self.types["l2"].type(),
-                         (frozenset([("str", ), (frozenset(["int", "float"]), )]), ))
-        self.assertEqual(self.types["s2"].type(),
-                         frozenset([("int", ), ("float", )]))
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+        self.assertEqual(
+            simple(env.lookup("y")).value(),
+            "int"
+        )
+        self.assertSetEqual(
+            {t.value() for t in simple(env.lookup("x")).get_attr("a")},
+            {"int", "float"}
+        )
+        self.assertSetEqual(
+            {t.value() for t in simple(env.lookup("y")).get_attr("a")},
+            {"int", "float"}
+        )
 
-    def test_unary_op(self):
-        """Test unary operations."""
-        self.assertEqual(self.types["b"].type(), "bool")
-        self.assertEqual(self.types["c"].type(), "int")
-        self.assertEqual(self.types["e"].type(), "int")
-        self.assertSetEqual(self.types["f"].type(), {"int", "float"})
+    def test_attribute_reassignment(self):
+        """Tets attribute reassingment on a variable."""
+        code = """
+class A:
+    def func(arg):
+        return arg
 
-    def test_bin_op(self):
-        """Test binary operation."""
-        self.assertSetEqual(self.types["a"].type(),
-                            frozenset([(frozenset(["int", "float"]), ), "float"]))
+A.func = 2
+        """
+        env = Environment.from_code(code)
 
-    def test_function_return(self):
-        """Test function return types."""
-        self.assertEqual(self.types["func"].callable_return_type().type(), "None")
-        self.assertEqual(self.types["func2"].callable_return_type().type(), "int")
-        self.assertEqual(self.types["func3"].callable_return_type(), self.types["x2"])
-        self.assertEqual(self.types["func4"].callable_return_type().type(), "str")
+        self.assertSetEqual(
+            {t.value() for t in simple(simple(env.lookup("A")).get_attr("func"))},
+            {"function", "int"}
+        )
 
+    def test_instance_creation(self):
+        """Test that all attributes of an instance are created on creation."""
+        code = """
+class A:
+    def a(self):
+        return self._a
+    def func(self):
+        return self
+    def __init__(self, arg):
+        self._a = arg
 
-    def test_function_body_env(self):
-        """Test the function body environment."""
-        self.assertEqual(self.types["func4"].environment()["x2"].type(), "str")
+x = A("string")
+y = x.func()
+        """
+        env = Environment.from_code(code)
 
-    def test_global(self):
-        """Test handling of global variables."""
-        self.assertSetEqual(self.types["func5"].callable_return_type().type(),
-                            {"int", "float"})
-        self.assertSetEqual(self.types["func5"].environment()["x3"].type(),
-                            {"int", "float"})
-        self.assertSetEqual(self.types["x3"].type(),
-                            {"int", "float"})
+        # Stored value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "A"
+        )
+        self.assertEqual(
+            simple(env.lookup("y")).value(),
+            "A"
+        )
 
-    def test_positional_args(self):
-        """Test positional argument handling."""
-        self.assertEqual(self.types["func7"].callable_return_type().type(), "None")
-        self.assertEqual(self.types["func7"].environment()["arg1"].type(), "Any")
-        self.assertEqual(self.types["func8"].callable_return_type().type(), "Any")
+        # Attributes of x
+        self.assertEqual(
+            simple(simple(simple(env.lookup("x")).get_attr("a")).return_type())
+            .value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(env.lookup("x")).get_attr("_a")).value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(simple(env.lookup("x")).get_attr("func")).return_type())
+            .value(),
+            "A"
+        )
 
-    def test_keyword_args(self):
-        """Test keyword arguments."""
-        self.assertEqual(self.types["func9"].callable_return_type().type(), "int")
-        self.assertEqual(self.types["func9"].environment()["kwarg1"].type(), "int")
-        self.assertSetEqual(self.types["func10"].callable_return_type().type(),
-                            {"None", "str"})
-        self.assertSetEqual(self.types["func10"].environment()["kwarg1"].type(),
-                            {"None", "str"})
-        self.assertEqual(self.types["func11"].callable_return_type().type(), "Any")
-        self.assertEqual(self.types["func14"].callable_return_type().type(), "Any")
-        self.assertEqual(self.types["func15"].callable_return_type().type(), "int")
+        # Attributes of y
+        self.assertEqual(
+            simple(simple(simple(env.lookup("y")).get_attr("a")).return_type())
+            .value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(env.lookup("y")).get_attr("_a")).value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(simple(env.lookup("y")).get_attr("func")).return_type())
+            .value(),
+            "A"
+        )
 
-    def test_vararg(self):
-        """Test variable positional arguments."""
-        self.assertEqual(self.types["func12"].callable_return_type().type(),
-                         ("Any", ))
+    def test_method_access_to_class(self):
+        """Test that methods have access to their classes."""
+        code = """
+class A:
+    def func(self):
+        pass
+        """
+        env = Environment.from_code(code)
 
-    def test_variable_keyword_args(self):
-        """Test variable keyword arguments."""
-        self.assertEqual(self.types["func13"].callable_return_type().type(),
-                         ("Any", "Any"))
+        # Just show the return type is the class itself
+        self.assertEqual(
+            simple(simple(simple(simple(env.lookup("A")).get_attr("func")).environment()
+            .lookup("A")).return_type()).value(),
+            "A"
+        )
 
-    def test_call(self):
-        """Test function calls."""
-        self.assertEqual(self.types["func16"].callable_return_type().type(), "int")
-        self.assertSetEqual(self.types["func17"].callable_return_type().type(),
-                            {"int", "str"})
+    def test_function_access_to_self(self):
+        """Test that a function has access to itself in its environment."""
+        code = """
+def func():
+    return 2
+        """
+        env = Environment.from_code(code)
 
-    def test_recursive_call(self):
-        """Test return types for recursive functions."""
-        self.assertEqual(self.types["func18"].callable_return_type().type(), "Any")
-        self.assertEqual(self.types["func19"].callable_return_type().type(), "int")
-        self.assertEqual(self.types["func20"].callable_return_type().type(), "int")
-        self.assertEqual(self.types["fib"].callable_return_type().type(), "Any")
+        self.assertSetEqual(
+            simple(env.lookup("func")).environment().lookup_values("func"),
+            {"function"}
+        )
 
-    def test_if_statement(self):
-        """Test if statement."""
-        self.assertSetEqual(self.types["n"].type(), {"int", "float"})
+    def test_uninferable_recursive_call(self):
+        """Test functional recursive calls that cannot be evaluated to anything."""
+        code = """
+def func():
+    return func()
 
-    def test_func_if_statement(self):
-        """Test if statements in a function."""
-        self.assertSetEqual(self.types["func21"].callable_return_type().type(),
-                            {"int", "str"})
+x = func()
+        """
+        env = Environment.from_code(code)
 
-    def test_while_statement(self):
-        """Test while statement."""
-        self.assertSetEqual(self.types["n2"].type(), {"int", "float"})
+        # Saved value
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
 
-    def test_func_while_statement(self):
-        """Test while statements in a function."""
-        self.assertSetEqual(self.types["func22"].callable_return_type().type(),
-                            {"int", "str"})
+    def test_inferable_recursive_call(self):
+        """Test that recursive calls that return another value return that value."""
+        code = """
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n-1) + fib(n-2)
 
-    def test_for_statement(self):
-        """Test for statement."""
-        self.assertSetEqual(self.types["n3"].type(), {"int", "float"})
+x = fib(5)
+        """
+        env = Environment.from_code(code)
 
-    def test_func_for_statement(self):
-        """Test for statements in a function."""
-        self.assertSetEqual(self.types["func23"].callable_return_type().type(),
-                            {"int", "str"})
-
-    def test_try_statement(self):
-        """Test try statement."""
-        self.assertSetEqual(self.types["n4"].type(), {"int", "float", "complex", "str", "None"})
-
-    def test_func_try_statement(self):
-        """Test try statements in a function."""
-        self.assertSetEqual(self.types["func24"].callable_return_type().type(),
-                            {"int", "float", "complex", "str", "None"})
-
-    def test_with_statement(self):
-        """Test with statement."""
-        self.assertSetEqual(self.types["n5"].type(), {"int", "float"})
-
-    def test_func_with_statement(self):
-        """Test with statements in a function."""
-        self.assertSetEqual(self.types["func25"].callable_return_type().type(),
-                            {"int", "float"})
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
 
     def test_mutual_recursion(self):
         """Test mutual recursion among multiple functions."""
-        env = TypeInferer.from_code("""
+        code = """
 def func():
     return func2()
-
 def func2():
+    return func3()
+def func3():
     return func()
-""").environment()
+x = func()
+        """
+        env = Environment.from_code(code)
 
-        self.assertEqual(env["func"].callable_return_type().type(), "Any")
-        self.assertEqual(env["func2"].callable_return_type().type(), "Any")
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
 
-    def test_nested_mutual_recursion(self):
-        """Test mutual recursion for nested functions."""
-        env = TypeInferer.from_code("""
-def func():
-    def nested():
-        return func()
-    return nested()
-""").environment()
+    def test_function_redefinition(self):
+        """Test the redefinition of a function."""
+        code = """
+def func(arg, arg2):
+    return arg(arg, arg2)
+x = func(func, 5j)
+def func(a):
+    return a(a)
+x = func(func)
+        """
+        env = Environment.from_code(code)
 
-        self.assertEqual(env["func"].callable_return_type().type(), "Any")
-        self.assertEqual(env["func"].environment()["nested"].callable_return_type().type(), "Any")
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
 
-    def test_mutual_recursion_bool_operation(self):
-        """Allow for one possible return type to be given in a boolean expression."""
-        env = TypeInferer.from_code("""
-def func():
-    return func2() or 2
+    def test_recursive_argument_calls(self):
+        """Test that a function whose argument is a call to itself returns none."""
+        code = """
+def func(arg, arg2):
+    return arg(arg, arg2)
+x = func(func, 5j)
+        """
+        env = Environment.from_code(code)
 
-def func2():
-    return func()
-
-x = func2()
-""").environment()
-
-        self.assertEqual(env["func"].callable_return_type().type(), "int")
-        self.assertEqual(env["x"].type(), "int")
-        self.assertEqual(env["func2"].callable_return_type().type(), "int")
-
-    def test_mutual_recursion_binary_operation(self):
-        """Allow for one possible return type to be given in a binary expression."""
-        env = TypeInferer.from_code("""
-def func2():
-    return func()
-
-def func():
-    return func2() + 2
-
-x = func2()
-""").environment()
-
-        self.assertEqual(env["func"].callable_return_type().type(), "int")
-        self.assertEqual(env["x"].type(), "int")
-        self.assertEqual(env["func2"].callable_return_type().type(), "int")
-
-    def test_local_vars(self):
-        """Local variables should not persist outside a function."""
-        env = TypeInferer.from_code("""
-def func():
-    x = 2
-""").environment()
-
-        self.assertNotIn("x", env)
-
-    def test_func_assignment(self):
-        """Test function assignment and calling."""
-        env = TypeInferer.from_code("""
-def func():
-    return 2
-
-x = func
-y = func()
-""").environment()
-        self.assertEqual(env["func"].callable_return_type().type(), "int")
-        self.assertEqual(env["x"].type(), "function")
-        self.assertEqual(env["y"].type(), "int")
-
-    def test_local_func_vars(self):
-        """Test variables with same name declared in func do not affect vars outside of func."""
-        env = TypeInferer.from_code("""
-x = "str"
-
-def func():
-    x = 2
-
-x = 1.0
-""").environment()
-        self.assertEqual(env["func"].callable_return_type().type(), "None")
-        self.assertEqual(env["func"].environment()["x"].type(), "int")
-        self.assertSetEqual(env["x"].type(), {"str", "float"})
-
-    def test_class_def(self):
-        """Test class definitions."""
-        env = TypeInferer.from_code("""
-class A:
-    pass
-x = A()
-
-y = x
-y = 2
-z = A
-a = z()
-""").environment()
-        self.assertEqual(env["x"].type(), "A")
-
-        # Multiple class definition
-        self.assertSetEqual(env["y"].type(), {"A", "int"})
-
-        # Class assignment and calling
-        self.assertEqual(env["z"].type(), "type")
-        self.assertEqual(env["a"].type(), "A")
-
-    def test_attribute_assignment(self):
-        """Test assignments to attributes."""
-        env = TypeInferer.from_code("""
-x = 2
-x.attr = 1
-""").environment()
-        self.assertEqual(env["x"].type(), "int")
-        self.assertEqual(env["x"].get_attr("attr").type(), "int")
-
-        # Assignment to another variable
-        env = TypeInferer.from_code("""
-class A:
-    pass
-
-x = A()
-x.a = 1
-
-y = x
-""").environment()
-        self.assertEqual(env["x"].type(), "A")
-        self.assertEqual(env["x"].get_attr("a").type(), "int")
-        self.assertEqual(env["y"].type(), "A")
-        self.assertEqual(env["y"].get_attr("a").type(), "int")
-
-        # Creating a new object
-        env = TypeInferer.from_code("""
-class A:
-    pass
-
-x = A()
-x.a = 1
-
-y = A()
-y.b = "a"
-""").environment()
-        self.assertEqual(env["x"].type(), "A")
-
-        self.assertEqual(env["x"].get_attr("a").type(), "int")
-        self.assertEqual(env["y"].type(), "A")
-
-        self.assertEqual(env["y"].get_attr("a").type(), "int")
-        self.assertEqual(env["y"].get_attr("b").type(), "str")
-        self.assertEqual(env["x"].get_attr("b").type(), "str")
-
-        # Adding new type for attribute
-        env = TypeInferer.from_code("""
-class A:
-    pass
-
-x = A()
-x.a = 1
-
-y = A()
-y.a = "a"
-""").environment()
-        self.assertEqual(env["x"].get_attr("a").type(), {"int", "str"})
-        self.assertEqual(env["y"].get_attr("a").type(), {"int", "str"})
-
-    def test_nested_attributes(self):
-        """Test nested attrbute assignment."""
-        env = TypeInferer.from_code("""
-class A:
-    pass
-
-x = A()
-x.a = A()
-x.a.b = 2
-""").environment()
-
-        self.assertEqual(env["x"].type(), "A")
-        self.assertEqual(env["x"].get_attr("a").type(), "A")
-        self.assertEqual(env["x"].get_attr("a").get_attr("b").type(), "int")
-
-    def test_attribute_in_func(self):
-        """Test attribute assignment in functions."""
-        env = TypeInferer.from_code("""
-class A:
-    pass
-
-def func():
-    def func2():
-        x = A()
-        x.a = 1.0
-    x = A()
-    x.a = "str"
-
-x = A()
-""").environment()
-
-        self.assertSetEqual(env["x"].get_attr("a").type(), {"str", "float"})
-
-    def test_class_method(self):
-        """Test class method call."""
-        env = TypeInferer.from_code("""
-class A:
-    def func(arg=2):
-        return arg
-
-x = A.func()
-""").environment()
-
-        self.assertEqual(env["x"].type(), "int")
-
-    def test_instance_method(self):
-        """Test types of class instances."""
-        env = TypeInferer.from_code("""
-class A:
-    def func(self, arg=2):
-        return arg
-    def func2(self):
-        return self
-
-x = A()
-""").environment()
-
-        self.assertEqual(env["x"].type(), "A")
-        self.assertEqual(env["x"].environment()["func"].callable_return_type().type(), "int")
-        self.assertEqual(env["x"].environment()["func2"].callable_return_type().type(), "A")
-
-    def test_nested_instances(self):
-        """Test instances in another instance."""
-        env = TypeInferer.from_code("""
-class A:
-    def func(self):
-        class B:
-            def func2(self):
-                class C:
-                    def func3(self):
-                        return self
-                return C()
-        return B()
-
-x = A()
-y = x.func()
-z = y.func2()
-""").environment()
-
-        self.assertEqual(env["x"].type(), "A")
-        self.assertEqual(env["x"].environment()["func"].callable_return_type().type(), "B")
-        self.assertEqual(env["y"].type(), "B")
-        self.assertEqual(env["z"].type(), "C")
-        self.assertEqual(env["x"].environment()["func"].environment()["B"]
-                         .environment()["func2"].callable_return_type().type(), "C")
-        self.assertEqual(env["x"].environment()["func"].environment()["B"]
-                         .environment()["func2"].environment()["C"]
-                         .environment()["func3"]
-                         .callable_return_type().type(), "C")
-
-    def test_class_aattribute_assignment(self):
-        """Test assignment of attributes to classes."""
-        env = TypeInferer.from_code("""
-class A:
-    pass
-
-A.a = 1
-""").environment()
-
-        self.assertEqual(env["A"].environment()["a"].type(), "int")
-
-    def test_function_call(self):
-        """Check that the type of an argument is affected by what is passed to the function."""
-        env = TypeInferer.from_code("""
-def func(arg):
-    return arg
-x = func(2)
-""").environment()
-
-        self.assertEqual(env["x"].type(), "int")
+        # Saved value
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
 
 
 if __name__ == "__main__":
     unittest.main()
+
 
