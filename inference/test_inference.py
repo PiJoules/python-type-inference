@@ -41,7 +41,10 @@ def func():
         )
 
     def test_func_def_default_args(self):
-        """Test function definition with an argument and the function is not called."""
+        """
+        Test function definition with an argument and the function is not
+        called. There is no parseable type in this case.
+        """
         code = """
 def func(arg):
     return arg
@@ -50,13 +53,13 @@ def func(arg):
 
         # Argument
         self.assertEqual(
-            simple(simple(env.lookup("func")).environment().lookup("arg")).value(),
-            "Any"
+            simple(env.lookup("func")).environment().lookup("arg"),
+            set()
         )
         # Return type
         self.assertEqual(
-            simple(simple(env.lookup("func")).return_type()).value(),
-            "Any"
+            simple(env.lookup("func")).return_type(),
+            set()
         )
 
     def test_func_def_keyword_args(self):
@@ -369,14 +372,77 @@ y.a = 5.0
 
     def test_attribute_reassignment(self):
         """Tets attribute reassingment on a variable."""
-#        code = """
-#class A:
-#    def func(arg):
-#        return arg
-#
-#A.func = 2
-#        """
-#        env = Environment.from_code(code)
+        code = """
+class A:
+    def func(arg):
+        return arg
+
+A.func = 2
+        """
+        env = Environment.from_code(code)
+
+        self.assertSetEqual(
+            {t.value() for t in simple(simple(env.lookup("A")).get_attr("func"))},
+            {"function", "int"}
+        )
+
+    def test_instance_creation(self):
+        """Test that all attributes of an instance are created on creation."""
+        code = """
+class A:
+    def a(self):
+        return self._a
+    def func(self):
+        return self
+    def __init__(self, arg):
+        self._a = arg
+
+x = A("string")
+y = x.func()
+        """
+        env = Environment.from_code(code)
+
+        # Stored value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "A"
+        )
+        self.assertEqual(
+            simple(env.lookup("y")).value(),
+            "A"
+        )
+
+        # Attributes of x
+        self.assertEqual(
+            simple(simple(simple(env.lookup("x")).get_attr("a")).return_type())
+            .value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(env.lookup("x")).get_attr("_a")).value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(simple(env.lookup("x")).get_attr("func")).return_type())
+            .value(),
+            "A"
+        )
+
+        # Attributes of y
+        self.assertEqual(
+            simple(simple(simple(env.lookup("y")).get_attr("a")).return_type())
+            .value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(env.lookup("y")).get_attr("_a")).value(),
+            "str"
+        )
+        self.assertEqual(
+            simple(simple(simple(env.lookup("y")).get_attr("func")).return_type())
+            .value(),
+            "A"
+        )
 
 
 if __name__ == "__main__":

@@ -228,12 +228,12 @@ class Type(object):
         else:
             self.__attrs[attr] |= val
 
-    def get_attr(self, attr):
+    def get_attr(self, attr, default=None):
         """
         Returns:
             set[Type]
         """
-        return self.__attrs.get(attr, set())
+        return self.__attrs.get(attr, default)
 
     def environment(self):
         """
@@ -283,7 +283,7 @@ class FunctionType(Type):
             start = 0
         else:
             start = 1
-            args_dict[pos_args[0]] = owner
+            args_dict[pos_args[0].arg] = {owner}
         end = len(pos_args) - len(args_node.defaults)
 
         # Positional args
@@ -309,6 +309,13 @@ class FunctionType(Type):
         if args_node.kwarg:
             args_dict[args_node.kwarg.arg] = {env.special_types()["dict"]}
 
+        # Checks on the args_dict
+        for k, v in args_dict.items():
+            assert isinstance(k, str)
+            assert isinstance(v, set)
+            assert all(isinstance(t, Type) for t in v)
+
+        # Function envs are parsed on creation
         env = Environment.from_env(env, init_variables=args_dict)
         env.parse_sequence(node.body)
 
@@ -370,13 +377,21 @@ class ClassType(Type):
         its instance.
         """
         super().__init__(ref_node=node)
+        self.__hash = self.__generate_hash(node)
+
+        # This env should not persist outside this function. It is only used
+        # for finding the attributes of this class.
         new_env = Environment.from_env(env)
         new_env.parse_sequence(node.body)
         for var, types in new_env.variables().items():
             self.add_attr(var, types)
 
-        self.__instance = InstanceType(self)
-        self.__hash = self.__generate_hash(node)
+        self.__instance = InstanceType(node, env)
+
+        # TODO: Call the __new__ method
+
+    def value(self):
+        return "type"
 
     def return_type(self):
         return {self.__instance}
@@ -395,11 +410,24 @@ class ClassType(Type):
 
 
 class InstanceType(Type):
-    def __init__(self, cls_type):
+    def __init__(self, node, env):
         """
         Create an instance from a class.
+
+        The methods are automatically parsed on the FunctionType creation in
+        the environment parse.
         """
-        self.__hash = self.__generate_hash(cls_type.reference_node())
+        super().__init__(ref_node=node)
+        self.__hash = self.__generate_hash(node)
+        self.__name = node.name
+
+        new_env = Environment.from_env(env, owner=self)
+        new_env.parse_sequence(node.body)
+        for var, types in new_env.variables().items():
+            self.add_attr(var, types)
+
+    def value(self):
+        return self.__name
 
     def __generate_hash(self, node):
         """
@@ -542,16 +570,20 @@ class Environment(object):
     required_types = tuple(load_builtin_types().keys())
 
     def __init__(self, init_node=None, parent_env=None, required_types=None,
-                 init_variables=None):
+                 init_variables=None, owner=None):
         """
         Args:
             required_types (dict[str, Type])
             init_variables (dict[str, set[Type]])
+            owner (Optional[InstanceType])
         """
         self.__special_types = {}
         self.__parent = parent_env
         self.__types = {}
         self.__variables = dict(**(init_variables or {}))  # Copy the dict
+
+        assert (owner is None) or isinstance(owner, InstanceType)
+        self.__owner = owner
 
         self.__initialize_special_types(required_types or load_builtin_types())
 
@@ -615,13 +647,10 @@ class Environment(object):
         variables = self.__variables
         if var in variables:
             types = variables[var]
-            if not types:
-                # Empty set
-                # This is a result of positional args that weren't evaluated
-                # More with function calls.
-                return {self.__special_types["Any"]}
-            else:
-                return types
+            # This could result in an empty set.
+            # Empty sets could be found for positional arguments of functions
+            # that aren't called.
+            return types
 
         # Check parent_env
         parent_env = self.__parent
@@ -694,7 +723,7 @@ class Environment(object):
         ret_types = set()
         types = self.infer_type(node.func)
         for t in types:
-            if isinstance(t, FunctionType):
+            if isinstance(t, (FunctionType, ClassType)):
                 ret_types |= t.return_type()
 
         return ret_types
@@ -710,7 +739,9 @@ class Environment(object):
         value_types = self.infer_type(value)
 
         for t in value_types:
-            attr_types |= t.get_attr(attr)
+            attr_type = t.get_attr(attr)
+            if attr_type is not None:
+                attr_types |= attr_type
 
         return attr_types
 
@@ -748,6 +779,14 @@ class Environment(object):
         for t in types:
             if isinstance(t, FunctionType):
                 t.apply_call_args(node)
+            elif isinstance(t, ClassType):
+                # Call the __init__ method if provided
+                # Then parse all other methods
+                instance = next(iter(t.return_type()))
+                inits = instance.get_attr("__init__")
+                if inits:
+                    init = next(iter(inits))  # FunctionType
+                    init.apply_call_args(node)
 
     def parse_assign(self, node):
         """
@@ -777,13 +816,13 @@ class Environment(object):
         """
         Create a new function type and add it to the env.
         """
-        self.bind(node.name, {FunctionType(node, self)})
+        self.bind(node.name, {FunctionType(node, self, owner=self.__owner)})
 
     def parse_class_def(self, node):
         """
         Create a new class and instance type and add them to the env.
         """
-        self.bind(node.name, {ClassType(node, self)})
+        self.bind(node.name, {ClassType(node, self, owner=self.__owner)})
 
     def parse_expr(self, node):
         """
