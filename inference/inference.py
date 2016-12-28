@@ -152,7 +152,7 @@ class Type(object):
         # parse_call env
         self.__env = init_env
 
-    def json(self):
+    def json(self, call_stack=None):
         return self.value()
 
     def reference_node(self):
@@ -167,7 +167,7 @@ class Type(object):
         """
         raise NotImplementedError
 
-    def return_type(self):
+    def return_type(self, call_stack=None):
         """
         The type of variable returned if this type was called.
 
@@ -176,6 +176,7 @@ class Type(object):
         Returns:
             set[Type]
         """
+        call_stack = call_stack or set()
         if not self.__ref_node:
             raise RuntimeError("An reference node is required when calling this type.")
         env = self.environment()
@@ -188,7 +189,7 @@ class Type(object):
         while stack:
             node = stack.pop()
             if isinstance(node, ast.Return):
-                types = env.infer_type(node.value)
+                types = env.infer_type(node.value, call_stack=call_stack)
                 types |= types
                 found_type = True
             elif isinstance(node, (ast.If, ast.While, ast.For)):
@@ -323,10 +324,18 @@ class FunctionType(Type):
 
         self.__hash = self.__generate_hash(node)
 
-    def json(self):
+    def json(self, call_stack=None):
+        call_stack = call_stack or set()
+
+        if self not in call_stack:
+            call_stack.add(self)
+            env_json = self.environment().json(call_stack=call_stack)
+        else:
+            env_json = {}
+
         return {
             "value": self.value(),
-            "environment": self.environment().json(),
+            "environment": env_json,
         }
 
     def apply_call_args(self, node):
@@ -338,9 +347,31 @@ class FunctionType(Type):
             node (ast.Call)
         """
         env = self.environment()
+        print("apply_call_args:")
+        print("self.__positional:", self.__positional)
+        ast_utils.prettyparseprint(node)
 
         # Apply positional
-        for i, arg in enumerate(node.args):
+        """
+        In rare cases where functions are passed as the argument,
+        the number of args provided to a function could exceed the
+        number of positional arguments defined in the function def.
+
+        Iterate up to the number of positional arguments defined.
+        Otherwise, an IndexError cold be thrown, like for the following
+        example:
+
+        def func(arg, arg2):
+            return arg(arg, arg2)
+        x = func(func, 5j)
+        def func(a):
+            return a(a)
+        x = func(func)
+
+        This is systactically valid, but throws an IndexError if not iterating
+        up to the number of defined positional args.
+        """
+        for i, arg in enumerate(node.args[:len(self.__positional)]):
             env.bind(self.__positional[i], env.infer_type(arg))
 
         # Apply keyword
@@ -393,7 +424,7 @@ class ClassType(Type):
     def value(self):
         return "type"
 
-    def return_type(self):
+    def return_type(self, call_stack=None):
         return {self.__instance}
 
     def __generate_hash(self, node):
@@ -641,7 +672,7 @@ class Environment(object):
                 the this is true and the variable is not in this env.
 
         Returns:
-            (None, set[Type]): The type of the variable if it exists. None if
+            set[Type]: The type of the variable if it exists. None if
                 not found.
         """
         variables = self.__variables
@@ -657,7 +688,7 @@ class Environment(object):
         if parent_env and not ignore_parent:
             return parent_env.lookup(var)
 
-        return None
+        return set()
 
     def lookup_values(self, var):
         """
@@ -687,12 +718,12 @@ class Environment(object):
         else:
             variables[var] = types
 
-    def infer_num(self, num):
+    def infer_num(self, node):
         """
         Returns:
             set[Type]
         """
-        val = num.n
+        val = node.n
         if isinstance(val, int):
             return {self.__special_types["int"]}
         elif isinstance(val, float):
@@ -711,7 +742,7 @@ class Environment(object):
         """
         return set(self.lookup(node.id))
 
-    def infer_call(self, node):
+    def infer_call(self, node, call_stack=None):
         """
         First change the function environment based on the argument,
         then evaluate.
@@ -720,15 +751,19 @@ class Environment(object):
             set[Type]
         """
         self.parse_call(node)
+        call_stack = call_stack or set()
         ret_types = set()
-        types = self.infer_type(node.func)
-        for t in types:
-            if isinstance(t, (FunctionType, ClassType)):
-                ret_types |= t.return_type()
+
+        if node not in call_stack:
+            call_stack.add(node)
+            types = self.infer_type(node.func, call_stack=call_stack)
+            for t in types:
+                if isinstance(t, (FunctionType, ClassType)):
+                    ret_types |= t.return_type(call_stack=call_stack)
 
         return ret_types
 
-    def infer_attribute(self, node):
+    def infer_attribute(self, node, call_stack=None):
         """
         Returns:
             set[Type]
@@ -736,7 +771,8 @@ class Environment(object):
         value = node.value  # ast node
         attr = node.attr  # str
         attr_types = set()
-        value_types = self.infer_type(value)
+        call_stack = call_stack or set()
+        value_types = self.infer_type(value, call_stack=call_stack)
 
         for t in value_types:
             attr_type = t.get_attr(attr)
@@ -745,7 +781,19 @@ class Environment(object):
 
         return attr_types
 
-    def infer_type(self, node):
+    def infer_binary_operation(self, node, call_stack=None):
+        """
+        The common binary operations call the respective magic method of the
+        left hand side object. For now, just return the set containing the
+        possible types of both expressions.
+        """
+        call_stack = call_stack or set()
+        types = set()
+        types |= self.infer_type(node.left, call_stack=call_stack)
+        types |= self.infer_type(node.right, call_stack=call_stack)
+        return types
+
+    def infer_type(self, node, call_stack=None):
         """
         Infer the type of an ast node.
 
@@ -757,6 +805,7 @@ class Environment(object):
         Returns:
             set[Type]: All possible types that this expression could be
         """
+        call_stack = call_stack or set()
         if isinstance(node, ast.Num):
             return self.infer_num(node)
         elif isinstance(node, ast.Str):
@@ -764,9 +813,11 @@ class Environment(object):
         elif isinstance(node, ast.Name):
             return self.infer_name(node)
         elif isinstance(node, ast.Call):
-            return self.infer_call(node)
+            return self.infer_call(node, call_stack=call_stack)
         elif isinstance(node, ast.Attribute):
-            return self.infer_attribute(node)
+            return self.infer_attribute(node, call_stack=call_stack)
+        elif isinstance(node, ast.BinOp):
+            return self.infer_binary_operation(node, call_stack=call_stack)
 
         raise RuntimeError("Unable to infer type for node '{}'".format(node))
 
@@ -855,13 +906,18 @@ class Environment(object):
     def from_code(cls, code, **kwargs):
         return cls(init_node=ast.parse(code), **kwargs)
 
-    def json(self):
+    def json(self, call_stack=None):
         """
         A json representation of this environment and nested envs for
         debugging purposes.
         """
+        call_stack = call_stack or set()
         d = {}
-        for var, types in self.variables().items():
-            d[var] = [t.json() for t in types]
+
+        if self not in call_stack:
+            call_stack.add(self)
+            for var, types in self.variables().items():
+                d[var] = [t.json(call_stack=call_stack) for t in types]
+
         return d
 

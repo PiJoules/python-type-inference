@@ -444,6 +444,119 @@ y = x.func()
             "A"
         )
 
+    def test_method_access_to_class(self):
+        """Test that methods have access to their classes."""
+        code = """
+class A:
+    def func(self):
+        pass
+        """
+        env = Environment.from_code(code)
+
+        # Just show the return type is the class itself
+        self.assertEqual(
+            simple(simple(simple(simple(env.lookup("A")).get_attr("func")).environment()
+            .lookup("A")).return_type()).value(),
+            "A"
+        )
+
+    def test_function_access_to_self(self):
+        """Test that a function has access to itself in its environment."""
+        code = """
+def func():
+    return 2
+        """
+        env = Environment.from_code(code)
+
+        self.assertSetEqual(
+            simple(env.lookup("func")).environment().lookup_values("func"),
+            {"function"}
+        )
+
+    def test_uninferable_recursive_call(self):
+        """Test functional recursive calls that cannot be evaluated to anything."""
+        code = """
+def func():
+    return func()
+
+x = func()
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
+
+    def test_inferable_recursive_call(self):
+        """Test that recursive calls that return another value return that value."""
+        code = """
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n-1) + fib(n-2)
+
+x = fib(5)
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            simple(env.lookup("x")).value(),
+            "int"
+        )
+
+    def test_mutual_recursion(self):
+        """Test mutual recursion among multiple functions."""
+        code = """
+def func():
+    return func2()
+def func2():
+    return func3()
+def func3():
+    return func()
+x = func()
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
+
+    def test_function_redefinition(self):
+        """Test the redefinition of a function."""
+        code = """
+def func(arg, arg2):
+    return arg(arg, arg2)
+x = func(func, 5j)
+def func(a):
+    return a(a)
+x = func(func)
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
+
+    def test_recursive_argument_calls(self):
+        """Test that a function whose argument is a call to itself returns none."""
+        code = """
+def func(arg, arg2):
+    return arg(arg, arg2)
+x = func(func, 5j)
+        """
+        env = Environment.from_code(code)
+
+        # Saved value
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
