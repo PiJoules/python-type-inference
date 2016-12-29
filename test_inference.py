@@ -557,6 +557,21 @@ x = func(func, 5j)
             set()
         )
 
+    def test_calls_for_undefined_functions(self):
+        """Test that args are still evaluated for calls to undefined functions."""
+        code = """
+def func(arg):
+    return arg
+
+print(func(2))
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            simple(simple(env.lookup("func")).return_type()).value(),
+            "int"
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

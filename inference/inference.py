@@ -822,6 +822,8 @@ class Environment(object):
         """
         Edit the function env to update the types of the arguments based
         on the types passed.
+
+        Parse the arguments also
         """
         types = self.infer_type(node.func)
         for t in types:
@@ -835,6 +837,22 @@ class Environment(object):
                 if inits:
                     init = next(iter(inits))  # FunctionType
                     init.apply_call_args(node)
+
+        # Positional
+        for arg in node.args:
+            self.parse(arg)
+
+        # Keyword
+        for arg in node.keywords:
+            self.parse(arg.value)
+
+        # *args
+        if node.starargs:
+            self.parse(node.starargs)
+
+        # **kwargs
+        if node.kwargs:
+            self.parse(node.kwargs)
 
     def parse_assign(self, node):
         """
@@ -877,7 +895,7 @@ class Environment(object):
         Will need to keep parsing expression to see if there are any function
         calls.
         """
-        raise NotImplementedError
+        self.parse(node.value)
 
     def parse(self, node):
         """
@@ -895,7 +913,7 @@ class Environment(object):
         elif isinstance(node, ast.Call):
             self.parse_call(node)
         elif isinstance(node, ast.Expr):
-            self.parse_expr(node.value)
+            self.parse_expr(node)
         elif isinstance(node, ast.ClassDef):
             self.parse_class_def(node)
 
