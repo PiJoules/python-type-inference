@@ -593,8 +593,8 @@ y = x.x
             "int"
         )
 
-    def test_instance_attribute_not_in_class(self):
-        """Test that adding an attribute to an instance does not add it to the class."""
+    def test_instance_attribute_in_class(self):
+        """Test that adding an attribute to an instance adds it to the class."""
         code = """
 class A:
     pass

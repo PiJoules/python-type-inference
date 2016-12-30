@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from . import ast_utils
+from .ast_utils import prettyparsetext
 import ast
 import astor
 
@@ -394,27 +394,31 @@ class ClassType(Type):
         """
         super().__init__()
         self.__hash = self.__generate_hash(node)
-        self.__instance = InstanceType(node, env)
+        self.__node = node
+        self.__env = env
+        self.__instances = []
 
         # This env should not persist outside this function. It is only used
         # for finding the attributes of this class.
         new_env = Environment.from_env(env)
         new_env.parse_sequence(node.body)
         for var, types in new_env.variables().items():
-            self.add_attr(var, types)
+            #self.add_attr(var, types)
+            self.add_class_attr(var, types)
+
+    def add_class_attr(self, attr, val):
+        """Add any new attribute only to the class."""
+        super().add_attr(attr, val)
+
+    def add_attr(self, attr, val):
+        self.__cls_type.add_class_attr(attr, val)
+        self.add_instance_attr(attr, val)
 
     def value(self):
         return "type"
 
-    def add_attr(self, attr, val):
-        """
-        Add to both the instance and the attribute.
-        """
-        super().add_attr(attr, val)
-        self.__instance.add_attr(attr, val)
-
     def return_type(self, call_stack=None):
-        return {self.__instance}
+        return {InstanceType(self.__node, self.__env, self)}
 
     def __generate_hash(self, node):
         """
@@ -430,7 +434,7 @@ class ClassType(Type):
 
 
 class InstanceType(Type):
-    def __init__(self, node, env):
+    def __init__(self, node, env, cls_type):
         """
         Create an instance from a class.
 
@@ -439,11 +443,29 @@ class InstanceType(Type):
         """
         super().__init__()
         self.__name = node.name
+        self.__cls_type = cls_type
 
         new_env = Environment.from_env(env, owner=self)
         new_env.parse_sequence(node.body)
         for var, types in new_env.variables().items():
-            self.add_attr(var, types)
+            #self.add_attr(var, types)
+            self.add_instance_attr(var, types)
+
+    def add_instance_attr(self, attr, val):
+        """Add any new attribute only to the instance."""
+        super().add_attr(attr, val)
+
+    def add_attr(self, attr, val):
+        self.__cls_type.add_class_attr(attr, val)
+        self.add_instance_attr(attr, val)
+
+    #def get_attr(self, attr, default=None):
+    #    """First check the instance then check the class."""
+    #    val = super().get_attr(attr)
+    #    if val is None:
+    #        # Check class
+    #        return self.__cls_type.get_attr(attr, default=default)
+    #    return val
 
     def value(self):
         return self.__name
@@ -455,37 +477,37 @@ class InstanceType(Type):
 """
 Builtin types
 """
-class BuiltinType(Type):
+class LiteralType(Type):
     def __hash__(self):
         return hash(self.value())
 
 
-class IntType(BuiltinType):
+class IntType(LiteralType):
     def value(self):
         return "int"
 
 
-class FloatType(BuiltinType):
+class FloatType(LiteralType):
     def value(self):
         return "float"
 
 
-class ComplexType(BuiltinType):
+class ComplexType(LiteralType):
     def value(self):
         return "complex"
 
 
-class StrType(BuiltinType):
+class StrType(LiteralType):
     def value(self):
         return "str"
 
 
-class AnyType(BuiltinType):
+class AnyType(LiteralType):
     def value(self):
         return "Any"
 
 
-class NoneType(BuiltinType):
+class NoneType(LiteralType):
     def value(self):
         return "None"
 
@@ -494,6 +516,8 @@ class ContainerType(Type):
     """
     A type that can contain different types. This container is meant to hold
     an undefined number of data types.
+
+    Lists/sets
     """
     def __init__(self, default, content_types=None):
         """
@@ -520,7 +544,12 @@ class ContainerType(Type):
         return "container"
 
     def __hash__(self):
-        return hash(self.value())
+        """All containers are based off their contents."""
+        return id(self)
+
+
+class ContainerInstance(Type):
+    pass
 
 
 class TupleType(Type):
@@ -865,7 +894,7 @@ class Environment(object):
             return self.infer_tuple(node, call_stack=call_stack)
 
         raise RuntimeError("Unable to infer type for node '{}'\n{}"
-                           .format(node, ast_utils.prettyparsetext(node)))
+                           .format(node, prettyparsetext(node)))
 
     def parse_call(self, node):
         """
