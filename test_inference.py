@@ -92,12 +92,12 @@ def func(*args):
         # Argument
         self.assertEqual(
             simple(simple(env.lookup("func")).environment().lookup("args")).value(),
-            "tuple"
+            "container"
         )
         # Return type
         self.assertEqual(
             simple(simple(env.lookup("func")).return_type()).value(),
-            "tuple"
+            "container"
         )
         # Tuple contents
         self.assertEqual(
@@ -571,6 +571,47 @@ print(func(2))
             simple(simple(env.lookup("func")).return_type()).value(),
             "int"
         )
+
+    def test_class_instance_attributes(self):
+        """Test that adding an attribute to a class also adds it to the instance."""
+        code = """
+class A:
+    pass
+
+A.x = 2
+x = A()
+y = x.x
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            simple(env.lookup("y")).value(),
+            "int"
+        )
+        self.assertEqual(
+            simple(simple(env.lookup("A")).get_attr("x")).value(),
+            "int"
+        )
+
+    def test_instance_attribute_not_in_class(self):
+        """Test that adding an attribute to an instance does not add it to the class."""
+        code = """
+class A:
+    pass
+
+x = A()
+x.x = 2
+y = x.x
+        """
+        env = Environment.from_code(code)
+
+        self.assertEqual(
+            simple(env.lookup("y")).value(),
+            "int"
+        )
+        self.assertIsNone(simple(env.lookup("A")).get_attr("x"))
+
+
 
 
 if __name__ == "__main__":

@@ -36,6 +36,7 @@ setup(
     test_suite="nose.collector",
     entry_points={
         "console_scripts": [
+            "dump_env=scripts.dump_env:main",
         ],
     },
 )

@@ -143,23 +143,14 @@ def simple(types):
 
 
 class Type(object):
-    def __init__(self, ref_node=None, init_env=None):
+    def __init__(self):
         self.__attrs = {}  # dict[str, set[int]]
-        self.__ref_node = ref_node
-
-        # Parse default arguments
-        # Arguments types are further infered in function calls in the
-        # parse_call env
-        self.__env = init_env
 
     def json(self, call_stack=None):
-        return self.value()
-
-    def reference_node(self):
-        """
-        The ast node this type is based off od if any.
-        """
-        return self.__ref_node
+        return {
+            "value": self.value(),
+            "attrs": self.attrs(),
+        }
 
     def value(self):
         """
@@ -176,38 +167,7 @@ class Type(object):
         Returns:
             set[Type]
         """
-        call_stack = call_stack or set()
-        if not self.__ref_node:
-            raise RuntimeError("An reference node is required when calling this type.")
-        env = self.environment()
-
-        types = set()
-
-        # Find all return statements
-        found_type = False
-        stack = list(self.__ref_node.body)
-        while stack:
-            node = stack.pop()
-            if isinstance(node, ast.Return):
-                types = env.infer_type(node.value, call_stack=call_stack)
-                types |= types
-                found_type = True
-            elif isinstance(node, (ast.If, ast.While, ast.For)):
-                stack += node.body + node.orelse
-            elif isinstance(node, ast.Try):
-                stack += node.body + node.orelse + node.finalbody
-                for handler in node.handlers:
-                    stack += handler.body
-            elif isinstance(node, ast.With):
-                stack += node.body
-
-        # All types should be types
-        assert all(isinstance(t, Type) for t in types)
-
-        if not found_type:
-            return {env.special_types()["None"]}
-
-        return types
+        raise NotImplementedError
 
     def attrs(self):
         """
@@ -236,27 +196,12 @@ class Type(object):
         """
         return self.__attrs.get(attr, default)
 
-    def environment(self):
+    def __hash__(self):
         """
-        The environment of variables and types in this type if it contains
-        a body of statements.
-
-        Can be called with or without a node. If the call node is provided,
-        more can be inferred about the types of the arguments.
-
-        TODO: Handle decorators later
-        """
-        return self.__env
-
-    def contents(self):
-        """
-        Returns:
-            set[Type]
+        This hash is for comparing against the different types that
+        exist within the environment.
         """
         raise NotImplementedError
-
-    def __hash__(self):
-        return hash(self.value())
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and (hash(self) == hash(other))
@@ -275,6 +220,10 @@ class FunctionType(Type):
                 that represents a method of an argument. If so, the first
                 positional arg when this is called is always this owner.
         """
+        super().__init__()
+        self.__hash = self.__generate_hash(node)
+        self.__node = node
+
         args_dict = {}
         args_node = node.args
 
@@ -306,7 +255,7 @@ class FunctionType(Type):
 
         # Vararg and kwargs
         if args_node.vararg:
-            args_dict[args_node.vararg.arg] = {env.special_types()["tuple"]}
+            args_dict[args_node.vararg.arg] = {env.special_types()["container"]}
         if args_node.kwarg:
             args_dict[args_node.kwarg.arg] = {env.special_types()["dict"]}
 
@@ -317,24 +266,67 @@ class FunctionType(Type):
             assert all(isinstance(t, Type) for t in v)
 
         # Function envs are parsed on creation
-        env = Environment.from_env(env, init_variables=args_dict)
-        env.parse_sequence(node.body)
+        func_env = Environment.from_env(env, init_variables=args_dict)
+        func_env.parse_sequence(node.body)
+        self.__env = func_env
 
-        super().__init__(ref_node=node, init_env=env)
+    def return_type(self, call_stack=None):
+        """
+        The type of variable returned if this type was called.
 
-        self.__hash = self.__generate_hash(node)
+        TODO: Check python version since args change between 3.4 and 3.5.
+
+        Returns:
+            set[Type]
+        """
+        call_stack = call_stack or set()
+        env = self.__env
+
+        types = set()
+
+        # Find all return statements
+        # Use boolean instead of checking empty types because infer_type()
+        # could return an empty set
+        found_type = False
+        stack = list(self.__node.body)
+        while stack:
+            node = stack.pop()
+            if isinstance(node, ast.Return):
+                types = env.infer_type(node.value, call_stack=call_stack)
+                types |= types
+                found_type = True
+            elif isinstance(node, (ast.If, ast.While, ast.For)):
+                stack += node.body + node.orelse
+            elif isinstance(node, ast.Try):
+                stack += node.body + node.orelse + node.finalbody
+                for handler in node.handlers:
+                    stack += handler.body
+            elif isinstance(node, ast.With):
+                stack += node.body
+
+        # All types should be types
+        assert all(isinstance(t, Type) for t in types)
+
+        if not found_type:
+            return {env.special_types()["None"]}
+
+        return types
+
+    def environment(self):
+        return self.__env
 
     def json(self, call_stack=None):
         call_stack = call_stack or set()
 
         if self not in call_stack:
             call_stack.add(self)
-            env_json = self.environment().json(call_stack=call_stack)
+            env_json = self.__env.json(call_stack=call_stack)
         else:
-            env_json = {}
+            env_json = "Recursive loop stop for this function."
 
         return {
             "value": self.value(),
+            "attrs:": self.attrs(),
             "environment": env_json,
         }
 
@@ -346,7 +338,7 @@ class FunctionType(Type):
         Args:
             node (ast.Call)
         """
-        env = self.environment()
+        env = self.__env
 
         # Apply positional
         """
@@ -376,7 +368,7 @@ class FunctionType(Type):
             env.bind(kwarg.arg, env.infer_type(kwarg.value))
 
         # Re-evaluate the body
-        env.parse_sequence(self.reference_node().body)
+        env.parse_sequence(self.__node.body)
 
     def __generate_hash(self, node):
         """
@@ -390,22 +382,19 @@ class FunctionType(Type):
     def value(self):
         return "function"
 
-    @classmethod
-    def from_node(cls, node):
-        raise NotImplementedError
-
     def __hash__(self):
         return self.__hash
 
 
 class ClassType(Type):
-    def __init__(self, node, env, owner=None):
+    def __init__(self, node, env):
         """
         All variables assigned in this env are attributes of this type and
         its instance.
         """
-        super().__init__(ref_node=node)
+        super().__init__()
         self.__hash = self.__generate_hash(node)
+        self.__instance = InstanceType(node, env)
 
         # This env should not persist outside this function. It is only used
         # for finding the attributes of this class.
@@ -414,12 +403,15 @@ class ClassType(Type):
         for var, types in new_env.variables().items():
             self.add_attr(var, types)
 
-        self.__instance = InstanceType(node, env)
-
-        # TODO: Call the __new__ method
-
     def value(self):
         return "type"
+
+    def add_attr(self, attr, val):
+        """
+        Add to both the instance and the attribute.
+        """
+        super().add_attr(attr, val)
+        self.__instance.add_attr(attr, val)
 
     def return_type(self, call_stack=None):
         return {self.__instance}
@@ -445,8 +437,7 @@ class InstanceType(Type):
         The methods are automatically parsed on the FunctionType creation in
         the environment parse.
         """
-        super().__init__(ref_node=node)
-        self.__hash = self.__generate_hash(node)
+        super().__init__()
         self.__name = node.name
 
         new_env = Environment.from_env(env, owner=self)
@@ -457,55 +448,52 @@ class InstanceType(Type):
     def value(self):
         return self.__name
 
-    def __generate_hash(self, node):
-        """
-        Generate the hash for this function once.
-
-        Args:
-            node (ast node)
-        """
-        return hash(astor.to_source(node))
-
     def __hash__(self):
-        return self.__hash
+        return hash(self.value())
 
 
 """
 Builtin types
 """
-class IntType(Type):
+class BuiltinType(Type):
+    def __hash__(self):
+        return hash(self.value())
+
+
+class IntType(BuiltinType):
     def value(self):
         return "int"
 
 
-class FloatType(Type):
+class FloatType(BuiltinType):
     def value(self):
         return "float"
 
 
-class ComplexType(Type):
+class ComplexType(BuiltinType):
     def value(self):
         return "complex"
 
 
-class StrType(Type):
+class StrType(BuiltinType):
     def value(self):
         return "str"
 
 
-class AnyType(Type):
+class AnyType(BuiltinType):
     def value(self):
         return "Any"
 
 
-class NoneType(Type):
+class NoneType(BuiltinType):
     def value(self):
         return "None"
 
 
-class TupleType(Type):
+class ContainerType(Type):
     """
-    A type that can contain different types.
+    A type that can contain different types. This container is meant to hold
+    an undefined number of data types.
     """
     def __init__(self, default, content_types=None):
         """
@@ -529,7 +517,54 @@ class TupleType(Type):
             return {self.__default}
 
     def value(self):
-        return "tuple"
+        return "container"
+
+    def __hash__(self):
+        return hash(self.value())
+
+
+class TupleType(Type):
+    """
+    Similar to a ContainerType but order and number of contents matter.
+    """
+    def __init__(self, node, env, owner=None):
+        """
+        All variables assigned in this env are attributes of this type and
+        its instance.
+        """
+        super().__init__()
+        self.__hash = self.__generate_hash(node)
+
+        # This env should not persist outside this function. It is only used
+        # for finding the attributes of this class.
+        new_env = Environment.from_env(env)
+        new_env.parse_sequence(node.body)
+        for var, types in new_env.variables().items():
+            self.add_attr(var, types)
+
+        self.__instance = InstanceType(node, env)
+
+    def value(self):
+        return "type"
+
+    def return_type(self, call_stack=None):
+        return {self.__instance}
+
+    def __generate_hash(self, node):
+        """
+        Generate the hash for this function once.
+
+        Args:
+            node (ast node)
+        """
+        return hash(astor.to_source(node))
+
+    def __hash__(self):
+        return self.__hash
+
+
+class TupleInstance(Type):
+    pass
 
 
 class DictType(Type):
@@ -573,6 +608,9 @@ class DictType(Type):
     def value(self):
         return "dict"
 
+    def __hash__(self):
+        return hash(self.value())
+
 
 def load_builtin_types():
     """
@@ -589,7 +627,8 @@ def load_builtin_types():
         "str": StrType(),
         "Any": any_type,
         "None": NoneType(),
-        "tuple": TupleType(any_type),
+        "container": ContainerType(any_type),
+        #"tuple": TupleType(),
         "dict": DictType(any_type, any_type),
     }
 
@@ -790,6 +829,13 @@ class Environment(object):
         types |= self.infer_type(node.right, call_stack=call_stack)
         return types
 
+    def infer_tuple(self, node, call_stack=None):
+        """
+        Infer the contents of a tuple literal.
+        """
+
+        raise NotImplementedError
+
     def infer_type(self, node, call_stack=None):
         """
         Infer the type of an ast node.
@@ -815,8 +861,11 @@ class Environment(object):
             return self.infer_attribute(node, call_stack=call_stack)
         elif isinstance(node, ast.BinOp):
             return self.infer_binary_operation(node, call_stack=call_stack)
+        elif isinstance(node, ast.Tuple):
+            return self.infer_tuple(node, call_stack=call_stack)
 
-        raise RuntimeError("Unable to infer type for node '{}'".format(node))
+        raise RuntimeError("Unable to infer type for node '{}'\n{}"
+                           .format(node, ast_utils.prettyparsetext(node)))
 
     def parse_call(self, node):
         """
@@ -888,7 +937,7 @@ class Environment(object):
         """
         Create a new class and instance type and add them to the env.
         """
-        self.bind(node.name, {ClassType(node, self, owner=self.__owner)})
+        self.bind(node.name, {ClassType(node, self)})
 
     def parse_expr(self, node):
         """
