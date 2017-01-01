@@ -15,7 +15,7 @@ x = 2
         env.parse_code(code)
 
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject()}
         )
 
@@ -29,7 +29,7 @@ x = 1.0
         env.parse_code(code)
 
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject(), FloatObject()}
         )
 
@@ -44,12 +44,12 @@ x = 1.0
         env.parse_code(code)
 
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject(), FloatObject()}
         )
 
         self.assertSetEqual(
-            env.lookup_variables("y"),
+            env.lookup("y"),
             {IntObject()}
         )
 
@@ -58,12 +58,18 @@ x = 1.0
         code = """
 def func():
     return 2
+
+x = func()
         """
         env = Environment()
         env.parse_code(code)
 
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
+            {IntObject()}
+        )
+        self.assertEqual(
+            env.lookup("x"),
             {IntObject()}
         )
 
@@ -81,13 +87,13 @@ def func(arg):
 
         # Argument
         self.assertEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("arg"),
+            simple(env.lookup("func")).environment().lookup("arg"),
             set()
         )
 
         # Return type
         self.assertEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             set()
         )
 
@@ -102,12 +108,12 @@ def func(arg=2):
 
         # Argument
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("arg"),
+            simple(env.lookup("func")).environment().lookup("arg"),
             {IntObject()}
         )
         # Return type
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             {IntObject()}
         )
 
@@ -122,17 +128,17 @@ def func(*args):
 
         # Argument
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("args"),
+            simple(env.lookup("func")).environment().lookup("args"),
             {ContainerObject()}
         )
         # Return type
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             {ContainerObject()}
         )
         # Tuple contents
         self.assertEqual(
-            simple(simple(env.lookup_variables("func")).environment().lookup_variables("args"))
+            simple(simple(env.lookup("func")).environment().lookup("args"))
             .content_types(),
             {AnyObject()}
         )
@@ -148,22 +154,22 @@ def func(**kwargs):
 
         # Arguments
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("kwargs"),
+            simple(env.lookup("func")).environment().lookup("kwargs"),
             {DictObject()}
         )
         # Return type
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             {DictObject()}
         )
         # Dict contents
         self.assertSetEqual(
-            simple(simple(env.lookup_variables("func")).environment().lookup_variables("kwargs"))
+            simple(simple(env.lookup("func")).environment().lookup("kwargs"))
             .value_types(),
             {AnyObject()}
         )
         self.assertSetEqual(
-            simple(simple(env.lookup_variables("func")).environment().lookup_variables("kwargs"))
+            simple(simple(env.lookup("func")).environment().lookup("kwargs"))
             .key_types(),
             {AnyObject()}
         )
@@ -181,17 +187,17 @@ x = func(2)
 
         # Saved value
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject()}
         )
         # Argument
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("arg"),
+            simple(env.lookup("func")).environment().lookup("arg"),
             {IntObject()}
         )
         # Return value
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             {IntObject()}
         )
 
@@ -208,17 +214,17 @@ x = func(arg=2)
 
         # Saved value
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject(), FloatObject()}
         )
         # Argument
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("arg"),
+            simple(env.lookup("func")).environment().lookup("arg"),
             {IntObject(), FloatObject()}
         )
         # Return types
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             {IntObject(), FloatObject()}
         )
 
@@ -235,12 +241,12 @@ x = func()
 
         # Saved value
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {NoneObject()}
         )
         # Return type
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).return_type(),
+            simple(env.lookup("func")).return_type(),
             {NoneObject()}
         )
 
@@ -256,19 +262,34 @@ def func():
     x = 1.0
 
 x = "str"
+func()
         """
         env = Environment()
         env.parse_code(code)
 
         # Outer
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject(), StringObject()}
         )
         # Inner
         self.assertSetEqual(
-            simple(env.lookup_variables("func")).environment().lookup_variables("x"),
+            simple(env.lookup("func")).environment().lookup("x"),
             {FloatObject()}
+        )
+
+    def test_uncalled_functions(self):
+        """Test that an uncalled function does not have its env evaluated."""
+        code = """
+def func():
+    x = 1.0
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        self.assertDictEqual(
+            simple(env.lookup("func")).environment().variables(),
+            {}
         )
 
     def test_nested_functions(self):
@@ -287,25 +308,25 @@ x = func()
 
         # Saved type
         self.assertSetEqual(
-            env.lookup_variables("x", ignore_parent=True),
+            env.lookup("x", ignore_parent=True),
             {IntObject()}
         )
         # Outer
         self.assertSetEqual(
-            simple(env.lookup_variables("func", ignore_parent=True)).return_type(),
+            simple(env.lookup("func", ignore_parent=True)).return_type(),
             {IntObject()}
         )
         # Inner (2nd)
         self.assertSetEqual(
-            simple(simple(env.lookup_variables("func", ignore_parent=True))
-            .environment().lookup_variables("func", ignore_parent=True)).return_type(),
+            simple(simple(env.lookup("func", ignore_parent=True))
+            .environment().lookup("func", ignore_parent=True)).return_type(),
             {IntObject()}
         )
         # Inner most
         self.assertSetEqual(
-            simple(simple(simple(env.lookup_variables("func", ignore_parent=True))
-            .environment().lookup_variables("func", ignore_parent=True)).environment()
-            .lookup_variables("func", ignore_parent=True)).return_type(),
+            simple(simple(simple(env.lookup("func", ignore_parent=True))
+            .environment().lookup("func", ignore_parent=True)).environment()
+            .lookup("func", ignore_parent=True)).return_type(),
             {IntObject()}
         )
 
@@ -322,13 +343,18 @@ x = A.x
 
         # Saved value
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject()}
         )
 
         # Attribute
         self.assertSetEqual(
-            simple(env.lookup_variables("A")).get_attr("x"),
+            simple(env.lookup("A")).get_attr("x"),
+            {IntObject()}
+        )
+
+        self.assertSetEqual(
+            env.types()[ClassObjectMock("A")]["x"],
             {IntObject()}
         )
 
@@ -346,14 +372,19 @@ x = A.func(2)
 
         # Saved value
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject()}
         )
 
         # Return type
         self.assertSetEqual(
-            simple(simple(env.lookup_variables("A")).get_attr("func"))
+            simple(simple(env.lookup("A")).get_attr("func"))
             .return_type(),
+            {IntObject()}
+        )
+
+        self.assertSetEqual(
+            simple(env.types()[ClassObjectMock("A")]["func"]).environment().lookup("arg"),
             {IntObject()}
         )
 
@@ -372,11 +403,11 @@ y.a = 5.0
         env.parse_code(code)
 
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {IntObject()}
         )
         self.assertSetEqual(
-            env.lookup_variables("y"),
+            env.lookup("y"),
             {IntObject()}
         )
         self.assertSetEqual(
@@ -414,50 +445,143 @@ class A:
 
 x = A("string")
 y = x.func()
+z = y.a()
         """
         env = Environment()
         env.parse_code(code)
 
         # Stored value
         self.assertSetEqual(
-            env.lookup_variables("x"),
+            env.lookup("x"),
             {InstanceObjectMock("A")}
         )
         self.assertSetEqual(
-            env.lookup_variables("y"),
+            env.lookup("y"),
             {InstanceObjectMock("A")}
         )
+        self.assertSetEqual(
+            env.lookup("z"),
+            {StringObject()}
+        )
 
-        # Attributes of x
         self.assertSetEqual(
             env.types()[InstanceObjectMock("A")]["_a"],
             {StringObject()}
         )
-        #self.assertEqual(
-        #    simple(simple(env.lookup("x")).get_attr("_a")).value(),
-        #    "str"
-        #)
-        #self.assertEqual(
-        #    simple(simple(simple(env.lookup("x")).get_attr("func")).return_type())
-        #    .value(),
-        #    "A"
-        #)
 
-        ## Attributes of y
-        #self.assertEqual(
-        #    simple(simple(simple(env.lookup("y")).get_attr("a")).return_type())
-        #    .value(),
-        #    "str"
-        #)
-        #self.assertEqual(
-        #    simple(simple(env.lookup("y")).get_attr("_a")).value(),
-        #    "str"
-        #)
-        #self.assertEqual(
-        #    simple(simple(simple(env.lookup("y")).get_attr("func")).return_type())
-        #    .value(),
-        #    "A"
-        #)
+        # Attributes of x
+        self.assertSetEqual(
+            simple(simple(env.lookup("x")).get_attr("a")).return_type(),
+            {StringObject()}
+        )
+        self.assertSetEqual(
+            simple(env.lookup("x")).get_attr("_a"),
+            {StringObject()}
+        )
+        self.assertSetEqual(
+            simple(simple(env.lookup("x")).get_attr("func")).return_type(),
+            {InstanceObjectMock("A")}
+        )
+
+        # Attributes of y
+        self.assertSetEqual(
+            simple(simple(env.lookup("y")).get_attr("a")).return_type(),
+            {StringObject()}
+        )
+        self.assertSetEqual(
+            simple(env.lookup("y")).get_attr("_a"),
+            {StringObject()}
+        )
+        self.assertSetEqual(
+            simple(simple(env.lookup("y")).get_attr("func")).return_type(),
+            {InstanceObjectMock("A")}
+        )
+
+    def test_method_access_to_class(self):
+        """Test that methods have access to their classes."""
+        code = """
+class A:
+    def func(self):
+        pass
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        # Just show the return type is the class itself
+        self.assertSetEqual(
+            simple(simple(simple(env.lookup("A")).get_attr("func")).environment()
+            .lookup("A")).return_type(),
+            {InstanceObjectMock("A")}
+        )
+
+    def test_function_access_to_self(self):
+        """Test that a function has access to itself in its environment."""
+        code = """
+def func():
+    return 2
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            simple(env.lookup("func")).environment().lookup("func"),
+            {FunctionObjectMock("func")}
+        )
+
+    def test_uninferable_recursive_call(self):
+        """Test functional recursive calls that cannot be evaluated to anything."""
+        code = """
+def func():
+    return func()
+
+x = func()
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        # Saved value
+        self.assertSetEqual(
+            env.lookup("x"),
+            set()
+        )
+
+    def test_inferable_recursive_call(self):
+        """Test that recursive calls that return another value return that value."""
+        code = """
+def fib(n):
+    if n < 2:
+        return n
+    return fib(n-1) + fib(n-2)
+
+x = fib(5)
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        # Saved value
+        self.assertSetEqual(
+            env.lookup("x"),
+            {IntObject()}
+        )
+
+    def test_mutual_recursion(self):
+        """Test mutual recursion among multiple functions."""
+        code = """
+def func():
+    return func2()
+def func2():
+    return func3()
+def func3():
+    return func()
+x = func()
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        self.assertEqual(
+            env.lookup("x"),
+            set()
+        )
 
 
 if __name__ == "__main__":

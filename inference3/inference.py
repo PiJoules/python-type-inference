@@ -76,6 +76,10 @@ class ComplexObject(BaseObject):
     def __init__(self):
         super().__init__("complex")
 
+class BoolObject(BaseObject):
+    def __init__(self):
+        super().__init__("bool")
+
 class AnyObject(BaseObject):
     def __init__(self):
         super().__init__("Any")
@@ -171,7 +175,7 @@ class InstanceObject(Object):
         """
         Create an instance from a class.
 
-        The methods are automatically parsed on the FunctionType creation in
+        The methods are automatically parsed on the FunctionObject creation in
         the environment parse.
         """
         super().__init__()
@@ -247,8 +251,10 @@ class FunctionObject(Object):
 
         # Function envs are parsed on creation
         func_env = Environment.from_env(env, init_variables=args_dict)
-        func_env.parse_sequence(node.body)
         self.__env = func_env
+
+    def evaluate_body(self, call_stack=None):
+        self.__env.parse_sequence(self.__node.body, call_stack=call_stack)
 
     def return_type(self, call_stack=None):
         call_stack = call_stack or set()
@@ -284,10 +290,10 @@ class FunctionObject(Object):
 
         return types
 
-    def apply_call_args(self, node):
+    def apply_call_args(self, node, call_stack=None):
         """
-        Updatee the variables in an environment based on what is passed to
-        a call to this function.
+        Update the variables in an environment based on what is passed to
+        a call to this function. This represents a call to the function.
 
         Args:
             node (ast.Call)
@@ -315,16 +321,17 @@ class FunctionObject(Object):
         up to the number of defined positional args.
         """
         for i, arg in enumerate(node.args[:len(self.__positional)]):
-            env.bind(self.__positional[i], env.infer_expr(arg))
+            env.bind(self.__positional[i], env.infer_expr(arg, call_stack=call_stack))
 
         # Apply keyword
         for kwarg in node.keywords:
-            env.bind(kwarg.arg, env.infer_expr(kwarg.value))
+            env.bind(kwarg.arg, env.infer_expr(kwarg.value, call_stack=call_stack))
 
-        # Re-evaluate the body
-        env.parse_sequence(self.__node.body)
+        # Evaluate the body
+        env.parse_sequence(self.__node.body, call_stack=call_stack)
 
     def environment(self):
+        # Evaluate in case this function was not called before
         return self.__env
 
     def __hash__(self):
@@ -378,70 +385,33 @@ class Environment:
 
         Returns:
             dict[Object, dict[str, set[Object]]]
-
-
-        types = self.infer_expr(node.func)
-        for t in types:
-            if isinstance(t, FunctionObject):
-                t.apply_call_args(node)
-            elif isinstance(t, ClassObject):
-                print(t)
-                # Call the __init__ method if provided
-                # Then parse all other methods
-                instance = next(iter(t.return_type()))
-                inits = instance.get_attr("__init__")
-                print("inits:", inits)
-                if inits:
-                    init = next(iter(inits))  # FunctionObject
-                    init.apply_call_args(node)
-                    print(next(iter(init.environment().variables()["self"])).attrs())
         """
         types = {}
-        #print("self:", id(self))
 
         # Check own variables
         for objs in self.__variables.values():
             for obj in objs:
-                #print("self:", obj.attrs(), obj not in types)
-                #if isinstance(obj, InstanceObject):
-                #    #print("types:", {hash(x):x for x in types})
-                #    print(obj.name(), hash(obj))
                 if obj not in types:
                     types[obj] = dict(obj.attrs())  # dict[str, set[Object]]
                 else:
                     for attr, vals in obj.attrs().items():
                         types[obj][attr] |= vals
-                        #if attr == "_a":
-                        #    print(attr, vals)
 
-        #print("types:", {hash(x): type(x) for x in types})
-        #print("halfway")
-
-        #print("children:", [id(x) for x in self.__child_envs])
         # Check children to see if they added attributes
         child_envs = list(self.__child_envs)
-        #for child_env in self.__child_envs:
         while child_envs:
             child_env = child_envs.pop()
             child_envs += child_env.child_envs()  # Add rest
 
             child_types = child_env.accumulate_types()
-            #print("child_types:", [type(x) for x in child_types])
             for obj, attrs in child_types.items():
-                #print(obj, obj in types, hash(obj))
-                #print("child:", attrs, obj, obj in types)
-                #if isinstance(obj, InstanceObject):
-                #    print(obj.name(), hash(obj), [type(x) for x in types], obj in types)
                 if obj in types:
-                    #if isinstance(obj, InstanceObject):
-                    #    print("OBJ IN TYPE")
-                    # Merge any attributes for this object
                     for attr, vals in attrs.items():
-                        types[obj][attr] |= vals
-                        #if attr == "_a":
-                        #    print(attr, vals)
+                        if attr in types[obj]:
+                            types[obj][attr] |= vals
+                        else:
+                            types[obj][attr] = vals
 
-        #print("final:", [type(x) for x in types])
         return types
 
     def json_types(self):
@@ -455,9 +425,9 @@ class Environment:
                         types[obj][attr] |= vals
         return types
 
-    def parse_sequence(self, seq):
+    def parse_sequence(self, seq, call_stack=None):
         for node in seq:
-            self.parse(node)
+            self.parse(node, call_stack=call_stack)
 
     def parse_module(self, node):
         self.parse_sequence(node.body)
@@ -484,21 +454,29 @@ class Environment:
             raise RuntimeError("Unknown num type {}".format(n))
 
     def infer_name(self, node):
-        if node.id in self.__variables:
-            return set(self.__variables[node.id])
+        """
+        TODO: See if its better to throw an error or just return empty set for
+        undeclared vars. Returning the empty set helps when doing the initial
+        body parse on a function before the function is added to the variables
+        list.
+        """
+        objs = self.lookup(node.id)
+        if objs is not None:
+            return set(objs)
         raise RuntimeError("Variable {} not declared in scope prior.".format(node.id))
 
     def infer_call(self, node, call_stack=None):
-        self.parse_call(node)
         call_stack = call_stack or set()
         ret_types = set()
 
         if node not in call_stack:
             call_stack.add(node)
+            self.parse_call(node, call_stack=call_stack)
             types = self.infer_expr(node.func, call_stack=call_stack)
             for t in types:
                 if isinstance(t, (FunctionObject, ClassObject)):
                     ret_types |= t.return_type(call_stack=call_stack)
+            call_stack.remove(node)
 
         return ret_types
 
@@ -506,15 +484,33 @@ class Environment:
         value = node.value  # ast node
         attr = node.attr  # str
         attr_types = set()
-        call_stack = call_stack or set()
         value_types = self.infer_expr(value, call_stack=call_stack)
 
+        self.__types = types = self.accumulate_types()
         for t in value_types:
-            attr_type = t.get_attr(attr)
-            if attr_type is not None:
-                attr_types |= attr_type
+            if attr in types[t]:
+                attr_types |= types[t][attr]
 
         return attr_types
+
+    def infer_compare(self, node, call_stack=None):
+        """
+        Comparisons always return boolean values, but evaluate all args
+        to see if any calls are made.
+        """
+        self.infer_expr(node.left, call_stack=call_stack)
+        for comp in node.comparators:
+            self.infer_expr(comp, call_stack=call_stack)
+        return {BoolObject()}
+
+    def infer_binary_op(self, node, call_stack=None):
+        """
+        For now, just return a combinatio of both types in the binary op.
+        """
+        types = set()
+        types |= self.infer_expr(node.left, call_stack=call_stack)
+        types |= self.infer_expr(node.right, call_stack=call_stack)
+        return types
 
     def infer_expr(self, node, call_stack=None):
         """
@@ -523,72 +519,73 @@ class Environment:
         Returns:
             set[Object]
         """
-        call_stack = call_stack or set()
         if isinstance(node, ast.Num):
             return {self.infer_num(node)}
         elif isinstance(node, ast.Name):
             return self.infer_name(node)
         elif isinstance(node, ast.Call):
-            return self.infer_call(node)
+            return self.infer_call(node, call_stack=call_stack)
         elif isinstance(node, ast.Str):
             return {StringObject()}
         elif isinstance(node, ast.Attribute):
-            return self.infer_attribute(node)
+            return self.infer_attribute(node, call_stack=call_stack)
+        elif isinstance(node, ast.Compare):
+            return self.infer_compare(node, call_stack=call_stack)
+        elif isinstance(node, ast.BinOp):
+            return self.infer_binary_op(node, call_stack=call_stack)
         else:
             raise NotImplementedError("No logic yet implemented for infering node {}".format(node))
 
-    def parse_call(self, node):
-        types = self.infer_expr(node.func)
+    def parse_call(self, node, call_stack=None):
+        types = self.infer_expr(node.func, call_stack=call_stack)
         for t in types:
             if isinstance(t, FunctionObject):
-                t.apply_call_args(node)
+                t.apply_call_args(node, call_stack=call_stack)
             elif isinstance(t, ClassObject):
-                #print(t)
                 # Call the __init__ method if provided
                 # Then parse all other methods
-                instance = next(iter(t.return_type()))
+                instance = next(iter(t.return_type(call_stack=call_stack)))
                 inits = instance.get_attr("__init__")
-                #print("inits:", inits)
                 if inits:
                     init = next(iter(inits))  # FunctionObject
-                    init.apply_call_args(node)
-                    #print(next(iter(init.environment().variables()["self"])).attrs())
+                    init.apply_call_args(node, call_stack=call_stack)
 
         # Positional
         for arg in node.args:
-            self.parse(arg)
+            self.infer_expr(arg, call_stack=call_stack)
 
         # Keyword
         for arg in node.keywords:
-            self.parse(arg.value)
+            self.infer_expr(arg.value, call_stack=call_stack)
 
         # *args
         if node.starargs:
-            self.parse(node.starargs)
+            self.infer_expr(node.starargs, call_stack=call_stack)
 
         # **kwargs
         if node.kwargs:
-            self.parse(node.kwargs)
+            self.infer_expr(node.kwargs, call_stack=call_stack)
 
-    def parse_assign(self, node):
+    def parse_assign(self, node, call_stack=None):
         targets = node.targets
         value = node.value
-        value_types = self.infer_expr(value)
+        value_types = self.infer_expr(value, call_stack=call_stack)
 
         for target in targets:
             if isinstance(target, ast.Name):
                 self.bind(target.id, value_types)
             elif isinstance(target, ast.Attribute):
-                types = self.infer_expr(target.value)
+                types = self.infer_expr(target.value, call_stack=call_stack)
                 for t in types:
                     t.add_attr(target.attr, value_types)
             else:
                 raise NotImplementedError("No logic implemented for assigning to target node {}".format(target))
 
-    def parse_func_def(self, node):
+    def parse_func_def(self, node, call_stack=None):
+        func = FunctionObject(node, self, owner=self.__owner)
         self.bind(
             node.name,
-            {FunctionObject(node, self, owner=self.__owner)}
+            {func}
         )
 
     def parse_class_def(self, node):
@@ -597,16 +594,30 @@ class Environment:
             {ClassObject(node, self)}
         )
 
-    def parse(self, node):
+    def parse_if(self, node, call_stack=None):
+        """
+        Evaluate the condition to check for function calls, then parse
+        the body and orelse.
+        """
+        self.infer_expr(node.test, call_stack=call_stack)
+        self.parse_sequence(node.body, call_stack=call_stack)
+        for seq in node.orelse:
+            self.parse_sequence(seq, call_stack=call_stack)
+
+    def parse(self, node, call_stack=None):
         if isinstance(node, ast.Module):
             self.parse_module(node)
         elif isinstance(node, ast.Assign):
-            self.parse_assign(node)
+            self.parse_assign(node, call_stack=call_stack)
         elif isinstance(node, ast.FunctionDef):
-            self.parse_func_def(node)
+            self.parse_func_def(node, call_stack=call_stack)
         elif isinstance(node, ast.ClassDef):
             self.parse_class_def(node)
-        elif isinstance(node, (ast.Return, ast.Num, ast.Pass, ast.Str)):
+        elif isinstance(node, ast.If):
+            self.parse_if(node, call_stack=call_stack)
+        elif isinstance(node, (ast.Return, ast.Expr)):
+            self.infer_expr(node.value, call_stack=call_stack)
+        elif isinstance(node, (ast.Num, ast.Pass, ast.Str)):
             pass
         else:
             raise NotImplementedError("No logic yet implemented for node {}".format(node))
@@ -617,7 +628,7 @@ class Environment:
     def variables(self):
         return self.__variables
 
-    def lookup_variables(self, var, ignore_parent=False):
+    def lookup(self, var, ignore_parent=False):
         """
         Lookup a type for a variable.
         """
@@ -626,7 +637,7 @@ class Environment:
             return variables[var]
 
         if self.__parent_env is not None and not ignore_parent:
-            return self.__parent_env.lookup_types(var)
+            return self.__parent_env.lookup(var)
 
         return None
 
