@@ -3,6 +3,13 @@
 
 import ast
 
+"""
+Helper functions
+"""
+
+def first(iterable):
+    return next(iter(iterable))
+
 
 """
 Types available at runtime
@@ -11,7 +18,7 @@ Types available at runtime
 class PyType:
     def __init__(self, name, attrs=None):
         self.__name = name
-        self.__attrs = attrs or {}  # dict[str, set[PyType]]
+        self.__attrs = attrs or {}  # dict[str, set[Instance]]
 
     def name(self):
         return self.__name
@@ -49,6 +56,7 @@ class PyType:
 INT_TYPE = PyType("int")
 FLOAT_TYPE = PyType("float")
 COMPLEX_TYPE = PyType("complex")
+NONE_TYPE = PyType("None")
 
 
 """
@@ -66,9 +74,15 @@ class Instance:
         return not (self == other)
 
     def __eq__(self, other):
+        """For comparing instances at runtime."""
         raise NotImplementedError
 
     def __hash__(self):
+        """For separating between different types in a set of instances."""
+        raise NotImplementedError
+
+    def returns(self):
+        """The instances returned by this instance if it were called."""
         raise NotImplementedError
 
 
@@ -94,12 +108,91 @@ class ComplexInst(BaseInstance):
     def __init__(self):
         super().__init__(COMPLEX_TYPE)
 
+class NoneInst(BaseInstance):
+    def __init__(self):
+        super().__init__(NONE_TYPE)
 
+
+# All types known to all environments
+# Populated with builtin types initially and filled at runtime with user-defined
+# types
 TYPES = {
     "int": INT_TYPE,
     "float": FLOAT_TYPE,
     "complex": COMPLEX_TYPE,
+    "None": NONE_TYPE,
 }
+
+
+class FunctionInst(Instance):
+    def __init__(self, name, ref_node, ref_env):
+        """
+        Create the new function type this instance represents since all
+        function definitions are unique instances.
+        """
+        if name in TYPES:
+            TYPES[name] |= PyType(name)
+        else:
+            TYPES[name] = {PyType(name)}
+
+        self.__ref_node = ref_node
+        self.__ref_env = rev_env
+
+    @classmethod
+    def from_node(cls, node):
+        name = node.name
+        args = node.args
+        body = node.body
+
+        if node.returns:
+            # node.returns is an ast.Str
+            returns = TYPES.get(node.returns.s, None)
+        else:
+            returns = None
+
+    def apply_call_node_args(self, node):
+        """
+        Parse the arguments of a call node then apply_call_args.
+
+        Args:
+            args (node.Call)
+        """
+        raise NotImplementedError
+
+    def apply_call_args(self, args, kwargs):
+        """
+
+        """
+        raise NotImplementedError
+
+    def returns(self):
+        """
+        Run through the code to find any return statements.
+        """
+        returns = set()
+
+        stack = list(self.__ref_node.body)
+        while stack:
+            node = stack.pop()
+            if isinstance(node, ast.Return):
+                returns |= self.__ref_env.eval_inst(node.value)
+            elif isinstance(node, (ast.If, ast.While, ast.For)):
+                stack += node.body + node.orelse
+            elif isinstance(node, ast.Try):
+                stack += node.body + node.orelse + node.finalbody
+                for handler in node.handlers:
+                    stack += handler.body
+            elif isinstance(node, ast.With):
+                stack += node.body
+
+        return returns or {NoneInst()}
+
+    def __eq__(self, other):
+        return id(self) == id(other)
+
+    def __hash__(self):
+        """All function instances are unique."""
+        return id(self)
 
 
 class Environment:
@@ -107,6 +200,7 @@ class Environment:
         self.__types = types or {}
         self.__variables = variables or {}
         self.__parent = parent
+        self.__uncalled_funcs = set()
 
     @classmethod
     def from_env(cls, env, **kwargs):
@@ -162,11 +256,25 @@ class Environment:
             else:
                 raise NotImplementedError("Unable to assign to target node {}".format(node))
 
+    def parse_func_def(self, node):
+        """
+        Create a new function instance and add this one to a set of uncalled
+        functions.
+        """
+        name = node.name
+        func_inst = FunctionInst.from_node(node)  # This creates the instance and the type
+        self.__uncalled_funcs.add(func_inst)
+
+        # Add to env also
+        self.bind(name, func_inst)
+
     def parse(self, node):
         if isinstance(node, ast.Module):
             self.parse_module(node)
         elif isinstance(node, ast.Assign):
             self.parse_assign(node)
+        elif isinstance(node, ast.FunctionDef):
+            self.parse_func_def(node)
         else:
             raise NotImplementedError("Cannot parse node {}".format(node))
 
