@@ -19,6 +19,28 @@ x = 2
             {IntInst()}
         )
 
+    def test_function_call(self):
+        """Test function calls."""
+        code = """
+def func():
+    return 2
+x = func()
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        # Stored value
+        self.assertSetEqual(
+            env.lookup("x"),
+            {IntInst()}
+        )
+
+        # Return type
+        self.assertSetEqual(
+            first(env.lookup("func")).returns(),
+            {IntInst()}
+        )
+
 
 if __name__ == "__main__":
     unittest.main()

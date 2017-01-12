@@ -4,6 +4,10 @@
 import ast
 
 
+"""
+Types available at runtime
+"""
+
 class PyType:
     def __init__(self, name, attrs=None):
         self.__name = name
@@ -46,6 +50,10 @@ INT_TYPE = PyType("int")
 FLOAT_TYPE = PyType("float")
 COMPLEX_TYPE = PyType("complex")
 
+
+"""
+Instances created at runtime or are builtin instances available at startup
+"""
 
 class Instance:
     def __init__(self, inst_type):
