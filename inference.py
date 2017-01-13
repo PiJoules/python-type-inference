@@ -154,6 +154,12 @@ class FunctionInst(Instance):
         self.__ref_node = ref_node
         self.__ref_env = ref_env
 
+        # Save the arguments
+        self.__pos_args = pos_args
+        self.__keyword_args = keyword_args
+        self.__varargs = varargs
+        self.__kwargs = kwargs
+
         # Add the arguments as new variables with no types for now
         args = {}
         if pos_args:
@@ -197,9 +203,16 @@ class FunctionInst(Instance):
         """
         raise NotImplementedError
 
-    def apply_call_args(self, args, kwargs):
+    def apply_call_args(self, pos_args=None, keyword_args=None, varargs=None,
+                        kwargs=None):
         """
         Update the environment of this body
+
+        Args:
+            pos_args (Optional[tuple[set[Instance]]])
+            keyword_args (Optional[dict[str, set[Instance]]])
+            varargs (Optional[str])
+            kwargs (Optional[str])
         """
         raise NotImplementedError
 
