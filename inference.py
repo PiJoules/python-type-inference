@@ -57,6 +57,7 @@ INT_TYPE = PyType("int")
 FLOAT_TYPE = PyType("float")
 COMPLEX_TYPE = PyType("complex")
 NONE_TYPE = PyType("None")
+ANY_TYPE = PyType("Any")
 
 
 """
@@ -112,6 +113,10 @@ class NoneInst(BaseInstance):
     def __init__(self):
         super().__init__(NONE_TYPE)
 
+class AnyInst(BaseInstance):
+    def __init__(self):
+        super().__init__(ANY_TYPE)
+
 
 # All types known to all environments
 # Populated with builtin types initially and filled at runtime with user-defined
@@ -125,10 +130,21 @@ TYPES = {
 
 
 class FunctionInst(Instance):
-    def __init__(self, name, ref_node, ref_env):
+    def __init__(self, name, ref_node, ref_env, pos_args=None,
+                 keyword_args=None, varargs=None, kwargs=None):
         """
         Create the new function type this instance represents since all
         function definitions are unique instances.
+
+        Args:
+            name (str)
+            ref_node (ast.FunctionDef)
+            ref_env (Environment): The environment this instance was created in
+
+            pos_args (Optional[tuple[str]])
+            keyword_args (Optional[dict[str, set[Instance]]])
+            varargs (Optional[str])
+            kwargs (Optional[str])
         """
         if name in TYPES:
             TYPES[name] |= PyType(name)
@@ -136,10 +152,30 @@ class FunctionInst(Instance):
             TYPES[name] = {PyType(name)}
 
         self.__ref_node = ref_node
-        self.__ref_env = rev_env
+        self.__ref_env = ref_env
+
+        # Add the arguments as new variables with no types for now
+        args = {}
+        if pos_args:
+            for arg in pos_args:
+                args[arg] = set()
+        if kwargs:
+            for arg, vals in kwargs.items():
+                args[arg] = vals
+        if varargs:
+            args[varargs] = {AnyInst()}  # should be tuple instance containing any type
+        if kwargs:
+            args[kwargs] = {AnyInst()}  # should be dict instance containing any type
+
+        # The environment of this body
+        self.__body_env = Environment(
+            types=ref_env.types(),
+            variables=args,
+            parent=self.__ref_env,
+        )
 
     @classmethod
-    def from_node(cls, node):
+    def from_node(cls, node, env):
         name = node.name
         args = node.args
         body = node.body
@@ -149,6 +185,8 @@ class FunctionInst(Instance):
             returns = TYPES.get(node.returns.s, None)
         else:
             returns = None
+
+        return cls(name, node, env)
 
     def apply_call_node_args(self, node):
         """
@@ -161,7 +199,7 @@ class FunctionInst(Instance):
 
     def apply_call_args(self, args, kwargs):
         """
-
+        Update the environment of this body
         """
         raise NotImplementedError
 
@@ -197,7 +235,7 @@ class FunctionInst(Instance):
 
 class Environment:
     def __init__(self, types=None, variables=None, parent=None):
-        self.__types = types or {}
+        self.__types = types or TYPES
         self.__variables = variables or {}
         self.__parent = parent
         self.__uncalled_funcs = set()
@@ -262,11 +300,11 @@ class Environment:
         functions.
         """
         name = node.name
-        func_inst = FunctionInst.from_node(node)  # This creates the instance and the type
+        func_inst = FunctionInst.from_node(node, self)  # This creates the instance and the type
         self.__uncalled_funcs.add(func_inst)
 
         # Add to env also
-        self.bind(name, func_inst)
+        self.bind(name, {func_inst})
 
     def parse(self, node):
         if isinstance(node, ast.Module):
@@ -301,4 +339,18 @@ class Environment:
             return self.__parent.lookup(var)
 
         return None
+
+    def types(self):
+        """
+        Returns:
+            dict[str, PyType]
+        """
+        return self.__types
+
+    def variables(self):
+        """
+        Returns:
+            dict[str, set[Instance]]
+        """
+        return self.__variables
 
