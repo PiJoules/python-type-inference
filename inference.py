@@ -3,6 +3,12 @@
 
 import ast
 
+if __debug__:
+    ENV_COUNTER = 1
+
+CALL_STACK = set()  # ids of instances that get called
+
+
 """
 Helper functions
 """
@@ -176,6 +182,7 @@ class FunctionInst(Instance):
             types=ref_env.types(),
             variables=args,
             parent=self.__ref_env,
+            owner=name,
         )
 
     @classmethod
@@ -217,7 +224,7 @@ class FunctionInst(Instance):
     def env(self):
         return self.__body_env
 
-    def apply_call_node_args(self, node):
+    def apply_call_node_args(self, node, env):
         """
         Parse the arguments of a call node then apply_call_args.
 
@@ -225,8 +232,8 @@ class FunctionInst(Instance):
             args (node.Call)
         """
         self.apply_call_args(
-            pos_args=tuple(self.__ref_env.eval_inst(a) for a in node.args),
-            keyword_args={kw.arg: self.__ref_env.eval_inst(kw.value)
+            pos_args=tuple(env.eval_inst(a) for a in node.args),
+            keyword_args={kw.arg: env.eval_inst(kw.value)
                           for kw in node.keywords},
             # TODO: Handle varargs and kwargs later
         )
@@ -283,15 +290,13 @@ class FunctionInst(Instance):
 
 
 class Environment:
-    def __init__(self, types=None, variables=None, parent=None):
+    def __init__(self, types=None, variables=None, parent=None, owner=None):
+        self.__owner = owner or "<module>" # for debugging
+
         self.__types = types or dict(TYPES)
         self.__variables = variables or {}
         self.__parent = parent
         self.__uncalled_funcs = set()
-
-    @classmethod
-    def from_env(cls, env, **kwargs):
-        raise NotImplementedError
 
     def bind(self, var, insts):
         assert isinstance(insts, set)
@@ -301,6 +306,20 @@ class Environment:
             self.__variables[var] = insts
         else:
             self.__variables[var] |= insts
+
+    """
+    Debugging methods
+    """
+
+    def env_lineage(self):
+        """
+        Returns:
+            str
+        """
+        if self.__parent is None:
+            return self.__owner
+        else:
+            return self.__parent.env_lineage() + "->" + self.__owner
 
 
     """
@@ -324,10 +343,22 @@ class Environment:
         return type.
         """
         funcs = self.eval_inst(node.func)
+
+        if __debug__:
+            print("calling:", funcs, "in env", self.env_lineage())
+
         returns = set()
         for func in funcs:
-            func.apply_call_node_args(node)
+            # Ignore called functions
+            if func in CALL_STACK:
+                continue
+
+            CALL_STACK.add(func)
+
+            func.apply_call_node_args(node, self)
             returns |= func.returns()
+
+            CALL_STACK.remove(func)
         return returns
 
     def eval_name(self, node):
@@ -336,16 +367,32 @@ class Environment:
         """
         vals = self.lookup(node.id)
         if vals is None:
-            raise RuntimeError("Variable '{}' not previously declared.".format(node.id))
+            raise RuntimeError("Variable '{}' not previously declared in env {}.".format(node.id, self.env_lineage()))
         return set(vals)
 
+    def eval_binop(self, node):
+        """
+        The interpreter actually calls the __whatever__ method of the first
+        object in the binary operation, but for now, just return the set of
+        both types of the expressions.
+        """
+        print("available vars in {}:".format(self.env_lineage()), self.available_variables())
+        returns = set()
+        returns |= self.eval_inst(node.left)
+        returns |= self.eval_inst(node.right)
+        return returns
+
     def eval_inst(self, node):
+        print("evaluating:", node, "in", self.env_lineage())
+
         if isinstance(node, ast.Num):
             return self.eval_num(node)
         elif isinstance(node, ast.Call):
             return self.eval_call(node)
         elif isinstance(node, ast.Name):
             return self.eval_name(node)
+        elif isinstance(node, ast.BinOp):
+            return self.eval_binop(node)
         else:
             raise NotImplementedError("Unable to infer type for node {}".format(node))
 
@@ -381,6 +428,9 @@ class Environment:
         self.bind(name, {func_inst})
 
     def parse(self, node):
+        if __debug__:
+            print("parsing:", node)
+
         if isinstance(node, ast.Module):
             self.parse_module(node)
         elif isinstance(node, ast.Assign):
@@ -396,6 +446,9 @@ class Environment:
 
     def parse_module(self, node):
         self.parse_sequence(node.body)
+
+        # Last minute check
+        assert not CALL_STACK
 
     def parse_code(self, code):
         self.parse(ast.parse(code))
@@ -427,4 +480,16 @@ class Environment:
             dict[str, set[Instance]]
         """
         return self.__variables
+
+    def available_variables(self):
+        """
+        All variables that can be accessed by in this env, including those
+        in parent envs.
+        """
+        variables = {}
+        variables.update(self.variables())
+        if self.__parent:
+            variables.update(self.__parent.available_variables())
+        return variables
+
 

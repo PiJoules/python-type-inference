@@ -81,6 +81,24 @@ x = fib(5)
         env = Environment()
         env.parse_code(code)
 
+        # Stored value
+        self.assertSetEqual(
+            env.lookup("x"),
+            {IntInst()}
+        )
+
+        # Return type
+        self.assertSetEqual(
+            first(env.lookup("fib")).returns(),
+            {IntInst()}
+        )
+
+        # Argument in function
+        self.assertSetEqual(
+            first(env.lookup("fib")).env().lookup("n"),
+            {IntInst()}
+        )
+
 
 
 if __name__ == "__main__":
