@@ -146,17 +146,15 @@ class FunctionInst(Instance):
             varargs (Optional[str])
             kwargs (Optional[str])
         """
-        if name in TYPES:
-            TYPES[name] |= PyType(name)
-        else:
-            TYPES[name] = {PyType(name)}
+        # Add to the types
+        ref_env.types()[name] = PyType(name)
 
         self.__ref_node = ref_node
         self.__ref_env = ref_env
 
         # Save the arguments
-        self.__pos_args = pos_args
-        self.__keyword_args = keyword_args
+        self.__pos_args = pos_args or tuple()
+        self.__keyword_args = keyword_args or {}
         self.__varargs = varargs
         self.__kwargs = kwargs
 
@@ -186,13 +184,38 @@ class FunctionInst(Instance):
         args = node.args
         body = node.body
 
-        if node.returns:
-            # node.returns is an ast.Str
-            returns = TYPES.get(node.returns.s, None)
-        else:
-            returns = None
+        # Extract args
+        # Pos args
+        pos_args = tuple(a.arg for a in args.args[:len(args.args)-len(args.defaults)])
 
-        return cls(name, node, env)
+        # Keywrod args
+        keyword_args = {}
+        for i, arg in enumerate(args.args[len(args.args)-len(args.defaults):]):
+            keyword_args[arg.arg] = env.eval_inst(args.defaults[i])
+        for i, kwarg in enumerate(args.kwonlyargs):
+            default = args.kw_defaults[i]
+            if default is None:
+                keyword_args[kwarg.arg] = set()
+            else:
+                keyword_args[kwarg.arg] = env.eval_inst(default)
+
+        # Varibale args
+        if args.vararg:
+            varargs = args.vararg.arg
+        else:
+            varargs = None
+
+        # kwargs
+        if args.kwarg:
+            kwargs = args.kwarg.arg
+        else:
+            kwargs = None
+
+        return cls(name, node, env, pos_args=pos_args, keyword_args=keyword_args,
+                   varargs=varargs, kwargs=kwargs)
+
+    def env(self):
+        return self.__body_env
 
     def apply_call_node_args(self, node):
         """
@@ -201,7 +224,12 @@ class FunctionInst(Instance):
         Args:
             args (node.Call)
         """
-        raise NotImplementedError
+        self.apply_call_args(
+            pos_args=tuple(self.__ref_env.eval_inst(a) for a in node.args),
+            keyword_args={kw.arg: self.__ref_env.eval_inst(kw.value)
+                          for kw in node.keywords},
+            # TODO: Handle varargs and kwargs later
+        )
 
     def apply_call_args(self, pos_args=None, keyword_args=None, varargs=None,
                         kwargs=None):
@@ -211,10 +239,18 @@ class FunctionInst(Instance):
         Args:
             pos_args (Optional[tuple[set[Instance]]])
             keyword_args (Optional[dict[str, set[Instance]]])
-            varargs (Optional[str])
-            kwargs (Optional[str])
+            varargs (Optional[Tuple])
+            kwargs (Optional[Dictionary])
         """
-        raise NotImplementedError
+        pos_args = pos_args or tuple()
+        for i, arg in enumerate(self.__pos_args):
+            self.__body_env.bind(arg, pos_args[i])
+
+        keyword_args = keyword_args or {}
+        for i, (arg, defaults) in enumerate(self.__keyword_args):
+            self.__body_env.bind(arg, keyword_args[arg])
+
+        # TODO: Handle varargs and kwargs later
 
     def returns(self):
         """
@@ -226,7 +262,7 @@ class FunctionInst(Instance):
         while stack:
             node = stack.pop()
             if isinstance(node, ast.Return):
-                returns |= self.__ref_env.eval_inst(node.value)
+                returns |= self.__body_env.eval_inst(node.value)
             elif isinstance(node, (ast.If, ast.While, ast.For)):
                 stack += node.body + node.orelse
             elif isinstance(node, ast.Try):
@@ -248,7 +284,7 @@ class FunctionInst(Instance):
 
 class Environment:
     def __init__(self, types=None, variables=None, parent=None):
-        self.__types = types or TYPES
+        self.__types = types or dict(TYPES)
         self.__variables = variables or {}
         self.__parent = parent
         self.__uncalled_funcs = set()
@@ -282,9 +318,34 @@ class Environment:
         else:
             raise RuntimeError("Unknown num type {}".format(n))
 
+    def eval_call(self, node):
+        """
+        Apply the arguments to the function body environmnen then evaluate the
+        return type.
+        """
+        funcs = self.eval_inst(node.func)
+        returns = set()
+        for func in funcs:
+            func.apply_call_node_args(node)
+            returns |= func.returns()
+        return returns
+
+    def eval_name(self, node):
+        """
+        Return a copy of the set of instances.
+        """
+        vals = self.lookup(node.id)
+        if vals is None:
+            raise RuntimeError("Variable '{}' not previously declared.".format(node.id))
+        return set(vals)
+
     def eval_inst(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
+        elif isinstance(node, ast.Call):
+            return self.eval_call(node)
+        elif isinstance(node, ast.Name):
+            return self.eval_name(node)
         else:
             raise NotImplementedError("Unable to infer type for node {}".format(node))
 
