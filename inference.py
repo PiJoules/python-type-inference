@@ -47,13 +47,16 @@ class PyType:
             attr (str)
             val (set[PyType]))
         """
+        assert isinstance(vals, set)
+        assert all(isinstance(x, Instance) for x in vals)
+
         if attr not in self.__attrs:
             self.__attrs[attr] = vals
         else:
             self.__attrs[attr] |= vals
 
-    def get_attr(self, attr):
-        return self.__attrs[attr]
+    def get_attr(self, attr, default=None):
+        return self.__attrs.get(attr, default)
 
     def attrs(self):
         return self.__attrs
@@ -64,6 +67,10 @@ FLOAT_TYPE = PyType("float")
 COMPLEX_TYPE = PyType("complex")
 NONE_TYPE = PyType("None")
 ANY_TYPE = PyType("Any")
+
+
+class MockType(PyType):
+    pass
 
 
 """
@@ -153,7 +160,9 @@ class FunctionInst(Instance):
             kwargs (Optional[str])
         """
         # Add to the types
-        ref_env.types()[name] = PyType(name)
+        func_type = PyType(name)
+        ref_env.types()[name] = func_type
+        super().__init__(func_type)
 
         self.__ref_node = ref_node
         self.__ref_env = ref_env
@@ -282,6 +291,88 @@ class FunctionInst(Instance):
         return returns or {NoneInst()}
 
     def __eq__(self, other):
+        return self.type().name() == other.type().name()
+
+    def __hash__(self):
+        """All function instances are unique."""
+        return hash(self.type().name())
+
+
+class InstanceInst(Instance):
+    def __init__(self, name, ref_node, ref_env):
+        # Create and add the instance type
+        inst_name = name + "_instance"
+        inst_type = PyType(inst_name)
+        ref_env.types()[inst_name] = inst_type
+        super().__init__(inst_type)
+
+    def __eq__(self, other):
+        return self.type().name() == other.type().name()
+
+    def __hash__(self):
+        return hash(self.type().name())
+
+
+class ClassInst(Instance):
+    def __init__(self, name, ref_node, ref_env):
+        """
+        Create the class type and the instance type of this class.
+        """
+        # Add class to the types
+        cls_type = PyType(name)
+        ref_env.types()[name] = cls_type
+        super().__init__(cls_type)
+
+        # Create and add the instance type
+        self.__inst = InstanceInst(name, ref_node, ref_env)
+
+    @classmethod
+    def from_node(cls, node, env):
+        return cls(node.name, node, env)
+
+    def apply_call_node_args(self, node, env):
+        """
+        Parse the arguments of a call node then apply_call_args.
+
+        Args:
+            args (node.Call)
+        """
+        self.apply_call_args(
+            pos_args=tuple(env.eval_inst(a) for a in node.args),
+            keyword_args={kw.arg: env.eval_inst(kw.value)
+                          for kw in node.keywords},
+            # TODO: Handle varargs and kwargs later
+        )
+
+    def apply_call_args(self, pos_args=None, keyword_args=None, varargs=None,
+                        kwargs=None):
+        """
+        Update the environment of the body of the __init__ method if provided.
+
+        Args:
+            pos_args (Optional[tuple[set[Instance]]])
+            keyword_args (Optional[dict[str, set[Instance]]])
+            varargs (Optional[Tuple])
+            kwargs (Optional[Dictionary])
+        """
+        init_funcs = self.__inst.type().get_attr("__init__")
+        if init_funcs is None:
+            return
+        for func in init_funcs:
+            func.apply_call_args(
+                pos_args=pos_args,
+                keyword_args=keyword_args,
+                varargs=varargs,
+                kwargs=kwargs,
+            )
+
+    def returns(self):
+        """
+        Create and return an instance of this class.
+        """
+        return {self.__inst}
+
+    def __eq__(self, other):
         return id(self) == id(other)
 
     def __hash__(self):
@@ -289,14 +380,41 @@ class FunctionInst(Instance):
         return id(self)
 
 
+"""
+Instance mocks for testing
+"""
+
+class MockInstance(Instance):
+    def __init__(self, name):
+        super().__init__(MockType(name + "_instance"))
+
+    def __eq__(self, other):
+        return self.type().name() == other.type().name()
+
+    def __hash__(self):
+        return hash(self.type().name())
+
+
+class MockFunction(Instance):
+    def __init__(self, name):
+        super().__init__(MockType(name))
+
+    def __eq__(self, other):
+        return self.type().name() == other.type().name()
+
+    def __hash__(self):
+        return hash(self.type().name())
+
+
 class Environment:
     def __init__(self, types=None, variables=None, parent=None, owner=None):
         self.__owner = owner or "<module>" # for debugging
 
-        self.__types = types or dict(TYPES)
-        self.__variables = variables or {}
+        self.__types = dict(types or TYPES)
+        self.__variables = dict(variables or {})
         self.__parent = parent
         self.__uncalled_funcs = set()
+        self.__uncalled_classes = set()
 
     def bind(self, var, insts):
         assert isinstance(insts, set)
@@ -349,7 +467,7 @@ class Environment:
 
         returns = set()
         for func in funcs:
-            # Ignore called functions
+            # Ignore previously called functions
             if func in CALL_STACK:
                 continue
 
@@ -376,15 +494,23 @@ class Environment:
         object in the binary operation, but for now, just return the set of
         both types of the expressions.
         """
-        print("available vars in {}:".format(self.env_lineage()), self.available_variables())
         returns = set()
         returns |= self.eval_inst(node.left)
         returns |= self.eval_inst(node.right)
         return returns
 
-    def eval_inst(self, node):
-        print("evaluating:", node, "in", self.env_lineage())
+    def eval_attr(self, node):
+        val = node.value
+        attr = node.attr  # str
 
+        insts = self.eval_inst(val)
+        returns = set()
+        for inst in insts:
+            inst_type = inst.type()
+            returns |= inst_type.get_attr(attr, default=set())
+        return returns
+
+    def eval_inst(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
         elif isinstance(node, ast.Call):
@@ -393,6 +519,8 @@ class Environment:
             return self.eval_name(node)
         elif isinstance(node, ast.BinOp):
             return self.eval_binop(node)
+        elif isinstance(node, ast.Attribute):
+            return self.eval_attr(node)
         else:
             raise NotImplementedError("Unable to infer type for node {}".format(node))
 
@@ -427,9 +555,34 @@ class Environment:
         # Add to env also
         self.bind(name, {func_inst})
 
+    def parse_class_def(self, node):
+        """
+        Similar to parse_func_def, but the body is evaluated and all variable
+        declarations are added as attributes of the class and its instance.
+        """
+        name = node.name
+        class_inst = ClassInst.from_node(node, self)  # This creates the instance and the type
+        self.__uncalled_classes.add(class_inst)
+
+        # Run the body and add attributes to the class
+        env = Environment(
+            types=self.types(),
+            parent=self,
+            owner=name,
+        )
+        env.parse_sequence(node.body)
+        for var, insts in env.variables().items():
+            class_inst.type().add_attrs(var, insts)
+
+        if __debug__:
+            print("class {} has attrs {}".format(name, class_inst.type().attrs()))
+
+        # Add to env also
+        self.bind(name, {class_inst})
+
     def parse(self, node):
         if __debug__:
-            print("parsing:", node)
+            print("parsing:", node, "in env", self.env_lineage())
 
         if isinstance(node, ast.Module):
             self.parse_module(node)
@@ -437,6 +590,10 @@ class Environment:
             self.parse_assign(node)
         elif isinstance(node, ast.FunctionDef):
             self.parse_func_def(node)
+        elif isinstance(node, ast.ClassDef):
+            self.parse_class_def(node)
+        elif isinstance(node, ast.Pass):
+            pass
         else:
             raise NotImplementedError("Cannot parse node {}".format(node))
 
@@ -448,7 +605,7 @@ class Environment:
         self.parse_sequence(node.body)
 
         # Last minute check
-        assert not CALL_STACK
+        assert not CALL_STACK, "Call stack not empty in env: {}".format(CALL_STACK)
 
     def parse_code(self, code):
         self.parse(ast.parse(code))
