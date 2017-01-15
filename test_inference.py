@@ -153,6 +153,109 @@ z = A.func(x, 2)
             {MockFunction("func")}
         )
 
+    def test_instance_attrs(self):
+        """Test instance methods with self attribute assignments."""
+        code = """
+class A:
+    def __init__(self, a):
+        self._a = a
+    def func(self):
+        return self._a
+x = A(2)
+y = x.func()
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        # Stored value
+        self.assertSetEqual(
+            env.lookup("x"),
+            {MockInstance("A")}
+        )
+        self.assertSetEqual(
+            env.lookup("y"),
+            {IntInst()}
+        )
+
+        # Instance attributes
+        self.assertSetEqual(
+            first(first(env.lookup("x")).type().get_attr("func")).returns(),
+            {IntInst()}
+        )
+        self.assertSetEqual(
+            first(first(env.lookup("x")).type().get_attr("__init__")).returns(),
+            {NoneInst()}
+        )
+        self.assertSetEqual(
+            first(env.lookup("x")).type().get_attr("_a"),
+            {IntInst()}
+        )
+
+    def test_multiple_instances(self):
+        """Test the attributes change with multiple instances."""
+        code = """
+class A:
+    def __init__(self, a):
+        self._a = a
+    def func(self):
+        return self._a
+x = A(2)
+y = x.func()
+x = A(4.0)
+y = x.func()
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        # Stored value
+        self.assertSetEqual(
+            env.lookup("x"),
+            {MockInstance("A")}
+        )
+        self.assertSetEqual(
+            env.lookup("y"),
+            {IntInst(), FloatInst()}
+        )
+
+        # Instance attributes
+        self.assertSetEqual(
+            first(first(env.lookup("x")).type().get_attr("func")).returns(),
+            {IntInst(), FloatInst()}
+        )
+        self.assertSetEqual(
+            first(first(env.lookup("x")).type().get_attr("__init__")).returns(),
+            {NoneInst()}
+        )
+        self.assertSetEqual(
+            first(env.lookup("x")).type().get_attr("_a"),
+            {IntInst(), FloatInst()}
+        )
+
+    def test_multiple_assignment(self):
+        """Test variables can hold mutiple types."""
+        code = """
+class A:
+    pass
+x = A(2)
+x = 2
+
+y = x
+y = 3.0
+
+x = 4j
+        """
+        env = Environment()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.lookup("x"),
+            {MockInstance("A"), IntInst(), ComplexInst()}
+        )
+        self.assertSetEqual(
+            env.lookup("y"),
+            {MockInstance("A"), IntInst(), FloatInst()}
+        )
+
 
 
 if __name__ == "__main__":

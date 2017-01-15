@@ -50,13 +50,19 @@ class PyType:
         assert isinstance(vals, set)
         assert all(isinstance(x, Instance) for x in vals)
 
+        if __debug__:
+            print("adding {} for type {}: {}".format(attr, self.name(), vals))
+
         if attr not in self.__attrs:
             self.__attrs[attr] = vals
         else:
             self.__attrs[attr] |= vals
 
     def get_attr(self, attr, default=None):
-        return self.__attrs.get(attr, default)
+        val = self.__attrs.get(attr, default)
+        if __debug__:
+            print("getting {} for type {}: {}".format(attr, self.name(), val))
+        return val
 
     def attrs(self):
         return self.__attrs
@@ -144,7 +150,8 @@ TYPES = {
 
 class FunctionInst(Instance):
     def __init__(self, name, ref_node, ref_env, pos_args=None,
-                 keyword_args=None, varargs=None, kwargs=None):
+                 keyword_args=None, varargs=None, kwargs=None,
+                 method_owner=None):
         """
         Create the new function type this instance represents since all
         function definitions are unique instances.
@@ -158,6 +165,7 @@ class FunctionInst(Instance):
             keyword_args (Optional[dict[str, set[Instance]]])
             varargs (Optional[str])
             kwargs (Optional[str])
+            method_owner (Optional[Instance])
         """
         # Add to the types
         func_type = PyType(name)
@@ -166,6 +174,7 @@ class FunctionInst(Instance):
 
         self.__ref_node = ref_node
         self.__ref_env = ref_env
+        self.__method_owner = method_owner
 
         # Save the arguments
         self.__pos_args = pos_args or tuple()
@@ -176,8 +185,13 @@ class FunctionInst(Instance):
         # Add the arguments as new variables with no types for now
         args = {}
         if pos_args:
-            for arg in pos_args:
-                args[arg] = set()
+            if method_owner is None:
+                for arg in pos_args:
+                    args[arg] = set()
+            else:
+                args[pos_args[0]] = {method_owner}
+                for arg in pos_args[1:]:
+                    args[arg] = set()
         if kwargs:
             for arg, vals in kwargs.items():
                 args[arg] = vals
@@ -195,7 +209,7 @@ class FunctionInst(Instance):
         )
 
     @classmethod
-    def from_node(cls, node, env):
+    def from_node(cls, node, env, method_owner=None):
         name = node.name
         args = node.args
         body = node.body
@@ -228,7 +242,7 @@ class FunctionInst(Instance):
             kwargs = None
 
         return cls(name, node, env, pos_args=pos_args, keyword_args=keyword_args,
-                   varargs=varargs, kwargs=kwargs)
+                   varargs=varargs, kwargs=kwargs, method_owner=method_owner)
 
     def env(self):
         return self.__body_env
@@ -259,7 +273,12 @@ class FunctionInst(Instance):
             kwargs (Optional[Dictionary])
         """
         pos_args = pos_args or tuple()
-        for i, arg in enumerate(self.__pos_args):
+        if self.__method_owner is None:
+            start = 0
+        else:
+            # Ignore the first arg
+            start = 1
+        for i, arg in enumerate(self.__pos_args[start:]):
             self.__body_env.bind(arg, pos_args[i])
 
         keyword_args = keyword_args or {}
@@ -287,6 +306,12 @@ class FunctionInst(Instance):
                     stack += handler.body
             elif isinstance(node, ast.With):
                 stack += node.body
+            else:
+                # Parse everything else
+                self.__body_env.parse(node)
+
+        if __debug__:
+            print("returns for", self.__body_env.env_lineage(), ":", returns)
 
         return returns or {NoneInst()}
 
@@ -305,6 +330,17 @@ class InstanceInst(Instance):
         inst_type = PyType(inst_name)
         ref_env.types()[inst_name] = inst_type
         super().__init__(inst_type)
+
+        # Run the body and add attributes to the inst
+        env = Environment(
+            types=ref_env.types(),
+            parent=ref_env,
+            owner=inst_name,
+            method_owner=self,
+        )
+        env.parse_sequence(ref_node.body)
+        for var, insts in env.variables().items():
+            self.type().add_attrs(var, insts)
 
     def __eq__(self, other):
         return self.type().name() == other.type().name()
@@ -325,6 +361,16 @@ class ClassInst(Instance):
 
         # Create and add the instance type
         self.__inst = InstanceInst(name, ref_node, ref_env)
+
+        # Run the body and add attributes to the class
+        env = Environment(
+            types=ref_env.types(),
+            parent=ref_env,
+            owner=name,
+        )
+        env.parse_sequence(ref_node.body)
+        for var, insts in env.variables().items():
+            self.type().add_attrs(var, insts)
 
     @classmethod
     def from_node(cls, node, env):
@@ -369,7 +415,12 @@ class ClassInst(Instance):
     def returns(self):
         """
         Create and return an instance of this class.
+
+        Be sure to call the __init__ method also.
         """
+        init_funcs = self.__inst.type().get_attr("__init__", default=set())
+        for func in init_funcs:
+            func.returns()
         return {self.__inst}
 
     def __eq__(self, other):
@@ -407,7 +458,8 @@ class MockFunction(Instance):
 
 
 class Environment:
-    def __init__(self, types=None, variables=None, parent=None, owner=None):
+    def __init__(self, types=None, variables=None, parent=None, owner=None,
+                 method_owner=None):
         self.__owner = owner or "<module>" # for debugging
 
         self.__types = dict(types or TYPES)
@@ -415,6 +467,7 @@ class Environment:
         self.__parent = parent
         self.__uncalled_funcs = set()
         self.__uncalled_classes = set()
+        self.__method_owner = method_owner
 
     def bind(self, var, insts):
         assert isinstance(insts, set)
@@ -511,6 +564,9 @@ class Environment:
         return returns
 
     def eval_inst(self, node):
+        if __debug__:
+            print("evaluating instance:", node)
+
         if isinstance(node, ast.Num):
             return self.eval_num(node)
         elif isinstance(node, ast.Call):
@@ -540,8 +596,15 @@ class Environment:
         for target in targets:
             if isinstance(target, ast.Name):
                 self.bind(target.id, insts)
+            elif isinstance(target, ast.Attribute):
+                base = target.value  # ast node
+                attr = target.attr  # str
+                base_insts = self.eval_inst(base)
+                for inst in base_insts:
+                    # Set the attribute for each instance
+                    inst.type().add_attrs(attr, insts)
             else:
-                raise NotImplementedError("Unable to assign to target node {}".format(node))
+                raise NotImplementedError("Unable to assign to target node {}".format(target))
 
     def parse_func_def(self, node):
         """
@@ -549,7 +612,7 @@ class Environment:
         functions.
         """
         name = node.name
-        func_inst = FunctionInst.from_node(node, self)  # This creates the instance and the type
+        func_inst = FunctionInst.from_node(node, self, method_owner=self.__method_owner)  # This creates the instance and the type
         self.__uncalled_funcs.add(func_inst)
 
         # Add to env also
@@ -563,16 +626,6 @@ class Environment:
         name = node.name
         class_inst = ClassInst.from_node(node, self)  # This creates the instance and the type
         self.__uncalled_classes.add(class_inst)
-
-        # Run the body and add attributes to the class
-        env = Environment(
-            types=self.types(),
-            parent=self,
-            owner=name,
-        )
-        env.parse_sequence(node.body)
-        for var, insts in env.variables().items():
-            class_inst.type().add_attrs(var, insts)
 
         if __debug__:
             print("class {} has attrs {}".format(name, class_inst.type().attrs()))
