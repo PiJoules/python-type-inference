@@ -133,7 +133,23 @@ class PyType:
         return self.__attrs
 
     def json(self):
-        return {attr: val.type().name() for attr, val in self.attrs().items()}
+        attrs = {attr: val.type().name() for attr, val in self.attrs().items()}
+
+        args = {
+            "positional": self.__pos_args,
+            "keyword": {arg: [inst.type().name() for inst in insts]
+                        for arg, insts in self.__keyword_args.items()},
+            "varargs": self.__varargs,
+            "kwargs": self.__kwargs,
+        }
+
+        return_types = [inst.type().name() for inst in self.returns()]
+
+        return {
+            "attrs": attrs,
+            "args": args,
+            "returns": return_types,
+        }
 
     def apply_call_node_args(self, node, env):
         """
