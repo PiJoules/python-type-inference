@@ -11,7 +11,7 @@ class TestInference(unittest.TestCase):
         code = """
 x = 2
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         self.assertSetEqual(
@@ -26,7 +26,7 @@ def func():
     return 2
 x = func()
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
@@ -37,7 +37,7 @@ x = func()
 
         # Return type
         self.assertSetEqual(
-            first(env.lookup("func")).returns(),
+            first(env.lookup("func")).type().returns(),
             {IntInst()}
         )
 
@@ -48,7 +48,7 @@ def func(a):
     return a
 x = func(2)
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
@@ -59,13 +59,13 @@ x = func(2)
 
         # Return type
         self.assertSetEqual(
-            first(env.lookup("func")).returns(),
+            first(env.lookup("func")).type().returns(),
             {IntInst()}
         )
 
         # Argument in function
         self.assertSetEqual(
-            first(env.lookup("func")).env().lookup("a"),
+            first(env.lookup("func")).type().env().lookup("a"),
             {IntInst()}
         )
 
@@ -78,7 +78,7 @@ def fib(n):
     return fib(n-1) + fib(n-2)
 x = fib(5)
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
@@ -89,13 +89,13 @@ x = fib(5)
 
         # Return type
         self.assertSetEqual(
-            first(env.lookup("fib")).returns(),
+            first(env.lookup("fib")).type().returns(),
             {IntInst()}
         )
 
         # Argument in function
         self.assertSetEqual(
-            first(env.lookup("fib")).env().lookup("n"),
+            first(env.lookup("fib")).type().env().lookup("n"),
             {IntInst()}
         )
 
@@ -106,7 +106,7 @@ class A:
     pass
 x = A()
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
@@ -126,10 +126,11 @@ x = A()
 y = A.x
 z = A.func(x, 2)
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
+        print("x:", env.lookup("x"))
         self.assertSetEqual(
             env.lookup("x"),
             {MockInstance("A")}
@@ -164,7 +165,7 @@ class A:
 x = A(2)
 y = x.func()
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
@@ -179,11 +180,11 @@ y = x.func()
 
         # Instance attributes
         self.assertSetEqual(
-            first(first(env.lookup("x")).type().get_attr("func")).returns(),
+            first(first(env.lookup("x")).type().get_attr("func")).type().returns(),
             {IntInst()}
         )
         self.assertSetEqual(
-            first(first(env.lookup("x")).type().get_attr("__init__")).returns(),
+            first(first(env.lookup("x")).type().get_attr("__init__")).type().returns(),
             {NoneInst()}
         )
         self.assertSetEqual(
@@ -204,7 +205,7 @@ y = x.func()
 x = A(4.0)
 y = x.func()
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         # Stored value
@@ -219,11 +220,11 @@ y = x.func()
 
         # Instance attributes
         self.assertSetEqual(
-            first(first(env.lookup("x")).type().get_attr("func")).returns(),
+            first(first(env.lookup("x")).type().get_attr("func")).type().returns(),
             {IntInst(), FloatInst()}
         )
         self.assertSetEqual(
-            first(first(env.lookup("x")).type().get_attr("__init__")).returns(),
+            first(first(env.lookup("x")).type().get_attr("__init__")).type().returns(),
             {NoneInst()}
         )
         self.assertSetEqual(
@@ -244,7 +245,7 @@ y = 3.0
 
 x = 4j
         """
-        env = Environment()
+        env = ModuleEnv()
         env.parse_code(code)
 
         self.assertSetEqual(

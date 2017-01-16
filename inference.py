@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 
 import ast
+import json
+
 
 if __debug__:
     ENV_COUNTER = 1
+
 
 CALL_STACK = set()  # ids of instances that get called
 
@@ -22,12 +25,74 @@ Types available at runtime
 """
 
 class PyType:
-    def __init__(self, name, attrs=None):
+    def __init__(self, name, ref_node=None, ref_env=None, pos_args=None,
+                 keyword_args=None, varargs=None, kwargs=None,
+                 method_owner=None, init_attrs=None):
+        """
+        Create the new function type this instance represents since all
+        function definitions are unique instances.
+
+        Args:
+            name (str)
+            ref_node (ast.FunctionDef)
+            ref_env (Environment): The environment this instance was created in
+
+            pos_args (Optional[tuple[str]])
+            keyword_args (Optional[dict[str, set[Instance]]])
+            varargs (Optional[str])
+            kwargs (Optional[str])
+            method_owner (Optional[Instance])
+            init_attrs (Optional[dict[str, set[Instance]]])
+        """
+        # Add to the types
         self.__name = name
-        self.__attrs = attrs or {}  # dict[str, set[Instance]]
+        self.__attrs = init_attrs or {}
+
+        self.__ref_node = ref_node
+        self.__ref_env = ref_env
+        self.__method_owner = method_owner
+
+        # Save the arguments
+        self.__pos_args = pos_args or tuple()
+        self.__keyword_args = keyword_args or {}
+        self.__varargs = varargs
+        self.__kwargs = kwargs
+
+        # Add the arguments as new variables with no types for now
+        args = {}
+        if pos_args:
+            if method_owner is None:
+                for arg in pos_args:
+                    args[arg] = set()
+            else:
+                args[pos_args[0]] = {method_owner}
+                for arg in pos_args[1:]:
+                    args[arg] = set()
+        if kwargs:
+            for arg, vals in kwargs.items():
+                args[arg] = vals
+        if varargs:
+            args[varargs] = {AnyInst()}  # should be tuple instance containing any type
+        if kwargs:
+            args[kwargs] = {AnyInst()}  # should be dict instance containing any type
+
+        # The environment of this body
+        # Create it but do not parse it
+        if ref_env:
+            self.__body_env = Environment(
+                types=ref_env.types(),
+                variables=args,
+                parent=self.__ref_env,
+                owner=name,
+            )
+        else:
+            self.__body_env = None
 
     def name(self):
         return self.__name
+
+    def env(self):
+        return self.__body_env
 
     def add_attr(self, attr, val):
         """
@@ -67,185 +132,8 @@ class PyType:
     def attrs(self):
         return self.__attrs
 
-
-INT_TYPE = PyType("int")
-FLOAT_TYPE = PyType("float")
-COMPLEX_TYPE = PyType("complex")
-NONE_TYPE = PyType("None")
-ANY_TYPE = PyType("Any")
-
-
-class MockType(PyType):
-    pass
-
-
-"""
-Instances created at runtime or are builtin instances available at startup
-"""
-
-class Instance:
-    def __init__(self, inst_type):
-        self.__type = inst_type
-
-    def type(self):
-        return self.__type
-
-    def __ne__(self, other):
-        return not (self == other)
-
-    def __eq__(self, other):
-        """For comparing instances at runtime."""
-        raise NotImplementedError
-
-    def __hash__(self):
-        """For separating between different types in a set of instances."""
-        raise NotImplementedError
-
-    def returns(self):
-        """The instances returned by this instance if it were called."""
-        raise NotImplementedError
-
-
-class BaseInstance(Instance):
-    """Instances of types where the runtime properties do not matter."""
-    def __eq__(self, other):
-        return isinstance(other, type(self))
-
-    def __hash__(self):
-        """Hash is just a hash of the name of this type of instance."""
-        return hash(self.type().name())
-
-
-class IntInst(BaseInstance):
-    def __init__(self):
-        super().__init__(INT_TYPE)
-
-class FloatInst(BaseInstance):
-    def __init__(self):
-        super().__init__(FLOAT_TYPE)
-
-class ComplexInst(BaseInstance):
-    def __init__(self):
-        super().__init__(COMPLEX_TYPE)
-
-class NoneInst(BaseInstance):
-    def __init__(self):
-        super().__init__(NONE_TYPE)
-
-class AnyInst(BaseInstance):
-    def __init__(self):
-        super().__init__(ANY_TYPE)
-
-
-# All types known to all environments
-# Populated with builtin types initially and filled at runtime with user-defined
-# types
-TYPES = {
-    "int": INT_TYPE,
-    "float": FLOAT_TYPE,
-    "complex": COMPLEX_TYPE,
-    "None": NONE_TYPE,
-}
-
-
-class FunctionInst(Instance):
-    def __init__(self, name, ref_node, ref_env, pos_args=None,
-                 keyword_args=None, varargs=None, kwargs=None,
-                 method_owner=None):
-        """
-        Create the new function type this instance represents since all
-        function definitions are unique instances.
-
-        Args:
-            name (str)
-            ref_node (ast.FunctionDef)
-            ref_env (Environment): The environment this instance was created in
-
-            pos_args (Optional[tuple[str]])
-            keyword_args (Optional[dict[str, set[Instance]]])
-            varargs (Optional[str])
-            kwargs (Optional[str])
-            method_owner (Optional[Instance])
-        """
-        # Add to the types
-        func_type = PyType(name)
-        ref_env.types()[name] = func_type
-        super().__init__(func_type)
-
-        self.__ref_node = ref_node
-        self.__ref_env = ref_env
-        self.__method_owner = method_owner
-
-        # Save the arguments
-        self.__pos_args = pos_args or tuple()
-        self.__keyword_args = keyword_args or {}
-        self.__varargs = varargs
-        self.__kwargs = kwargs
-
-        # Add the arguments as new variables with no types for now
-        args = {}
-        if pos_args:
-            if method_owner is None:
-                for arg in pos_args:
-                    args[arg] = set()
-            else:
-                args[pos_args[0]] = {method_owner}
-                for arg in pos_args[1:]:
-                    args[arg] = set()
-        if kwargs:
-            for arg, vals in kwargs.items():
-                args[arg] = vals
-        if varargs:
-            args[varargs] = {AnyInst()}  # should be tuple instance containing any type
-        if kwargs:
-            args[kwargs] = {AnyInst()}  # should be dict instance containing any type
-
-        # The environment of this body
-        self.__body_env = Environment(
-            types=ref_env.types(),
-            variables=args,
-            parent=self.__ref_env,
-            owner=name,
-        )
-
-    @classmethod
-    def from_node(cls, node, env, method_owner=None):
-        name = node.name
-        args = node.args
-        body = node.body
-
-        # Extract args
-        # Pos args
-        pos_args = tuple(a.arg for a in args.args[:len(args.args)-len(args.defaults)])
-
-        # Keywrod args
-        keyword_args = {}
-        for i, arg in enumerate(args.args[len(args.args)-len(args.defaults):]):
-            keyword_args[arg.arg] = env.eval_inst(args.defaults[i])
-        for i, kwarg in enumerate(args.kwonlyargs):
-            default = args.kw_defaults[i]
-            if default is None:
-                keyword_args[kwarg.arg] = set()
-            else:
-                keyword_args[kwarg.arg] = env.eval_inst(default)
-
-        # Varibale args
-        if args.vararg:
-            varargs = args.vararg.arg
-        else:
-            varargs = None
-
-        # kwargs
-        if args.kwarg:
-            kwargs = args.kwarg.arg
-        else:
-            kwargs = None
-
-        return cls(name, node, env, pos_args=pos_args, keyword_args=keyword_args,
-                   varargs=varargs, kwargs=kwargs, method_owner=method_owner)
-
-    def env(self):
-        return self.__body_env
+    def json(self):
+        return {attr: val.type().name() for attr, val in self.attrs().items()}
 
     def apply_call_node_args(self, node, env):
         """
@@ -291,6 +179,8 @@ class FunctionInst(Instance):
         """
         Run through the code to find any return statements.
         """
+        if self.__ref_node is None:
+            return set()
         returns = set()
 
         stack = list(self.__ref_node.body)
@@ -314,6 +204,209 @@ class FunctionInst(Instance):
             print("returns for", self.__body_env.env_lineage(), ":", returns)
 
         return returns or {NoneInst()}
+
+
+class ClassType(PyType):
+    def __init__(self, name, ref_node, ref_env):
+        """
+        Create the class type and the instance type of this class.
+        """
+        super().__init__(name, ref_node=ref_node, ref_env=ref_env)
+
+        # Create and add the instance type
+        self.__inst = InstanceInst(name, ref_node, ref_env)
+
+        # Run the body and add attributes to the class
+        env = Environment(
+            types=ref_env.types(),
+            parent=ref_env,
+            owner=name,
+        )
+        env.parse_sequence(ref_node.body)
+        for var, insts in env.variables().items():
+            self.add_attrs(var, insts)
+
+    def apply_call_args(self, pos_args=None, keyword_args=None, varargs=None,
+                        kwargs=None):
+        """
+        Update the environment of the body of the __init__ method if provided.
+
+        Args:
+            pos_args (Optional[tuple[set[Instance]]])
+            keyword_args (Optional[dict[str, set[Instance]]])
+            varargs (Optional[Tuple])
+            kwargs (Optional[Dictionary])
+        """
+        init_funcs = self.__inst.type().get_attr("__init__")
+        if init_funcs is None:
+            return
+        for func in init_funcs:
+            func.type().apply_call_args(
+                pos_args=pos_args,
+                keyword_args=keyword_args,
+                varargs=varargs,
+                kwargs=kwargs,
+            )
+
+    def returns(self):
+        """
+        Create and return an instance of this class.
+
+        Be sure to call the __init__ method also.
+        """
+        init_funcs = self.__inst.type().get_attr("__init__", default=set())
+        for func in init_funcs:
+            func.type().returns()
+        return {self.__inst}
+
+
+
+class MockType(PyType):
+    pass
+
+
+"""
+Instances created at runtime or are builtin instances available at startup
+"""
+
+class Instance:
+    def __init__(self, inst_type):
+        self.__type = inst_type
+
+    def type(self):
+        return self.__type
+
+    def __ne__(self, other):
+        return not (self == other)
+
+    def __eq__(self, other):
+        """For comparing instances at runtime."""
+        raise NotImplementedError
+
+    def __hash__(self):
+        """For separating between different types in a set of instances."""
+        raise NotImplementedError
+
+
+class BaseInstance(Instance):
+    """Instances of types where the runtime properties do not matter."""
+    def __eq__(self, other):
+        return isinstance(other, type(self))
+
+    def __hash__(self):
+        """Hash is just a hash of the name of this type of instance."""
+        return hash(self.type().name())
+
+
+class IntInst(BaseInstance):
+    def __init__(self):
+        super().__init__(INT_TYPE)
+
+class FloatInst(BaseInstance):
+    def __init__(self):
+        super().__init__(FLOAT_TYPE)
+
+class ComplexInst(BaseInstance):
+    def __init__(self):
+        super().__init__(COMPLEX_TYPE)
+
+class NoneInst(BaseInstance):
+    def __init__(self):
+        super().__init__(NONE_TYPE)
+
+class AnyInst(BaseInstance):
+    def __init__(self):
+        super().__init__(ANY_TYPE)
+
+class BoolInst(BaseInstance):
+    def __init__(self):
+        super().__init__(BOOL_TYPE)
+
+
+class FunctionInst(Instance):
+    def __eq__(self, other):
+        return self.type().name() == other.type().name()
+
+    def __hash__(self):
+        """All function instances are unique."""
+        return hash(self.type().name())
+
+
+class BuiltinFunctionInst(FunctionInst):
+    def __init__(self, name):
+        # Add to the types
+        func_type = PyType(name)
+        TYPES[name] = func_type
+        super().__init__(func_type)
+
+
+class PrintFunction(BuiltinFunctionInst):
+    def __init__(self):
+        super().__init__("print")
+
+
+class DefinedFunctionInst(Instance):
+    def __init__(self, name, ref_node, ref_env, pos_args=None,
+                 keyword_args=None, varargs=None, kwargs=None,
+                 method_owner=None):
+        """
+        Create the new function type this instance represents since all
+        function definitions are unique instances.
+
+        Args:
+            name (str)
+            ref_node (ast.FunctionDef)
+            ref_env (Environment): The environment this instance was created in
+
+            pos_args (Optional[tuple[str]])
+            keyword_args (Optional[dict[str, set[Instance]]])
+            varargs (Optional[str])
+            kwargs (Optional[str])
+            method_owner (Optional[Instance])
+        """
+        # Add to the types
+        func_type = PyType(name, ref_node=ref_node, ref_env=ref_env,
+                           pos_args=pos_args, keyword_args=keyword_args,
+                           varargs=varargs, kwargs=kwargs,
+                           method_owner=method_owner)
+        ref_env.types()[name] = func_type
+        super().__init__(func_type)
+
+    @classmethod
+    def from_node(cls, node, env, method_owner=None):
+        name = node.name
+        args = node.args
+        body = node.body
+
+        # Extract args
+        # Pos args
+        pos_args = tuple(a.arg for a in args.args[:len(args.args)-len(args.defaults)])
+
+        # Keywrod args
+        keyword_args = {}
+        for i, arg in enumerate(args.args[len(args.args)-len(args.defaults):]):
+            keyword_args[arg.arg] = env.eval_inst(args.defaults[i])
+        for i, kwarg in enumerate(args.kwonlyargs):
+            default = args.kw_defaults[i]
+            if default is None:
+                keyword_args[kwarg.arg] = set()
+            else:
+                keyword_args[kwarg.arg] = env.eval_inst(default)
+
+        # Varibale args
+        if args.vararg:
+            varargs = args.vararg.arg
+        else:
+            varargs = None
+
+        # kwargs
+        if args.kwarg:
+            kwargs = args.kwarg.arg
+        else:
+            kwargs = None
+
+        return cls(name, node, env, pos_args=pos_args, keyword_args=keyword_args,
+                   varargs=varargs, kwargs=kwargs, method_owner=method_owner)
 
     def __eq__(self, other):
         return self.type().name() == other.type().name()
@@ -355,74 +448,13 @@ class ClassInst(Instance):
         Create the class type and the instance type of this class.
         """
         # Add class to the types
-        cls_type = PyType(name)
+        cls_type = ClassType(name, ref_node, ref_env)
         ref_env.types()[name] = cls_type
         super().__init__(cls_type)
-
-        # Create and add the instance type
-        self.__inst = InstanceInst(name, ref_node, ref_env)
-
-        # Run the body and add attributes to the class
-        env = Environment(
-            types=ref_env.types(),
-            parent=ref_env,
-            owner=name,
-        )
-        env.parse_sequence(ref_node.body)
-        for var, insts in env.variables().items():
-            self.type().add_attrs(var, insts)
 
     @classmethod
     def from_node(cls, node, env):
         return cls(node.name, node, env)
-
-    def apply_call_node_args(self, node, env):
-        """
-        Parse the arguments of a call node then apply_call_args.
-
-        Args:
-            args (node.Call)
-        """
-        self.apply_call_args(
-            pos_args=tuple(env.eval_inst(a) for a in node.args),
-            keyword_args={kw.arg: env.eval_inst(kw.value)
-                          for kw in node.keywords},
-            # TODO: Handle varargs and kwargs later
-        )
-
-    def apply_call_args(self, pos_args=None, keyword_args=None, varargs=None,
-                        kwargs=None):
-        """
-        Update the environment of the body of the __init__ method if provided.
-
-        Args:
-            pos_args (Optional[tuple[set[Instance]]])
-            keyword_args (Optional[dict[str, set[Instance]]])
-            varargs (Optional[Tuple])
-            kwargs (Optional[Dictionary])
-        """
-        init_funcs = self.__inst.type().get_attr("__init__")
-        if init_funcs is None:
-            return
-        for func in init_funcs:
-            func.apply_call_args(
-                pos_args=pos_args,
-                keyword_args=keyword_args,
-                varargs=varargs,
-                kwargs=kwargs,
-            )
-
-    def returns(self):
-        """
-        Create and return an instance of this class.
-
-        Be sure to call the __init__ method also.
-        """
-        init_funcs = self.__inst.type().get_attr("__init__", default=set())
-        for func in init_funcs:
-            func.returns()
-        return {self.__inst}
-
     def __eq__(self, other):
         return id(self) == id(other)
 
@@ -460,9 +492,10 @@ class MockFunction(Instance):
 class Environment:
     def __init__(self, types=None, variables=None, parent=None, owner=None,
                  method_owner=None):
-        self.__owner = owner or "<module>" # for debugging
+        #self.__owner = owner or "<module>" # for debugging
+        self.__owner = owner
 
-        self.__types = dict(types or TYPES)
+        self.__types = dict(types or {})
         self.__variables = dict(variables or {})
         self.__parent = parent
         self.__uncalled_funcs = set()
@@ -526,8 +559,8 @@ class Environment:
 
             CALL_STACK.add(func)
 
-            func.apply_call_node_args(node, self)
-            returns |= func.returns()
+            func.type().apply_call_node_args(node, self)
+            returns |= func.type().returns()
 
             CALL_STACK.remove(func)
         return returns
@@ -563,6 +596,12 @@ class Environment:
             returns |= inst_type.get_attr(attr, default=set())
         return returns
 
+    def eval_compare(self, node):
+        """
+        Comparisons always return boolean values.
+        """
+        return {BoolInst()}
+
     def eval_inst(self, node):
         if __debug__:
             print("evaluating instance:", node)
@@ -577,6 +616,8 @@ class Environment:
             return self.eval_binop(node)
         elif isinstance(node, ast.Attribute):
             return self.eval_attr(node)
+        elif isinstance(node, ast.Compare):
+            return self.eval_compare(node)
         else:
             raise NotImplementedError("Unable to infer type for node {}".format(node))
 
@@ -612,7 +653,8 @@ class Environment:
         functions.
         """
         name = node.name
-        func_inst = FunctionInst.from_node(node, self, method_owner=self.__method_owner)  # This creates the instance and the type
+        func_inst = DefinedFunctionInst.from_node(node, self, method_owner=self.__method_owner)  # This creates the instance and the type
+        #self.__types[name] = func_inst
         self.__uncalled_funcs.add(func_inst)
 
         # Add to env also
@@ -633,6 +675,14 @@ class Environment:
         # Add to env also
         self.bind(name, {class_inst})
 
+    def parse_if(self, node):
+        """
+        Check the conditions then the bodies.
+        """
+        self.eval_inst(node.test)
+        self.parse_sequence(node.body)
+        self.parse_sequence(node.orelse)
+
     def parse(self, node):
         if __debug__:
             print("parsing:", node, "in env", self.env_lineage())
@@ -645,6 +695,18 @@ class Environment:
             self.parse_func_def(node)
         elif isinstance(node, ast.ClassDef):
             self.parse_class_def(node)
+        elif isinstance(node, ast.Expr):
+            self.eval_inst(node.value)
+        elif isinstance(node, ast.If):
+            self.parse_if(node)
+        #elif isinstance(node, (ast.If, ast.While, ast.For)):
+        #    stack += node.body + node.orelse
+        #elif isinstance(node, ast.Try):
+        #    stack += node.body + node.orelse + node.finalbody
+        #    for handler in node.handlers:
+        #        stack += handler.body
+        #elif isinstance(node, ast.With):
+        #    stack += node.body
         elif isinstance(node, ast.Pass):
             pass
         else:
@@ -701,5 +763,74 @@ class Environment:
         if self.__parent:
             variables.update(self.__parent.available_variables())
         return variables
+
+    def json(self):
+        variables = {}
+        for var, insts in self.variables().items():
+            variables[var] = [inst.type().name() for inst in insts]
+        types = {}
+        for name, t in self.types().items():
+            types[name] = t.json()
+        return {
+            "variables": variables,
+            "types": types,
+        }
+
+
+class ModuleEnv(Environment):
+    def __init__(self, types=None, variables=None, parent=None, owner=None,
+                 method_owner=None):
+        super().__init__(types=TYPES, variables=BUILTIN_INSTS,
+                         owner="<module>")
+
+
+INT_TYPE = PyType("int")
+FLOAT_TYPE = PyType("float")
+COMPLEX_TYPE = PyType("complex")
+NONE_TYPE = PyType("None")
+ANY_TYPE = PyType("Any")
+BOOL_TYPE = PyType("bool")
+
+
+# All types known to all environments
+# Populated with builtin types initially and filled at runtime with user-defined
+# types
+TYPES = {
+    "int": INT_TYPE,
+    "float": FLOAT_TYPE,
+    "complex": COMPLEX_TYPE,
+    "None": NONE_TYPE,
+    "bool": BOOL_TYPE,
+}
+
+
+BUILTIN_INSTS = {
+    "print": {PrintFunction()}
+}
+
+
+def get_args():
+    from argparse import ArgumentParser
+    parser = ArgumentParser("Python type inference")
+
+    parser.add_argument("filename", help="Filename to type check.")
+
+    args = parser.parse_args()
+    return args
+
+
+def main():
+    args = get_args()
+
+    with open(args.filename) as f:
+        env = ModuleEnv()
+        env.parse_code(f.read())
+        print(json.dumps(env.json(), indent=4))
+
+    return 0
+
+
+if __name__ == "__main__":
+    main()
 
 
