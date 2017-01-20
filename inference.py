@@ -135,10 +135,19 @@ class PyType:
     def json(self):
         attrs = {attr: val.type().name() for attr, val in self.attrs().items()}
 
+        pos_args = set()
+        for arg in self.__pos_args:
+            insts = self.__body_env.lookup(arg)
+            pos_args |= {inst.type().name() for inst in insts}
+
+        keyword_args = {}
+        for arg in self.__keyword_args.keys():
+            insts = self.__body_env.lookup(arg)
+            keyword_args[arg] = {inst.type().name() for inst in insts}
+
         args = {
-            "positional": self.__pos_args,
-            "keyword": {arg: [inst.type().name() for inst in insts]
-                        for arg, insts in self.__keyword_args.items()},
+            "positional": list(pos_args),
+            "keyword": {arg: list(types) for arg, types in keyword_args},
             "varargs": self.__varargs,
             "kwargs": self.__kwargs,
         }
