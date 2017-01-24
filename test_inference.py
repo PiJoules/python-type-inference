@@ -232,6 +232,50 @@ y = x.func()
             {IntInst(), FloatInst()}
         )
 
+    def test_object_containment(self):
+        """Test objects containing other objects."""
+        code = """
+class A:
+    def __init__(self, a):
+        self._a = a
+    def func(self):
+        return self._a
+class B:
+    def __init__(self, b):
+        self._b = b
+    def func(self):
+        return self._b
+x = A(2)
+y = x.func()
+b = B(x)
+c = b.func()
+d = b.func().func()
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        # Stored value
+        self.assertSetEqual(
+            env.lookup("x"),
+            {MockInstance("A")}
+        )
+        self.assertSetEqual(
+            env.lookup("y"),
+            {IntInst()}
+        )
+        self.assertSetEqual(
+            env.lookup("b"),
+            {MockInstance("B")}
+        )
+        self.assertSetEqual(
+            env.lookup("c"),
+            {MockInstance("A")}
+        )
+        self.assertSetEqual(
+            env.lookup("d"),
+            {IntInst()}
+        )
+
     def test_multiple_assignment(self):
         """Test variables can hold mutiple types."""
         code = """

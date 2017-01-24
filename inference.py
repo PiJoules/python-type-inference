@@ -335,6 +335,10 @@ class ComplexInst(BaseInstance):
     def __init__(self):
         super().__init__(COMPLEX_TYPE)
 
+class StrInst(BaseInstance):
+    def __init__(self):
+        super().__init__(STR_TYPE)
+
 class NoneInst(BaseInstance):
     def __init__(self):
         super().__init__(NONE_TYPE)
@@ -643,6 +647,8 @@ class Environment:
             return self.eval_attr(node)
         elif isinstance(node, ast.Compare):
             return self.eval_compare(node)
+        elif isinstance(node, ast.Str):
+            return {}
         else:
             raise NotImplementedError("Unable to infer type for node {}".format(node))
 
@@ -812,6 +818,7 @@ class ModuleEnv(Environment):
 INT_TYPE = PyType("int")
 FLOAT_TYPE = PyType("float")
 COMPLEX_TYPE = PyType("complex")
+STR_TYPE = PyType("str")
 NONE_TYPE = PyType("None")
 ANY_TYPE = PyType("Any")
 BOOL_TYPE = PyType("bool")
@@ -824,6 +831,7 @@ TYPES = {
     "int": INT_TYPE,
     "float": FLOAT_TYPE,
     "complex": COMPLEX_TYPE,
+    "str": STR_TYPE,
     "None": NONE_TYPE,
     "bool": BOOL_TYPE,
 }
