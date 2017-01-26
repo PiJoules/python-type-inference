@@ -1,2 +1,2 @@
-nose
+nose==0.5
 astor
