@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import ast
+import astor
 import json
+import importlib
 
 
 if __debug__:
@@ -714,6 +716,31 @@ class Environment:
         self.parse_sequence(node.body)
         self.parse_sequence(node.orelse)
 
+    def parse_import(self, node):
+        """
+        Check imported packages/modules.
+        """
+        imports = node.names
+        for alias in imports:
+            name = alias.name
+            asname = alias.asname
+
+            # TODO: Handle asname later
+            module = importlib.import_module(name)
+            if asnamme:
+                raise NotImplementedError("Implement logic for asname in import alias.")
+
+            # Try to see if can make ast from the import
+            try:
+                module_node = astor.codetoast(module)
+            except Exception as e:
+                raise RuntimeError("Unable to get ast from module {}: {}".format(name, e))
+
+            # Create a module instance
+            # Add the module to this env
+
+        raise NotImplementedError
+
     def parse(self, node):
         if __debug__:
             print("parsing:", node, "in env", self.env_lineage())
@@ -740,6 +767,8 @@ class Environment:
         #    stack += node.body
         elif isinstance(node, ast.Pass):
             pass
+        elif isinstance(node, ast.Import):
+            self.parse_import(node)
         else:
             raise NotImplementedError("Cannot parse node {}".format(node))
 
