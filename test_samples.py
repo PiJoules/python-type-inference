@@ -33,9 +33,9 @@ class TestSamples(unittest.TestCase):
             ["int"]
         )
 
-    def test_degrees(self):
-        """Test degrees.py"""
-        json = self.__env_json_from_file("samples/degrees.py")
+    #def test_degrees(self):
+    #    """Test degrees.py"""
+    #    json = self.__env_json_from_file("samples/degrees.py")
 
 
 

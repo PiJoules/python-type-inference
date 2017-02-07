@@ -376,6 +376,11 @@ class PrintFunction(BuiltinFunctionInst):
         super().__init__("print")
 
 
+class MathModule(Instance):
+    def __init__(self):
+        super().__init__(MATH_MODULE_TYPE)
+
+
 class DefinedFunctionInst(Instance):
     def __init__(self, name, ref_node, ref_env, pos_args=None,
                  keyword_args=None, varargs=None, kwargs=None,
@@ -727,14 +732,17 @@ class Environment:
 
             # TODO: Handle asname later
             module = importlib.import_module(name)
-            if asnamme:
+            if asname:
                 raise NotImplementedError("Implement logic for asname in import alias.")
 
             # Try to see if can make ast from the import
             try:
                 module_node = astor.codetoast(module)
             except Exception as e:
-                raise RuntimeError("Unable to get ast from module {}: {}".format(name, e))
+                # Check builtins for module
+                insts = self.lookup(name)
+                if not insts:
+                    raise RuntimeError("Unable to get ast from module '{}': {}".format(name, e))
 
             # Create a module instance
             # Add the module to this env
@@ -853,6 +861,10 @@ ANY_TYPE = PyType("Any")
 BOOL_TYPE = PyType("bool")
 
 
+# Create math module and add the attributes manually
+#MATH_MODULE_TYPE = PyType("math_module")
+
+
 # All types known to all environments
 # Populated with builtin types initially and filled at runtime with user-defined
 # types
@@ -863,11 +875,13 @@ TYPES = {
     "str": STR_TYPE,
     "None": NONE_TYPE,
     "bool": BOOL_TYPE,
+    #"math_module": MATH_MODULE_TYPE,
 }
 
 
 BUILTIN_INSTS = {
-    "print": {PrintFunction()}
+    "print": {PrintFunction()},
+    #"math": {MathModule()}
 }
 
 
