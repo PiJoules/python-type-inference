@@ -1,8 +1,6 @@
 # -*- coding: utf-8 -*-
 
-#from . import pyinstance
-#from . import pytype
-
-from .pyinstance import PyInstance
-from .pytype import PyType
+from .environment import ModuleEnv
+from .instance import Instance, ClassInstance
+from .builtin_insts import *
 

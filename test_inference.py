@@ -7,18 +7,18 @@ from inference import *
 
 class TestInference(unittest.TestCase):
     pass
-#    def test_assignment(self):
-#        """Test variable assignment."""
-#        code = """
-#x = 2
-#        """
-#        env = ModuleEnv()
-#        env.parse_code(code)
-#
-#        self.assertSetEqual(
-#            env.lookup("x"),
-#            {IntInst()}
-#        )
+    def test_assignment(self):
+        """Test variable assignment."""
+        code = """
+x = 2
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.lookup("x"),
+            {MockInt()}
+        )
 #
 #    def test_function_call(self):
 #        """Test function calls."""
