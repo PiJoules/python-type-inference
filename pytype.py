@@ -18,6 +18,9 @@ class PyType:
     def name(self):
         return self.__name
 
+    def __ne__(self, other):
+        return not (self == other)
+
 
 class RunnableType(PyType):
     """
@@ -44,6 +47,12 @@ Create builtin variables
 class IntType(PyType):
     def __init__(self):
         super().__init__("int")
+
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return isinstance(other, IntType)
 
 
 def load_builtin_vars():

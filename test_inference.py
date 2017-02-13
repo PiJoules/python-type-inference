@@ -1,6 +1,7 @@
 import unittest
 
 from inference import ModuleEnv
+from pytype import *
 
 
 class TestInference(unittest.TestCase):
@@ -10,6 +11,11 @@ x = 2
 """
         env = ModuleEnv()
         env.parse_code(code)
+
+        self.assertSetEqual(
+            env.lookup("x"),
+            {IntType()}
+        )
 
 
 if __name__ == "__main__":
