@@ -103,7 +103,8 @@ class Environment:
         vararg_node = node.vararg
         if vararg_node:
             # Create a new tuple which could contain different types
-            self.bind(vararg_node.arg, {self.__types["tuple"].new_container()})
+            #self.bind(vararg_node.arg, {self.__types["tuple"].new_container()})
+            self.bind(vararg_node.arg, set())
 
         # Keyword arguments
         for i, arg_node in enumerate(pos_args_nodes[pos_args_end:]):
@@ -122,7 +123,8 @@ class Environment:
         kwarg_node = node.kwarg
         if kwarg_node:
             # Create a new dict which could contain different types
-            self.bind(kwarg_node.arg, {self.__types["dict"].new_container()})
+            #self.bind(kwarg_node.arg, {self.__types["dict"].new_container()})
+            self.bind(kwarg_node.arg, set())
 
     def parse_assign(self, node):
         targets = node.targets

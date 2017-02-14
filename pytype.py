@@ -57,6 +57,13 @@ class FunctionType(PyType):
         Update this env based on the arguments provided.
 
         This also handles unpacking.
+
+        Example:
+        def func(a, b=1, c=2, *d, e=3, **f):
+            ...
+
+        func(1, 2, c=3, e=5) -> a = 1, b = 2, c=3, e=5
+        func(1,2,3,4,5) -> a=1,b=2,c=3,d=(4,5)
         """
         env = self.__env
         defined_args = set()
@@ -64,26 +71,38 @@ class FunctionType(PyType):
         # Positional args
         pos_args = args.pos_args()
         for i, arg in enumerate(self.__pos_args):
-            defined_args.add(arg)
             env.bind(arg, pos_args[i])
+            defined_args.add(arg)
+        counted_pos_args = len(self.__pos_args)
 
         # Keyword args
         # Make sure the positional args are fully exhausted first
-        remaining = len(pos_args) - len(self.__pos_args)
-        for i in range(remaining):
-            arg = self.__keywords[i]
-            env.bind(arg, pos_args[i + len(self.__pos_args)])
-            defined_args.add(arg)
+        for i, arg in enumerate(self.__keywords):
+            if len(pos_args) > counted_pos_args:
+                env.bind(arg, pos_args[counted_pos_args])
+                defined_args.add(arg)
+                counted_pos_args += 1
 
-        # Then fill in the remaining keyword arguments
-        kw_args = args.keyword_args()
-        for i in range(remaining, len(self.__keywords)):
-            arg = self.__keywords[i]
+        # Vararg
+        if len(pos_args) > counted_pos_args:
+            if self.__vararg:
+                # Create new tuple containing these types
+                tup = self.__env.lookup_type("tuple").new_container()
+                for types in pos_args[counted_pos_args:]:
+                    tup.add_container_types(types)
+                env.bind(self.__vararg, {tup})
+            else:
+                raise RuntimeError("Too many arguments provided for function '{}'".format(self.name()))
 
-            assert arg not in defined_args, "Multiple definitions of argument '{}' provided".format(arg)
+        ## Then fill in the remaining keyword arguments
+        #kw_args = args.keyword_args()
+        #for i in range(remaining, len(self.__keywords)):
+        #    arg = self.__keywords[i]
 
-            env.bind(arg, kw_args[arg])
-            defined_args.add(arg)
+        #    assert arg not in defined_args, "Multiple definitions of argument '{}' provided".format(arg)
+
+        #    env.bind(arg, kw_args[arg])
+        #    defined_args.add(arg)
 
         ## Vararg
         #vararg = args.vararg()
