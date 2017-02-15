@@ -6,8 +6,9 @@ import arguments
 
 
 class Environment:
-    def __init__(self, init_vars=None):
+    def __init__(self, init_vars=None, parent_env=None):
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
+        self.__parent = parent_env
 
         # Initialize types known in the env
         self.__types = {}  # dict[str, pytype.PyType]
@@ -35,8 +36,17 @@ class Environment:
         else:
             self.__variables[varname] = set(types)  # The types are always copied
 
-    def lookup(self, varname):
+    def exclusive_lookup(self, varname):
         return self.__variables[varname]
+
+    def lookup(self, varname):
+        if varname in self.__variables:
+            return self.exclusive_lookup(varname)
+
+        if self.__parent:
+            return self.__parent.lookup(varname)
+
+        raise KeyError(varname)
 
     def lookup_type(self, typename):
         return self.__types[typename]
@@ -70,6 +80,16 @@ class Environment:
         """
         return set(self.__variables[node.id])
 
+    def eval_bin_op(self, node):
+        """
+        For now, just make the type the set containing both parts' types.
+
+        TODO: Check the __op__ method of the left node
+        """
+        left = self.eval(node.left)
+        right = self.eval(node.right)
+        return left | right
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -77,6 +97,8 @@ class Environment:
             return self.eval_call(node)
         elif isinstance(node, ast.Name):
             return self.eval_name(node)
+        elif isinstance(node, ast.BinOp):
+            return self.eval_bin_op(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}'".format(node))
 

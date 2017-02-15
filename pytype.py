@@ -177,7 +177,8 @@ class FunctionType(PyType):
             node (ast.FunctionDef)
             parent_env (inference.Environment)
         """
-        env = inference.Environment.from_parent_env(parent_env)
+        #env = inference.Environment.from_parent_env(parent_env)
+        env = inference.Environment(parent_env=parent_env)
 
         # Add the arguments as variables
         env.parse_arguments(node.args)
