@@ -52,6 +52,12 @@ class FunctionType(PyType):
         self.__kwonlyargs = kwonlyargs or set()
         self.__kwarg = kwarg
 
+    def __hash__(self):
+        return id(self)
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)
+
     def update_args(self, args):
         """
         Update this env based on the arguments provided.

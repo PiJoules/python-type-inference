@@ -9,6 +9,7 @@ class Environment:
     def __init__(self, init_vars=None, parent_env=None):
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
+        self.__call_stack = set()
 
         # Initialize types known in the env
         self.__types = {}  # dict[str, pytype.PyType]
@@ -48,8 +49,17 @@ class Environment:
 
         raise KeyError(varname)
 
-    def lookup_type(self, typename):
+    def exclusive_lookup_type(self, typename):
         return self.__types[typename]
+
+    def lookup_type(self, typename):
+        if typename in self.__types:
+            return self.exclusive_lookup_type(typename)
+
+        if self.__parent:
+            return self.__parent.lookup_type(typename)
+
+        raise KeyError(typename)
 
 
     """
@@ -59,7 +69,7 @@ class Environment:
     def eval_num(self, node):
         n = node.n
         if isinstance(n, int):
-            return self.__types["int"]
+            return self.lookup_type("int")
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
@@ -68,17 +78,26 @@ class Environment:
         Call, update, and evaluate the function.
         """
         ret_types = set()
-        args = arguments.Arguments.from_call_node(node, self)
+
         func_types = self.eval(node.func)  # set[PyType]
+        args = arguments.Arguments.from_call_node(node, self)
+
         for func in func_types:
-            ret_types |= func.call_and_update(args)
+            if func not in self.__call_stack:
+                ret_types |= func.call_and_update(args)
+                self.__call_stack.add(func)
+
+        # Remove called functions
+        for func in func_types:
+            self.__call_stack.remove(func)
+
         return ret_types
 
     def eval_name(self, node):
         """
         Return a copy of the set.
         """
-        return set(self.__variables[node.id])
+        return set(self.lookup(node.id))
 
     def eval_bin_op(self, node):
         """
@@ -186,6 +205,7 @@ class Environment:
 
     def parse_code(self, code):
         self.parse_module(ast.parse(code))
+        assert not self.__call_stack
 
 
 class ModuleEnv(Environment):
