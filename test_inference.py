@@ -20,7 +20,7 @@ x = 2
         env.parse_code(code)
 
         self.assertSetEqual(
-            env.lookup("x"),
+            env.exclusive_lookup("x"),
             {IntType()}
         )
 
@@ -37,7 +37,7 @@ x = func(5)
         env.parse_code(code)
 
         self.assertSetEqual(
-            env.lookup("x"),
+            env.exclusive_lookup("x"),
             {IntType()}
         )
 
@@ -50,7 +50,7 @@ x = func(5)
 
         # Function env
         self.assertSetEqual(
-            func.env().lookup("a"),
+            func.env().exclusive_lookup("a"),
             {IntType()}
         )
 
@@ -68,6 +68,33 @@ x = fib(5)
         env = ModuleEnv()
         env.parse_code(code)
 
+        # Stored var
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {IntType()}
+        )
+
+        # Function env
+        func = first(env.exclusive_lookup("fib"))
+        self.assertSetEqual(
+            func.env().exclusive_lookup("n"),
+            {IntType()}
+        )
+
+        # Function return type
+        self.assertSetEqual(
+            func.returns(),
+            {IntType()}
+        )
+
+        # fib() not in func env
+        self.assertRaises(KeyError, func.env().exclusive_lookup, "fib")
+
+        # fib() in module env
+        self.assertSetEqual(
+            func.env().lookup("fib"),
+            env.exclusive_lookup("fib")
+        )
 
 
 if __name__ == "__main__":

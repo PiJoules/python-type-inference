@@ -132,8 +132,6 @@ class FunctionType(PyType):
         """
         Find the return types of this function.
         """
-        env = self.__env
-
         returns = set()
 
         stack = list(self.__ref_node.body)
@@ -143,7 +141,6 @@ class FunctionType(PyType):
                 returns |= self.__env.eval(node.value)
             elif isinstance(node, (ast.If, ast.While)):
                 stack += node.body + node.orelse
-
                 # Evalate the test to check for function args
                 self.__env.eval(node.test)
             elif isinstance(node, ast.For):
@@ -232,20 +229,28 @@ class FunctionType(PyType):
 Create builtin variables
 """
 
-class IntType(PyType):
-    def __init__(self):
-        super().__init__("int")
-
+class ValueType(PyType):
     def __hash__(self):
         return id(self.name())
 
     def __eq__(self, other):
-        return isinstance(other, IntType)
+        return isinstance(other, type(self))
+
+
+class IntType(ValueType):
+    def __init__(self):
+        super().__init__("int")
+
+
+class BoolType(ValueType):
+    def __init__(self):
+        super().__init__("bool")
 
 
 def load_builtin_vars():
     types = [
         IntType(),
+        BoolType(),
     ]
     return {t.name(): {t} for t in types}
 

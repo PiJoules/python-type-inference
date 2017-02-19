@@ -9,7 +9,10 @@ class Environment:
     def __init__(self, init_vars=None, parent_env=None):
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
-        self.__call_stack = set()
+        if self.__parent:
+            self.__call_stack = self.__parent.call_stack()
+        else:
+            self.__call_stack = set()
 
         # Initialize types known in the env
         self.__types = {}  # dict[str, pytype.PyType]
@@ -17,12 +20,8 @@ class Environment:
             for t in types:
                 self.__types[t.name()] = {t}
 
-    @classmethod
-    def from_parent_env(cls, parent_env):
-        """
-        Variables are copied over.
-        """
-        return cls(init_vars=dict(parent_env.variables()))
+    def call_stack(self):
+        return self.__call_stack
 
     def variables(self):
         return self.__variables
@@ -84,12 +83,9 @@ class Environment:
 
         for func in func_types:
             if func not in self.__call_stack:
-                ret_types |= func.call_and_update(args)
                 self.__call_stack.add(func)
-
-        # Remove called functions
-        for func in func_types:
-            self.__call_stack.remove(func)
+                ret_types |= func.call_and_update(args)
+                self.__call_stack.remove(func)
 
         return ret_types
 
@@ -109,6 +105,10 @@ class Environment:
         right = self.eval(node.right)
         return left | right
 
+    def eval_compare(self, node):
+        """Always returns bools"""
+        return self.lookup_type("bool")
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -118,6 +118,8 @@ class Environment:
             return self.eval_name(node)
         elif isinstance(node, ast.BinOp):
             return self.eval_bin_op(node)
+        elif isinstance(node, ast.Compare):
+            return self.eval_compare(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}'".format(node))
 
