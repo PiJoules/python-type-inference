@@ -96,6 +96,22 @@ x = fib(5)
             env.exclusive_lookup("fib")
         )
 
+    def test_instance_attributes(self):
+        """
+        Test attributes of instances function correctly.
+        """
+        code = """
+class A:
+    def __init__(self, a):
+        self._a = a
+    def func(self):
+        return self._a
+x = A(2)
+y = x.func()
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
 
 if __name__ == "__main__":
     unittest.main()

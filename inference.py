@@ -3,6 +3,8 @@
 import ast
 import pytype
 import arguments
+import function_type
+import class_type
 
 
 class Environment:
@@ -184,9 +186,12 @@ class Environment:
         """
         Add a function type to the variables.
         """
-        name = node.name
-        func_type = pytype.FunctionType.from_node_and_env(node, self)
-        self.bind(name, {func_type})
+        func_type = function_type.FunctionType.from_node_and_env(node, self)
+        self.bind(node.name, {func_type})
+
+    def parse_class_def(self, node):
+        cls_type = class_type.ClassType.from_node_and_env(node, self)
+        self.bind(node.name, {cls_type})
 
     def parse(self, node):
         if isinstance(node, ast.Assign):
@@ -195,6 +200,8 @@ class Environment:
             self.parse_function_def(node)
         elif isinstance(node, ast.arguments):
             self.parse_arguments(node)
+        elif isinstance(node, ast.ClassDef):
+            self.parse_class_def(node)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 
