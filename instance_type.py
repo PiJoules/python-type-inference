@@ -4,6 +4,8 @@ import bound_method
 
 
 class InstanceType(pytype.PyType):
+    INIT_METHOD = "__init__"
+
     @classmethod
     def from_class_type(cls, cls_type):
         """
@@ -32,3 +34,9 @@ class InstanceType(pytype.PyType):
             return self.__class.get_attr(attr)
         else:
             return self.__attrs[attr]
+
+    def call_init(self, args):
+        if self.INIT_METHOD in self.attrs():
+            for t in self.attrs()[self.INIT_METHOD]:
+                t.call_and_update(args)
+

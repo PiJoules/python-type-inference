@@ -33,11 +33,66 @@ class FunctionType(pytype.PyType):
         self.__kwonlyargs = kwonlyargs or set()
         self.__kwarg = kwarg
 
+    def pos_args(self):
+        return self.__pos_args
+
+    def keywords(self):
+        return self.__keywords
+
+    def vararg(self):
+        return self.__vararg
+
+    def kwonlyargs(self):
+        return self.__kwonlyargs
+
+    def kwarg(self):
+        return self.__kwarg
+
     def __hash__(self):
         return id(self)
 
     def __eq__(self, other):
         return hash(self) == hash(other)
+
+    def _update_positional_args(self, args):
+        """
+        Returns:
+            set[str]: Arguments defined as positional args
+        """
+        defined_args = set()
+        pos_args = args.pos_args()
+        for i, arg in enumerate(self.__pos_args):
+            self.__env.bind(arg, pos_args[i])
+            defined_args.add(arg)
+        return defined_args
+
+    def _update_keyword_args(self, args, defined_args):
+        # Make sure the positional args are fully exhausted first
+        pos_args = args.pos_args()
+        for i, arg in enumerate(self.__keywords):
+            if len(pos_args) > counted_pos_args:
+                self.__env.bind(arg, pos_args[len(defined_args)])
+                defined_args.add(arg)
+        return defined_args
+
+    def _update_vararg(self, args, counted_pos_args):
+        """
+        Args:
+            args (arguments.Arguments)
+            counted_pos_args (int): Number of arguments unpacked into positional
+                and keyword arguments.
+        """
+        pos_args = self.pos_args()
+
+        if len(pos_args) > counted_pos_args:
+            if self.__vararg:
+                # Create new tuple containing these types
+                tup = self.__env.lookup_type("tuple").new_container()
+                for types in pos_args[counted_pos_args:]:
+                    tup.add_container_types(types)
+                self.__env.bind(self.__vararg, {tup})
+            else:
+                raise RuntimeError("Too many arguments provided for function '{}'".format(self.name()))
 
     def update_args(self, args):
         """
@@ -57,29 +112,14 @@ class FunctionType(pytype.PyType):
 
         # Positional args
         pos_args = args.pos_args()
-        for i, arg in enumerate(self.__pos_args):
-            env.bind(arg, pos_args[i])
-            defined_args.add(arg)
-        counted_pos_args = len(self.__pos_args)
+        defined_args = self._update_positional_args(args)
 
         # Keyword args
         # Make sure the positional args are fully exhausted first
-        for i, arg in enumerate(self.__keywords):
-            if len(pos_args) > counted_pos_args:
-                env.bind(arg, pos_args[counted_pos_args])
-                defined_args.add(arg)
-                counted_pos_args += 1
+        defined_args = self._update_keyword_args(args, defined_args)
 
         # Vararg
-        if len(pos_args) > counted_pos_args:
-            if self.__vararg:
-                # Create new tuple containing these types
-                tup = self.__env.lookup_type("tuple").new_container()
-                for types in pos_args[counted_pos_args:]:
-                    tup.add_container_types(types)
-                env.bind(self.__vararg, {tup})
-            else:
-                raise RuntimeError("Too many arguments provided for function '{}'".format(self.name()))
+        self._update_vararg(args, len(defined_args))
 
         ## Then fill in the remaining keyword arguments
         #kw_args = args.keyword_args()
@@ -203,3 +243,7 @@ class FunctionType(pytype.PyType):
                    vararg=vararg,
                    kwonlyargs=kwonlyargs,
                    kwarg=kwarg)
+
+    def ref_node(self):
+        return self.__ref_node
+

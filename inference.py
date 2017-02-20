@@ -38,6 +38,14 @@ class Environment:
         else:
             self.__variables[varname] = set(types)  # The types are always copied
 
+    def bind_attr(node, types):
+        """
+        Args:
+            node (ast.Attribute)
+            types (set[pytype.PyType])
+        """
+        raise NotImplementedError
+
     def exclusive_lookup(self, varname):
         return self.__variables[varname]
 
@@ -184,6 +192,8 @@ class Environment:
         for target in targets:
             if isinstance(target, ast.Name):
                 self.bind(target.id, types)
+            elif isinstance(target, ast.Attribute):
+                self.bind_attr(target, types)
             else:
                 raise NotImplementedError("Unable to assign to target node '{}'".format(target))
 
