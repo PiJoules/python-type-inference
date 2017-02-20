@@ -86,7 +86,12 @@ class Environment:
         for func in func_types:
             if func not in self.__call_stack:
                 self.__call_stack.add(func)
-                ret_types |= func.call_and_update(args)
+                if isinstance(func, function_type.FunctionType):
+                    ret_types |= func.call_and_update(args)
+                elif isinstance(func, class_type.ClassType):
+                    ret_types |= func.create_and_init(args)
+                else:
+                    raise RuntimeError("Unknown callable type '{}'".format(type(func)))
                 self.__call_stack.remove(func)
 
         return ret_types

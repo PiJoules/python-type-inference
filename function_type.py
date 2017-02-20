@@ -197,7 +197,7 @@ class FunctionType(pytype.PyType):
         if args_node.kwarg:
             kwarg = args_node.kwarg.arg
 
-        return cls(node.name, env, node,
+        return cls("function", env, node,
                    pos_args=pos_args,
                    keywords=keywords,
                    vararg=vararg,
