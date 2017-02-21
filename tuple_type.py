@@ -22,6 +22,16 @@ class TupleType(pytype.PyType):
         """
         return TuplePointer(self, **kwargs)
 
+    def get_idx(self, keys):
+        types = set()
+        for key in keys:
+            if not isinstance(key, pytype.IntType):
+                raise TypeError("Tuple indeces must be IntTypes")
+            else:
+                print(key.value())
+        raise NotImplementedError
+        return types
+
     def __hash__(self):
         # Tuple hash depends on hashs of contents
         #return hash(tuple(map(hash, self.contents())))

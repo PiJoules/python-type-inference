@@ -49,6 +49,13 @@ Create builtin variables
 """
 
 class ValueType(PyType):
+    def __init__(self, name, *args, value=None, **kwargs):
+        super().__init__(name, *args, **kwargs)
+        self.__value = value
+
+    def value(self):
+        return self.__value
+
     def __hash__(self):
         return id(self.name())
 
@@ -56,9 +63,21 @@ class ValueType(PyType):
         return isinstance(other, type(self))
 
 
+class ValuePointer(ValueType):
+    def __init__(self, original, **kwargs):
+        super().__init__(**kwargs)
+        self.__original = original
+
+    def get_attr(self, attr):
+        return self.__original.get_attr(attr)
+
+    def add_attr(self, attr, types):
+        return self.__original.add_attr(attr, types)
+
+
 class IntType(ValueType):
-    def __init__(self):
-        super().__init__("int")
+    def __init__(self, *args, **kwargs):
+        super().__init__("int", *args, **kwargs)
 
 
 class BoolType(ValueType):
