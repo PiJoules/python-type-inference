@@ -137,6 +137,46 @@ y = x.func()
         self.assertRaises(KeyError, cls.get_attr, "_a")
 
         # Instance attributes
+        inst = first(env.exclusive_lookup("x"))
+        self.assertSetEqual(
+            inst.get_attr("_a"),
+            {IntType()}
+        )
+
+    def test_keyword_args(self):
+        code = """
+def func(a=1):
+    return a
+x = func()
+y = func("b")
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.lookup("x"),
+            {IntType()}
+        )
+        self.assertSetEqual(
+            env.lookup("y"),
+            {StrType(), IntType()}
+        )
+
+        func = first(env.exclusive_lookup("func"))
+        self.assertSetEqual(
+            func.env().exclusive_lookup("a"),
+            {StrType(), IntType()}
+        )
+
+    def test_vararg(self):
+        code = """
+def func(*args):
+    return args[0]
+x = func(1, "a")
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
 
 
 if __name__ == "__main__":

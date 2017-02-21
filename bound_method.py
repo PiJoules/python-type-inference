@@ -10,7 +10,7 @@ class BoundMethod(function_type.FunctionType):
 
     @classmethod
     def from_function_type(cls, func_type, inst):
-        func = cls(inst, "function", func_type.env(), func_type.ref_node(),
+        func = cls(inst, func_type.env(), func_type.ref_node(),
                    pos_args=func_type.pos_args(),
                    keywords=func_type.keywords(),
                    vararg=func_type.vararg(),

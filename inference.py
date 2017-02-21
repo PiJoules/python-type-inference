@@ -141,6 +141,9 @@ class Environment:
             types |= t.get_attr(attr)
         return types
 
+    def eval_str(self, node):
+        return {self.lookup_type("str")}
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -154,6 +157,8 @@ class Environment:
             return self.eval_compare(node)
         elif isinstance(node, ast.Attribute):
             return self.eval_attr(node)
+        elif isinstance(node, ast.Str):
+            return self.eval_str(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}'".format(node))
 
@@ -225,6 +230,17 @@ class Environment:
         cls_type = class_type.ClassType.from_node_and_env(node, self)
         self.bind(node.name, {cls_type})
 
+    def parse_if(self, node):
+        """
+        Evaluate the test then the bodies.
+        """
+        self.eval(node.test)
+        self.parse_sequence(node.body)
+        self.parse_sequence(node.orelse)
+
+    def parse_expr(self, node):
+        return self.eval(node.value)
+
     def parse(self, node):
         if isinstance(node, ast.Assign):
             self.parse_assign(node)
@@ -234,6 +250,10 @@ class Environment:
             self.parse_arguments(node)
         elif isinstance(node, ast.ClassDef):
             self.parse_class_def(node)
+        elif isinstance(node, ast.If):
+            self.parse_if(node)
+        elif isinstance(node, ast.Expr):
+            self.parse_expr(node)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 

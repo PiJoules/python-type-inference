@@ -71,11 +71,25 @@ class NoneType(ValueType):
         super().__init__("None")
 
 
+class StrType(ValueType):
+    def __init__(self):
+        super().__init__("str")
+
+
 def load_builtin_vars():
-    types = [
-        IntType(),
-        BoolType(),
-        NoneType(),
-    ]
-    return {t.name(): {t} for t in types}
+    from function_type import FunctionType
+
+    #class PrintFunction(FunctionType):
+    #    def __init__(self):
+    #        super().__init__(None, None,
+    #                         vararg="objects",
+    #                         kwonlyargs={"sep", })
+
+    return {
+        "int": {IntType()},
+        "bool": {BoolType()},
+        "None": {NoneType()},
+        "str": {StrType()},
+        #"print": PrintFunction(),
+    }
 

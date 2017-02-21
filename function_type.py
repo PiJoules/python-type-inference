@@ -8,8 +8,9 @@ class FunctionType(pytype.PyType):
     """
     Type that can contain code to be executed.
     """
-    def __init__(self, name, env, node, *args, pos_args=None, keywords=None,
-                 vararg=None, kwonlyargs=None, kwarg=None, **kwargs):
+    def __init__(self, env, node, *args, pos_args=None, keywords=None,
+                 vararg=None, kwonlyargs=None, kwarg=None,
+                 keyword_defaults=None, kwonly_defaults=None, **kwargs):
         """
         Args:
             name (str)
@@ -19,19 +20,40 @@ class FunctionType(pytype.PyType):
             pos_args (Optional[list[str]])
             keywords (Optional[list[str]])  # List to retain positional args unpacked into keyword args
             vararg (Optional[str])
-            kwonlyargs (Optional[set[str]])
+            kwonlyargs (Optional[list[str]])
             kwarg (Optional[str])
             kwargs (dict)
+            keyword_defaults (Optional[list[set[pytype.PyType]]])
+            kwonly_defaults (Optional[list[set[pytype.PyType]]])
         """
-        super().__init__(name, *args, **kwargs)
+        super().__init__("function", *args, **kwargs)
         self.__env = env  # inference.Environment
         self.__ref_node = node
 
         self.__pos_args = pos_args or []
         self.__keywords = keywords or []
         self.__vararg = vararg
-        self.__kwonlyargs = kwonlyargs or set()
+        self.__kwonlyargs = kwonlyargs or []
         self.__kwarg = kwarg
+
+        self.__keyword_defaults = keyword_defaults or []
+        self.__kwonly_defaults = kwonly_defaults or []
+
+        # Type checks
+        assert len(self.__keywords) == len(self.__keyword_defaults)
+        assert len(self.__kwonlyargs) == len(self.__kwonly_defaults)
+
+        assert all(isinstance(x, set) for x in self.__keyword_defaults)
+        for default in self.__keyword_defaults:
+            assert all(isinstance(x, pytype.PyType) for x in default)
+        assert all(isinstance(x, set) for x in self.__kwonly_defaults)
+        for default in self.__kwonly_defaults:
+            assert all(isinstance(x, pytype.PyType) for x in default)
+
+
+    """
+    Getters
+    """
 
     def pos_args(self):
         return self.__pos_args
@@ -47,6 +69,12 @@ class FunctionType(pytype.PyType):
 
     def kwarg(self):
         return self.__kwarg
+
+    def keyword_defaults(self):
+        return self.__keyword_defaults
+
+    def kwonly_defaults(self):
+        return self.__kwonly_defaults
 
     def __hash__(self):
         return id(self)
@@ -69,10 +97,13 @@ class FunctionType(pytype.PyType):
     def _update_keyword_args(self, args, defined_args):
         # Make sure the positional args are fully exhausted first
         pos_args = args.pos_args()
+        kw_args = args.keyword_args()
         for i, arg in enumerate(self.__keywords):
-            if len(pos_args) > counted_pos_args:
+            if len(pos_args) > len(defined_args):
                 self.__env.bind(arg, pos_args[len(defined_args)])
                 defined_args.add(arg)
+            else:
+                self.__env.bind(arg, kw_args.get(arg, self.__keyword_defaults[i]))
         return defined_args
 
     def _update_vararg(self, args, counted_pos_args):
@@ -209,8 +240,10 @@ class FunctionType(pytype.PyType):
         # Save arguments
         pos_args = []
         keywords = []
+        keyword_defaults = []
         vararg = None
-        kwonlyargs = set()  # Order does not matter for this
+        kwonlyargs = []
+        kwonly_defaults = []
         kwarg = None
 
         args_node = node.args
@@ -222,27 +255,36 @@ class FunctionType(pytype.PyType):
             pos_args.append(arg.arg)
 
         # Keywords
-        for arg in pos_arg_nodes[pos_end:]:
+        for i, arg in enumerate(pos_arg_nodes[pos_end:]):
             keywords.append(arg.arg)
+            keyword_defaults.append(parent_env.eval(args_node.defaults[i]))
 
         # Vararg
         if args_node.vararg:
             vararg = args_node.vararg.arg
 
         # Kwonlyargs
-        for arg in args_node.kwonlyargs:
-            kwonlyargs.add(arg.arg)
+        for i, arg in enumerate(args_node.kwonlyargs):
+            kwonlyargs.append(arg.arg)
+            kw_def = args_node.kwonly_defaults[i]  # The kw_def can be None
+            if kw_def is None:
+                kw_defaults.append(set())
+            else:
+                kwonly_defaults.append(parent_env.eval(kw_def))
 
         # Kwarg
         if args_node.kwarg:
             kwarg = args_node.kwarg.arg
 
-        return cls("function", env, node,
+        func = cls(env, node,
                    pos_args=pos_args,
                    keywords=keywords,
                    vararg=vararg,
                    kwonlyargs=kwonlyargs,
-                   kwarg=kwarg)
+                   kwarg=kwarg,
+                   keyword_defaults=keyword_defaults)
+
+        return func
 
     def ref_node(self):
         return self.__ref_node
