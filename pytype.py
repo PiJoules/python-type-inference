@@ -35,6 +35,12 @@ class PyType:
     def __ne__(self, other):
         return not (self == other)
 
+    def __hash__(self):
+        raise NotImplementedError("Must implement __hash__ for pytype '{}'".format(type(self)))
+
+    def __eq__(self, other):
+        raise NotImplementedError("Must implement __eq__ for pytype '{}'".format(type(self)))
+
 
 
 
@@ -60,10 +66,16 @@ class BoolType(ValueType):
         super().__init__("bool")
 
 
+class NoneType(ValueType):
+    def __init__(self):
+        super().__init__("None")
+
+
 def load_builtin_vars():
     types = [
         IntType(),
         BoolType(),
+        NoneType(),
     ]
     return {t.name(): {t} for t in types}
 

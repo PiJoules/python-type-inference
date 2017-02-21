@@ -37,7 +37,14 @@ class ClassType(pytype.PyType):
     def create_and_init(self, args):
         inst_type = self.create_instance()
         inst_type.call_init(args)
-        return inst_type
+        return {inst_type}
 
     def ref_node(self):
         return self.__ref_node
+
+    def __hash__(self):
+        # All classes are unique
+        return id(self)
+
+    def __eq__(self, other):
+        return hash(self) == hash(other)

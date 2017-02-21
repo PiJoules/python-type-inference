@@ -30,13 +30,19 @@ class InstanceType(pytype.PyType):
         """
         Check self first. If not in self, check the class.
         """
-        if attr not in self.__attrs:
+        if attr not in self.attrs():
             return self.__class.get_attr(attr)
         else:
-            return self.__attrs[attr]
+            return super().get_attr(attr)
 
     def call_init(self, args):
         if self.INIT_METHOD in self.attrs():
             for t in self.attrs()[self.INIT_METHOD]:
                 t.call_and_update(args)
+
+    def __hash__(self):
+        return hash(self.name())
+
+    def __eq__(self, other):
+        return isinstance(other, type(self))
 

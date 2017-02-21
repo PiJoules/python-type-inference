@@ -20,7 +20,7 @@ class Environment:
         self.__types = {}  # dict[str, pytype.PyType]
         for types in self.__variables.values():
             for t in types:
-                self.__types[t.name()] = {t}
+                self.__types[t.name()] = t
 
     def call_stack(self):
         return self.__call_stack
@@ -38,13 +38,18 @@ class Environment:
         else:
             self.__variables[varname] = set(types)  # The types are always copied
 
-    def bind_attr(node, types):
+    def bind_attr(self, node, types):
         """
         Args:
             node (ast.Attribute)
             types (set[pytype.PyType])
         """
-        raise NotImplementedError
+        value = node.value
+        attr = node.attr
+
+        value_types = self.eval(value)
+        for t in value_types:
+            t.add_attr(attr, types)
 
     def exclusive_lookup(self, varname):
         return self.__variables[varname]
@@ -71,6 +76,7 @@ class Environment:
         raise KeyError(typename)
 
 
+
     """
     Type evaluation
     """
@@ -78,7 +84,7 @@ class Environment:
     def eval_num(self, node):
         n = node.n
         if isinstance(n, int):
-            return self.lookup_type("int")
+            return {self.lookup_type("int")}
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
@@ -124,6 +130,17 @@ class Environment:
         """Always returns bools"""
         return self.lookup_type("bool")
 
+    def eval_attr(self, node):
+        value = node.value
+        attr = node.attr
+
+        value_types = self.eval(value)
+
+        types = set()
+        for t in value_types:
+            types |= t.get_attr(attr)
+        return types
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -135,6 +152,8 @@ class Environment:
             return self.eval_bin_op(node)
         elif isinstance(node, ast.Compare):
             return self.eval_compare(node)
+        elif isinstance(node, ast.Attribute):
+            return self.eval_attr(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}'".format(node))
 
@@ -161,7 +180,6 @@ class Environment:
         vararg_node = node.vararg
         if vararg_node:
             # Create a new tuple which could contain different types
-            #self.bind(vararg_node.arg, {self.__types["tuple"].new_container()})
             self.bind(vararg_node.arg, set())
 
         # Keyword arguments
@@ -181,7 +199,6 @@ class Environment:
         kwarg_node = node.kwarg
         if kwarg_node:
             # Create a new dict which could contain different types
-            #self.bind(kwarg_node.arg, {self.__types["dict"].new_container()})
             self.bind(kwarg_node.arg, set())
 
     def parse_assign(self, node):

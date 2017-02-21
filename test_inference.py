@@ -2,6 +2,7 @@ import unittest
 
 from inference import ModuleEnv
 from pytype import *
+from instance_type import InstanceType
 
 
 def first(x):
@@ -111,6 +112,31 @@ y = x.func()
         """
         env = ModuleEnv()
         env.parse_code(code)
+
+        # Stored vars
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {InstanceType("A")}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {IntType()}
+        )
+
+        # Class functions
+        cls = first(env.exclusive_lookup("A"))
+        init_func = first(cls.get_attr("__init__"))
+        self.assertSetEqual(
+            init_func.env().exclusive_lookup("a"),
+            {IntType()}
+        )
+        self.assertSetEqual(
+            init_func.env().exclusive_lookup("self"),
+            {InstanceType("A")}
+        )
+        self.assertRaises(KeyError, cls.get_attr, "_a")
+
+        # Instance attributes
 
 
 if __name__ == "__main__":
