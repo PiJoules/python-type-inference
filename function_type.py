@@ -113,14 +113,15 @@ class FunctionType(pytype.PyType):
             counted_pos_args (int): Number of arguments unpacked into positional
                 and keyword arguments.
         """
-        pos_args = self.pos_args()
+        pos_args = args.pos_args()
 
         if len(pos_args) > counted_pos_args:
             if self.__vararg:
-                # Create new tuple containing these types
-                tup = self.__env.lookup_type("tuple").new_container()
-                for types in pos_args[counted_pos_args:]:
-                    tup.add_container_types(types)
+                #combined_types = []
+                #for types in pos_args[counted_pos_args:]:
+                #    combined_types.append(types)
+                tup = self.__env.lookup_type("tuple").new_container(
+                    init_contents=tuple(pos_args[counted_pos_args:]))
                 self.__env.bind(self.__vararg, {tup})
             else:
                 raise RuntimeError("Too many arguments provided for function '{}'".format(self.name()))

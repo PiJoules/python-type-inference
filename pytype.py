@@ -78,6 +78,7 @@ class StrType(ValueType):
 
 def load_builtin_vars():
     from function_type import FunctionType
+    from tuple_type import TupleType
 
     #class PrintFunction(FunctionType):
     #    def __init__(self):
@@ -90,6 +91,7 @@ def load_builtin_vars():
         "bool": {BoolType()},
         "None": {NoneType()},
         "str": {StrType()},
+        "tuple": {TupleType()},
         #"print": PrintFunction(),
     }
 

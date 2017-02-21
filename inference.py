@@ -144,6 +144,26 @@ class Environment:
     def eval_str(self, node):
         return {self.lookup_type("str")}
 
+    def eval_subscript_index(self, node):
+        idx_values = self.eval(node.slice.value)
+        values = self.eval(node.value)
+
+        ret_types = set()
+        for value in values:
+            ret_types |= value.get_idx(idx_values)
+        return ret_types
+
+    def eval_subscript(self, node):
+        slice = node.slice
+        if isinstance(slice, ast.Index):
+            return self.eval_subscript_index(node)
+        elif isinstance(slice, ast.Slice):
+            return self.eval_subscript_slice(node)
+        elif isinstance(slice, ast.ExtSlice):
+            return self.eval_subscript_extslice(node)
+        else:
+            raise RuntimeError("Unknown slice type '{}'".format(slice))
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -159,6 +179,8 @@ class Environment:
             return self.eval_attr(node)
         elif isinstance(node, ast.Str):
             return self.eval_str(node)
+        elif isinstance(node, ast.Subscript):
+            return self.eval_subscript(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}'".format(node))
 

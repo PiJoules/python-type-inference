@@ -177,6 +177,11 @@ x = func(1, "a")
         env = ModuleEnv()
         env.parse_code(code)
 
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {IntType(), StrType()}
+        )
+
 
 
 if __name__ == "__main__":
