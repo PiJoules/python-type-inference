@@ -29,9 +29,9 @@ class Arguments:
         """
         Args:
             pos_args (list[set[pytype.PyType]])
-            vararg (pytype.PyType)
+            vararg (Optional[pytype.PyType])
             keyword_args (dict[str, set[pytype.PyType]])
-            kwarg (pytype.PyType)
+            kwarg (Optional[pytype.PyType])
         """
         assert isinstance(pos_args, list)
         assert all(isinstance(x, set) for x in pos_args)

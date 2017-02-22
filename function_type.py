@@ -114,19 +114,32 @@ class FunctionType(pytype.PyType):
                 and keyword arguments.
         """
         pos_args = args.pos_args()
-
-        if len(pos_args) > counted_pos_args:
-            if self.__vararg:
-                tup = self.__env.lookup_type("tuple").new_container(
-                    init_contents=tuple(pos_args[counted_pos_args:]))
-                self.__env.bind(self.__vararg, {tup})
-            else:
-                raise RuntimeError("Too many arguments provided for function '{}'".format(self.name()))
+        tup = self.__env.lookup_type("tuple").new_container(
+            init_contents=tuple(pos_args[counted_pos_args:]))
+        self.__env.bind(self.__vararg, {tup})
 
     def _update_kwonly_args(self, args):
         kw_args = args.keyword_args()
         for i, arg in enumerate(self.__kwonlyargs):
             self.__env.bind(arg, kw_args.get(arg, self.__kwonly_defaults[i]))
+
+    def _update_kwargs(self, args):
+        """
+        All keyowrds provided in the arguments but not in the keyword/kwonly
+        args go here.
+        """
+        value_types = set()
+        expected_keywords = set(self.__keywords + self.__kwonlyargs)
+        for arg, types in args.keyword_args().items():
+            if arg not in expected_keywords:
+                value_types |= types
+
+        # Create new dict container
+        d = self.__env.lookup_type("dict").new_container(
+            key_types={pytype.StrType()},
+            value_types=value_types,
+        )
+        self.__env.bind(self.__kwarg, {d})
 
     def update_args(self, args):
         """
@@ -145,7 +158,6 @@ class FunctionType(pytype.PyType):
         defined_args = set()
 
         # Positional args
-        pos_args = args.pos_args()
         defined_args = self._update_positional_args(args)
 
         # Keyword args
@@ -153,20 +165,23 @@ class FunctionType(pytype.PyType):
         defined_args = self._update_keyword_args(args, defined_args)
 
         # Vararg
-        self._update_vararg(args, len(defined_args))
+        if self.__vararg:
+            self._update_vararg(args, len(defined_args))
+        elif len(args.pos_args()) > len(defined_args):
+            # There are still extra positonal arguments, but not vararg given
+            raise RuntimeError("Too many arguments provided for function")
 
-        ## Keyword only args
+        if args.vararg() or args.kwarg():
+            raise NotImplementedError
+
+        # Keyword only args
         self._update_kwonly_args(args)
-        #kwonlyargs = args.kwonlyargs()
-        #for kw in self.__kwonlyargs:
-        #    assert kw not in defined_args, "Multiple definitions of argument '{}' provided".format(arg)
-        #    env.bind(kw, kw_args[kw])
-        #    defined_args.add(kw)
 
-        ## Kwarg
-        #kwarg = args.kwarg()
-        #if kwarg:
-        #    env.bind(self.__kwarg, )
+        # Kwarg
+        if self.__kwarg:
+            self._update_kwargs(args)
+        elif len(args.keyword_args()) > len(self.__keywords + self.__kwonlyargs):
+            raise RuntimeError("Too many keyword arguments provided for function")
 
     def returns(self):
         """

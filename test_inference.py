@@ -4,6 +4,7 @@ from inference import ModuleEnv
 from pytype import *
 from instance_type import InstanceType
 from tuple_type import TupleType
+from dict_type import DictType
 
 
 def first(x):
@@ -256,13 +257,64 @@ def func2(**kwargs):
     return kwargs
 x = func(a=1)
 y = func(a="str")
+a = func2(a=1)
+b = func2(a="str")
         """
         env = ModuleEnv()
         env.parse_code(code)
 
+        d_types ={
+            DictType(
+                key_types={StrType()},
+                value_types={IntType()}
+            ),
+            DictType(
+                key_types={StrType()},
+                value_types={StrType()}
+            )
+        }
+
+        # Stored values
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {IntType()}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {IntType(), StrType()}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("a"),
+            {DictType(
+                key_types={StrType()},
+                value_types={IntType()}
+            )}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("b"),
+            d_types
+        )
+
+        # func()
+        func = first(env.exclusive_lookup("func"))
+        self.assertSetEqual(
+            func.env().exclusive_lookup("kwargs"),
+            d_types
+        )
+        self.assertSetEqual(
+            func.returns(),
+            {IntType(), StrType()}
+        )
+
+        # func2()
+        func2 = first(env.exclusive_lookup("func2"))
+        self.assertSetEqual(
+            func2.env().exclusive_lookup("kwargs"),
+            d_types
+        )
+        self.assertSetEqual(
+            func2.returns(),
+            d_types
         )
 
 
