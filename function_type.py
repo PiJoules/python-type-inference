@@ -117,14 +117,16 @@ class FunctionType(pytype.PyType):
 
         if len(pos_args) > counted_pos_args:
             if self.__vararg:
-                #combined_types = []
-                #for types in pos_args[counted_pos_args:]:
-                #    combined_types.append(types)
                 tup = self.__env.lookup_type("tuple").new_container(
                     init_contents=tuple(pos_args[counted_pos_args:]))
                 self.__env.bind(self.__vararg, {tup})
             else:
                 raise RuntimeError("Too many arguments provided for function '{}'".format(self.name()))
+
+    def _update_kwonly_args(self, args):
+        kw_args = args.keyword_args()
+        for i, arg in enumerate(self.__kwonlyargs):
+            self.__env.bind(arg, kw_args.get(arg, self.__kwonly_defaults[i]))
 
     def update_args(self, args):
         """
@@ -153,23 +155,8 @@ class FunctionType(pytype.PyType):
         # Vararg
         self._update_vararg(args, len(defined_args))
 
-        ## Then fill in the remaining keyword arguments
-        #kw_args = args.keyword_args()
-        #for i in range(remaining, len(self.__keywords)):
-        #    arg = self.__keywords[i]
-
-        #    assert arg not in defined_args, "Multiple definitions of argument '{}' provided".format(arg)
-
-        #    env.bind(arg, kw_args[arg])
-        #    defined_args.add(arg)
-
-        ## Vararg
-        #vararg = args.vararg()
-        #if vararg:
-        #    env.bind(self.__vararg, vararg)
-        #    defined_args.add(self.__vararg)
-
         ## Keyword only args
+        self._update_kwonly_args(args)
         #kwonlyargs = args.kwonlyargs()
         #for kw in self.__kwonlyargs:
         #    assert kw not in defined_args, "Multiple definitions of argument '{}' provided".format(arg)
@@ -267,9 +254,9 @@ class FunctionType(pytype.PyType):
         # Kwonlyargs
         for i, arg in enumerate(args_node.kwonlyargs):
             kwonlyargs.append(arg.arg)
-            kw_def = args_node.kwonly_defaults[i]  # The kw_def can be None
+            kw_def = args_node.kw_defaults[i]  # The kw_def can be None
             if kw_def is None:
-                kw_defaults.append(set())
+                kwonly_defaults.append(set())
             else:
                 kwonly_defaults.append(parent_env.eval(kw_def))
 
@@ -283,7 +270,8 @@ class FunctionType(pytype.PyType):
                    vararg=vararg,
                    kwonlyargs=kwonlyargs,
                    kwarg=kwarg,
-                   keyword_defaults=keyword_defaults)
+                   keyword_defaults=keyword_defaults,
+                   kwonly_defaults=kwonly_defaults)
 
         return func
 

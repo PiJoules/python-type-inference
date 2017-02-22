@@ -63,18 +63,6 @@ class ValueType(PyType):
         return isinstance(other, type(self))
 
 
-class ValuePointer(ValueType):
-    def __init__(self, original, **kwargs):
-        super().__init__(**kwargs)
-        self.__original = original
-
-    def get_attr(self, attr):
-        return self.__original.get_attr(attr)
-
-    def add_attr(self, attr, types):
-        return self.__original.add_attr(attr, types)
-
-
 class IntType(ValueType):
     def __init__(self, *args, **kwargs):
         super().__init__("int", *args, **kwargs)

@@ -3,6 +3,7 @@ import unittest
 from inference import ModuleEnv
 from pytype import *
 from instance_type import InstanceType
+from tuple_type import TupleType
 
 
 def first(x):
@@ -144,6 +145,7 @@ y = x.func()
         )
 
     def test_keyword_args(self):
+        """Test keyword arguments."""
         code = """
 def func(a=1):
     return a
@@ -169,17 +171,98 @@ y = func("b")
         )
 
     def test_vararg(self):
+        """Test variable positional args."""
         code = """
 def func(*args):
     return args[0]
+def func2(*args):
+    return args
 x = func(1, "a")
+y = func2(1, "a")
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        tup = {TupleType(init_contents=({IntType()}, {StrType()}))}
+
+        # Stored vars
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {IntType(), StrType()}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            tup
+        )
+
+        # func
+        func = first(env.exclusive_lookup("func"))
+        self.assertSetEqual(
+            func.env().exclusive_lookup("args"),
+            tup
+        )
+        self.assertSetEqual(
+            func.returns(),
+            {IntType(), StrType()}
+        )
+
+        # func2
+        func2 = first(env.exclusive_lookup("func2"))
+        self.assertSetEqual(
+            func2.env().exclusive_lookup("args"),
+            tup
+        )
+        self.assertSetEqual(
+            func2.returns(),
+            tup
+        )
+
+    def test_kwonly_args(self):
+        """Test keyword only arguments."""
+        code = """
+def func(*, a, b=1):
+    return a + b
+x = func(a=1)
+y = func(a=2, b=2)
         """
         env = ModuleEnv()
         env.parse_code(code)
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {IntType(), StrType()}
+            {IntType()}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {IntType()}
+        )
+
+        func = first(env.exclusive_lookup("func"))
+        self.assertSetEqual(
+            func.env().exclusive_lookup("a"),
+            {IntType()}
+        )
+        self.assertSetEqual(
+            func.env().exclusive_lookup("b"),
+            {IntType()}
+        )
+
+    def test_kwarg(self):
+        """Test the **kwarg."""
+        code = """
+def func(**kwargs):
+    return kwargs["a"]
+def func2(**kwargs):
+    return kwargs
+x = func(a=1)
+y = func(a="str")
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {IntType()}
         )
 
 

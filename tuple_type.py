@@ -3,6 +3,10 @@ import pytype
 
 class TupleType(pytype.PyType):
     def __init__(self, init_contents=None):
+        """
+        Args:
+            init_contents (Optional[tuple[set[pytype.PyType]]])
+        """
         super().__init__("tuple")
 
         self.__contents = init_contents or tuple()
@@ -24,22 +28,17 @@ class TupleType(pytype.PyType):
 
     def get_idx(self, keys):
         types = set()
-        for key in keys:
-            if not isinstance(key, pytype.IntType):
-                raise TypeError("Tuple indeces must be IntTypes")
-            else:
-                print(key.value())
-        raise NotImplementedError
+        for content_types in self.contents():
+            types |= content_types
         return types
 
     def __hash__(self):
         # Tuple hash depends on hashs of contents
-        #return hash(tuple(map(hash, self.contents())))
         return hash(tuple(hash(frozenset(x)) for x in self.contents()))
 
     def __eq__(self, other):
         # Tuples are equal if the contents are equal
-        if not isinstance(other, type(self)):
+        if not isinstance(other, TupleType):
             return False
 
         own_contents = self.contents()
@@ -48,7 +47,7 @@ class TupleType(pytype.PyType):
         if len(own_contents) != len(other_contents):
             return False
 
-        for i in range(own_contents):
+        for i in range(len(own_contents)):
             if own_contents[i] != other_contents[i]:
                 return False
 
