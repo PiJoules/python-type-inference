@@ -34,3 +34,7 @@ class TestSamples(unittest.TestCase):
             {IntType()}
         )
 
+    def test_degrees(self):
+        """Testing degrees.py"""
+        env = self.__get_module_env("samples/degrees.py")
+

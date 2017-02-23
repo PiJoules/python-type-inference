@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import ast
+import astor
 import pytype
 import arguments
 import function_type
@@ -263,6 +264,22 @@ class Environment:
     def parse_expr(self, node):
         return self.eval(node.value)
 
+    def parse_regular_import_alias(self, node):
+        """
+        Parse the imported module and make all variable assignments attributes
+        of a new module type.
+        """
+        raise NotImplementedError
+
+    def parse_import(self, node):
+        for alias in node.names:
+            asname = alias.asname
+            if asname is None:
+                self.parse_regular_import_alias(alias)
+            else:
+                raise NotImplementedError("No logic implemented yet for handling importing aliases")
+        raise NotImplementedError
+
     def parse(self, node):
         if isinstance(node, ast.Assign):
             self.parse_assign(node)
@@ -276,6 +293,8 @@ class Environment:
             self.parse_if(node)
         elif isinstance(node, ast.Expr):
             self.parse_expr(node)
+        elif isinstance(node, ast.Import):
+            self.parse_import(node)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 
