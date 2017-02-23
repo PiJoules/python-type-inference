@@ -136,7 +136,7 @@ class FunctionType(pytype.PyType):
 
         # Create new dict container
         d = self.__env.lookup_type("dict").new_container(
-            key_types={pytype.StrType()},
+            key_types={self.__env.lookup_type("str")},
             value_types=value_types,
         )
         self.__env.bind(self.__kwarg, {d})
@@ -287,9 +287,13 @@ class FunctionType(pytype.PyType):
                    kwarg=kwarg,
                    keyword_defaults=keyword_defaults,
                    kwonly_defaults=kwonly_defaults)
-
         return func
 
     def ref_node(self):
         return self.__ref_node
+
+
+class BuiltinFunction(FunctionType):
+    def call_and_update(self, args):
+        raise NotImplementedError
 

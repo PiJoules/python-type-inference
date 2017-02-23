@@ -84,23 +84,42 @@ class StrType(ValueType):
 
 
 def load_builtin_vars():
-    from function_type import FunctionType
+    from function_type import BuiltinFunction
     from tuple_type import TupleType
     from dict_type import DictType
 
-    #class PrintFunction(FunctionType):
-    #    def __init__(self):
-    #        super().__init__(None, None,
-    #                         vararg="objects",
-    #                         kwonlyargs={"sep", })
+    int_type = IntType()
+    bool_type = BoolType()
+    none_type = NoneType()
+    str_type = StrType()
+    tuple_type = TupleType()
+    dict_type = DictType()
+
+    class FileType(ValueType):
+        def __init__(self):
+            super().__init__("File")
+    file_type = FileType()
+
+    class PrintFunction(BuiltinFunction):
+        def __init__(self):
+            super().__init__(None, None,
+                             vararg="objects",
+                             kwonlyargs=["sep", "end", "file", "flush"],
+                             kwonly_defaults=[
+                                 {str_type}, {str_type}, {file_type}, {bool_type},
+                             ])
+
+        def call_and_update(self, args):
+            return {none_type}
+    print_func = PrintFunction()
 
     return {
-        "int": {IntType()},
-        "bool": {BoolType()},
-        "None": {NoneType()},
-        "str": {StrType()},
-        "tuple": {TupleType()},
-        "dict": {DictType()},
-        #"print": PrintFunction(),
+        "int": {int_type},
+        "bool": {bool_type},
+        "None": {none_type},
+        "str": {str_type},
+        "tuple": {tuple_type},
+        "dict": {dict_type},
+        "print": {print_func},
     }
 
