@@ -9,7 +9,7 @@ import class_type
 
 
 class Environment:
-    def __init__(self, init_vars=None, parent_env=None):
+    def __init__(self, init_vars=None, parent_env=None, init_modules=None):
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
         if self.__parent:
@@ -22,6 +22,9 @@ class Environment:
         for types in self.__variables.values():
             for t in types:
                 self.__types[t.name()] = t
+
+        # Moules
+        self.__modules = init_modules or {}  # dict[str, ModuleType]
 
     def call_stack(self):
         return self.__call_stack
@@ -76,6 +79,14 @@ class Environment:
 
         raise KeyError(typename)
 
+    def lookup_module(self, mod_name):
+        if mod_name in self.__modules:
+            return self.__modules[mod_name]
+
+        if self.__parent:
+            return self.__parent.lookup_module(mod_name)
+
+        raise KeyError(mod_name)
 
 
     """
@@ -269,7 +280,14 @@ class Environment:
         Parse the imported module and make all variable assignments attributes
         of a new module type.
         """
-        raise NotImplementedError
+        name = node.name
+        asname = node.asname or name
+        try:
+            mod_t = self.lookup_module(name)
+        except KeyError:
+            mod_t = module_type.ModuleType.from_node(node)
+        finally:
+            self.bind(asname, {mod_t})
 
     def parse_import(self, node):
         for alias in node.names:
@@ -312,6 +330,7 @@ class Environment:
 
 class ModuleEnv(Environment):
     def __init__(self):
-        super().__init__(init_vars=pytype.load_builtin_vars())
+        super().__init__(init_vars=pytype.load_builtin_vars(),
+                         init_modules=pytype.load_builtin_modules())
 
 
