@@ -129,5 +129,9 @@ def load_builtin_modules():
     Returns:
         dict[str, ModuleType]
     """
+    from module_type import ModuleType
+
+
+
     return {}
 

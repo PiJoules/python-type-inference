@@ -9,7 +9,8 @@ import class_type
 
 
 class Environment:
-    def __init__(self, init_vars=None, parent_env=None, init_modules=None):
+    def __init__(self, init_vars=None, parent_env=None, init_modules=None,
+                 module_location=None):
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
         if self.__parent:
@@ -23,8 +24,10 @@ class Environment:
             for t in types:
                 self.__types[t.name()] = t
 
-        # Moules
+        # Modules
         self.__modules = init_modules or {}  # dict[str, ModuleType]
+
+        self.__module_location = module_location
 
     def call_stack(self):
         return self.__call_stack
@@ -285,7 +288,10 @@ class Environment:
         try:
             mod_t = self.lookup_module(name)
         except KeyError:
-            mod_t = module_type.ModuleType.from_node(node)
+            if self.__module_location:
+                mod_t = module_type.ModuleType.from_path(self.__module_location)
+            else:
+                raise RuntimeError("Path to main module required for non-builtin module")
         finally:
             self.bind(asname, {mod_t})
 
@@ -329,8 +335,9 @@ class Environment:
 
 
 class ModuleEnv(Environment):
-    def __init__(self):
+    def __init__(self, module_location=None):
         super().__init__(init_vars=pytype.load_builtin_vars(),
-                         init_modules=pytype.load_builtin_modules())
+                         init_modules=pytype.load_builtin_modules(),
+                         module_location=module_location)
 
 
