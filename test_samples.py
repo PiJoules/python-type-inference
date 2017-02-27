@@ -8,7 +8,7 @@ from pytype import *
 class TestSamples(unittest.TestCase):
     def __get_module_env(self, filepath):
         with open(filepath, "r") as f:
-            env = ModuleEnv()
+            env = ModuleEnv(module_location=filepath)
             env.parse_code(f.read())
             return env
 

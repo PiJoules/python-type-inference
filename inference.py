@@ -6,10 +6,11 @@ import pytype
 import arguments
 import function_type
 import class_type
+import module_type
 
 
 class Environment:
-    def __init__(self, init_vars=None, parent_env=None, init_modules=None,
+    def __init__(self, init_vars=None, parent_env=None,
                  module_location=None):
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
@@ -25,8 +26,6 @@ class Environment:
                 self.__types[t.name()] = t
 
         # Modules
-        self.__modules = init_modules or {}  # dict[str, ModuleType]
-
         self.__module_location = module_location
 
     def call_stack(self):
@@ -81,15 +80,6 @@ class Environment:
             return self.__parent.lookup_type(typename)
 
         raise KeyError(typename)
-
-    def lookup_module(self, mod_name):
-        if mod_name in self.__modules:
-            return self.__modules[mod_name]
-
-        if self.__parent:
-            return self.__parent.lookup_module(mod_name)
-
-        raise KeyError(mod_name)
 
 
     """
@@ -285,15 +275,8 @@ class Environment:
         """
         name = node.name
         asname = node.asname or name
-        try:
-            mod_t = self.lookup_module(name)
-        except KeyError:
-            if self.__module_location:
-                mod_t = module_type.ModuleType.from_path(self.__module_location)
-            else:
-                raise RuntimeError("Path to main module required for non-builtin module")
-        finally:
-            self.bind(asname, {mod_t})
+        mod_t = module_type.load_module(name)
+        self.bind(asname, {mod_t})
 
     def parse_import(self, node):
         for alias in node.names:
@@ -337,7 +320,6 @@ class Environment:
 class ModuleEnv(Environment):
     def __init__(self, module_location=None):
         super().__init__(init_vars=pytype.load_builtin_vars(),
-                         init_modules=pytype.load_builtin_modules(),
                          module_location=module_location)
 
 

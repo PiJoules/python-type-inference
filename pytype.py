@@ -123,15 +123,3 @@ def load_builtin_vars():
         "print": {print_func},
     }
 
-
-def load_builtin_modules():
-    """
-    Returns:
-        dict[str, ModuleType]
-    """
-    from module_type import ModuleType
-
-
-
-    return {}
-
