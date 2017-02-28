@@ -3,11 +3,11 @@ import astor
 import pkgutil
 
 
-def builtin_module_file_path(name):
+def module_path_from_name(name):
     """
     Returns:
         (None, str): None if the module cannot be imported. The string path
-            otherwise.
+            otherwise (absolute).
     """
     loader = pkgutil.get_loader(name)
     if loader is None:
@@ -15,19 +15,35 @@ def builtin_module_file_path(name):
     return loader.path
 
 
-def load_module(name):
+def module_node_from_path(path):
     try:
-        mod_t = self.lookup_module(name)
-    except KeyError:
-        if self.__module_location:
-            mod_t = module_type.ModuleType.from_path(self.__module_location)
+        node = astor.parsefile(path)
+    except:
+        return None
+    else:
+        return node
+
+
+def load_module(name):
+    """
+    Returns:
+        ModuleType
+
+    Raises:
+        RuntimeError
+    """
+    mod_location = module_path_from_name(name)
+    if mod_location is None:
+        raise RuntimeError("The module '{}' cannot be found on the pythonpath: {}.".format(name, sys.path))
+    mod_node = module_node_from_path(mod_location)
+    if mod_node is None:
+        # The module is probably implemented in C
+        # See if we have a ModuleType for it
+        if name not in BUILTIN_MODULES:
+            raise RuntimeError("The module '{}' is probably implemented in C and does not have a python implementation. This module should have a pre-built ModuleType.".format(name))
         else:
-            raise RuntimeError("Path to main module required for non-builtin module")
-    raise NotImplementedError
-
-
-def module_location(mod_name):
-    raise NotImplementedError
+            return BUILTIN_MODULES[name]
+    return ModuleType.from_node(mod_node)
 
 
 class ModuleType(pytype.PyType):
@@ -41,3 +57,10 @@ class ModuleType(pytype.PyType):
         Convert the file to an ast
         """
         raise NotImplementedError
+
+
+def load_builtin_modules():
+    return {}
+
+
+BUILTIN_MODULES = load_builtin_modules()

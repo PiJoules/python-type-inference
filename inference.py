@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 
 import ast
+import sys
+import os
 import astor
 import pytype
 import arguments
@@ -321,5 +323,9 @@ class ModuleEnv(Environment):
     def __init__(self, module_location=None):
         super().__init__(init_vars=pytype.load_builtin_vars(),
                          module_location=module_location)
+
+        # Also add this location to the pythonpath
+        if module_location is not None:
+            sys.path.insert(1, os.path.dirname(module_location))
 
 
