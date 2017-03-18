@@ -181,9 +181,9 @@ class Environment:
             raise RuntimeError("Unknown slice type '{}'".format(slice))
 
     def eval_tuple(self, node):
-        return self.lookup_type("tuple").new_container(
+        return {self.lookup_type("tuple").new_container(
             init_contents=tuple(self.eval(n) for n in node.elts)
-        )
+        )}
 
     def eval(self, node):
         if isinstance(node, ast.Num):

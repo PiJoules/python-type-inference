@@ -30,7 +30,10 @@ class PyType:
             self.__attrs[attr] = set(types)
 
     def get_attr(self, attr):
-        return self.__attrs[attr]
+        if attr in self.__attrs:
+            return self.__attrs[attr]
+        else:
+            raise KeyError("Attr '{}' not in type '{}'".format(attr, self.name()))
 
     def __ne__(self, other):
         return not (self == other)
@@ -100,6 +103,26 @@ def load_builtin_vars():
             super().__init__("File")
     file_type = FileType()
 
+
+    """
+    Add methods to types
+    """
+    class StripMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                None, None,
+                keywords=["chars"],
+                keyword_defaults=[{str_type}],
+            )
+        def call_and_update(self, args):
+            return {str_type}
+    strip_method = StripMethod()
+    str_type.add_attr("strip", {strip_method})
+
+
+    """
+    Builtin functions
+    """
     class PrintFunction(BuiltinFunction):
         def __init__(self):
             super().__init__(None, None,
@@ -113,6 +136,19 @@ def load_builtin_vars():
             return {none_type}
     print_func = PrintFunction()
 
+
+    class InputFunction(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                None, None,
+                keywords=["prompt"],
+                keyword_defaults=[{str_type}],
+            )
+        def call_and_update(self, args):
+            return {str_type}
+    input_func = InputFunction()
+
+
     return {
         "int": {int_type},
         "bool": {bool_type},
@@ -121,5 +157,6 @@ def load_builtin_vars():
         "tuple": {tuple_type},
         "dict": {dict_type},
         "print": {print_func},
+        "input": {input_func},
     }
 
