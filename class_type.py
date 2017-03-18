@@ -25,6 +25,11 @@ class ClassType(pytype.PyType):
         # Convert all saved variables to attributes
         return cls(node, init_attrs=env.variables())
 
+    def defined_name(self):
+        if self.__ref_node is None:
+            return None
+        return self.__ref_node.name
+
     def create_instance(self):
         return instance_type.InstanceType.from_class_type(self)
 

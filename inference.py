@@ -83,6 +83,14 @@ class Environment:
 
         raise KeyError(typename)
 
+    def unpack_assign(self, target, types):
+        if isinstance(target, ast.Name):
+            self.bind(target.id, types)
+        elif isinstance(target, ast.Attribute):
+            self.bind_attr(target, types)
+        else:
+            raise NotImplementedError("Unable to assign to target node '{}'".format(target))
+
 
     """
     Type evaluation
@@ -102,6 +110,7 @@ class Environment:
         ret_types = set()
 
         func_types = self.eval(node.func)  # set[PyType]
+
         args = arguments.Arguments.from_call_node(node, self)
 
         for func in func_types:
@@ -171,6 +180,11 @@ class Environment:
         else:
             raise RuntimeError("Unknown slice type '{}'".format(slice))
 
+    def eval_tuple(self, node):
+        return self.lookup_type("tuple").new_container(
+            init_contents=tuple(self.eval(n) for n in node.elts)
+        )
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -188,8 +202,10 @@ class Environment:
             return self.eval_str(node)
         elif isinstance(node, ast.Subscript):
             return self.eval_subscript(node)
+        elif isinstance(node, ast.Tuple):
+            return self.eval_tuple(node)
         else:
-            raise NotImplementedError("Unable to evaluate type for node '{}'".format(node))
+            raise NotImplementedError("Unable to evaluate type for node '{}' on line {}".format(node, node.lineno))
 
     """
     Node parsing
@@ -241,12 +257,7 @@ class Environment:
         types = self.eval(val)
 
         for target in targets:
-            if isinstance(target, ast.Name):
-                self.bind(target.id, types)
-            elif isinstance(target, ast.Attribute):
-                self.bind_attr(target, types)
-            else:
-                raise NotImplementedError("Unable to assign to target node '{}'".format(target))
+            self.unpack_assign(target, types)
 
     def parse_function_def(self, node):
         """
@@ -287,7 +298,6 @@ class Environment:
                 self.parse_regular_import_alias(alias)
             else:
                 raise NotImplementedError("No logic implemented yet for handling importing aliases")
-        raise NotImplementedError
 
     def parse(self, node):
         if isinstance(node, ast.Assign):

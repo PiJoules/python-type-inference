@@ -51,16 +51,22 @@ class ModuleType(pytype.PyType):
         super().__init__("module", *args, **kwargs)
         self.__ref_node = ref_node
 
-    @classmethod
-    def from_path(cls, path):
-        """
-        Convert the file to an ast
-        """
-        raise NotImplementedError
+
+class MathModuleType(ModuleType):
+    def __init__(self):
+        super().__init__(None)
+
+    def __hash__(self):
+        return hash(self.name())
+
+    def __eq__(self, other):
+        return isinstance(other, type(self)) and hash(self) == hash(other)
 
 
 def load_builtin_modules():
-    return {}
+    return {
+        "math": MathModuleType(),
+    }
 
 
 BUILTIN_MODULES = load_builtin_modules()

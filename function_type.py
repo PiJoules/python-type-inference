@@ -55,6 +55,11 @@ class FunctionType(pytype.PyType):
     Getters
     """
 
+    def defined_name(self):
+        if self.__ref_node is None:
+            return None
+        return self.__ref_node.name
+
     def pos_args(self):
         return self.__pos_args
 
@@ -189,7 +194,7 @@ class FunctionType(pytype.PyType):
         """
         returns = set()
 
-        stack = list(self.__ref_node.body)
+        stack = list(self.__ref_node.body)[::-1]
         while stack:
             node = stack.pop()
             if isinstance(node, ast.Return):
