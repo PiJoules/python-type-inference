@@ -86,6 +86,21 @@ class NoneType(ValueType):
         super().__init__("None")
 
 
+"""
+Exceptions
+"""
+
+class ExceptionType(ValueType):
+    def __init__(self, name="Exception", *args, **kwargs):
+        super().__init__(name, *args, **kwargs)
+
+
+class ValueErrorType(ExceptionType):
+    def __init__(self):
+        super().__init__("ValueError")
+
+
+
 class StrType(ValueType):
     def __init__(self):
         super().__init__("str")
@@ -96,7 +111,8 @@ class StrType(ValueType):
 
 def load_builtin_vars():
     from function_type import BuiltinFunction
-    from class_type import ClassType
+    from class_type import BuiltinClass
+    from instance_type import InstanceType
     from tuple_type import TupleType
     from dict_type import DictType
 
@@ -107,6 +123,8 @@ def load_builtin_vars():
     str_type = StrType()
     tuple_type = TupleType()
     dict_type = DictType()
+
+    value_err = ValueErrorType()
 
     class FileType(ValueType):
         def __init__(self):
@@ -164,24 +182,47 @@ def load_builtin_vars():
 
     TODO: Add the other builtin classes for builtin types
     """
-    class FloatClass(ClassType):
-        def __init__(self):
-            super().__init__(None)
-
+    class FloatClass(BuiltinClass):
         def create_and_init(self, args):
             return {float_type}
     float_cls = FloatClass()
 
+    class IntClass(BuiltinClass):
+        def create_and_init(self, args):
+            return {int_type}
+    int_cls = IntClass()
+
+    class BoolClass(BuiltinClass):
+        def create_and_init(self, args):
+            return {bool_type}
+    bool_cls = BoolClass()
+
+    class StrClass(BuiltinClass):
+        def create_and_init(self, args):
+            return {str_type}
+    str_cls = StrClass()
+
+
+    """
+    Exception classes
+    """
+    class ValueErrorClass(BuiltinClass):
+        def create_and_init(self, args):
+            return {value_err}
+    value_err_cls = ValueErrorClass()
+
 
     return {
-        "int": {int_type},
+        "int": {int_cls},
         "float": {float_cls},
-        "bool": {bool_type},
+        "bool": {bool_cls},
         "None": {none_type},
-        "str": {str_type},
+        "str": {str_cls},
         "tuple": {tuple_type},
         "dict": {dict_type},
         "print": {print_func},
         "input": {input_func},
+
+        "ValueError": {value_err_cls},
     }
 

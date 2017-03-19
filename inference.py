@@ -117,7 +117,9 @@ class Environment:
     def eval_num(self, node):
         n = node.n
         if isinstance(n, int):
-            return {self.lookup_type("int")}
+            return next(iter(self.lookup("int"))).create_and_init(None)
+        elif isinstance(n, float):
+            return next(iter(self.lookup("float"))).create_and_init(None)
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
@@ -162,7 +164,7 @@ class Environment:
 
     def eval_compare(self, node):
         """Always returns bools"""
-        return self.lookup_type("bool")
+        return next(iter(self.lookup("bool"))).create_and_init(None)
 
     def eval_attr(self, node):
         value = node.value
@@ -176,7 +178,7 @@ class Environment:
         return types
 
     def eval_str(self, node):
-        return {self.lookup_type("str")}
+        return next(iter(self.lookup("str"))).create_and_init(None)
 
     def eval_subscript_index(self, node):
         idx_values = self.eval(node.slice.value)
@@ -351,6 +353,14 @@ class Environment:
 
         raise NotImplementedError
 
+    def parse_raise(self, node):
+        """
+        Evaluate both the exception and cause
+        """
+        self.eval(node.exc)
+        if node.cause:
+            self.eval(node.cause)
+
     def parse(self, node):
         if isinstance(node, ast.Assign):
             self.parse_assign(node)
@@ -370,6 +380,8 @@ class Environment:
             self.parse_for(node)
         elif isinstance(node, ast.Try):
             self.parse_try(node)
+        elif isinstance(node, ast.Raise):
+            self.parse_raise(node)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 

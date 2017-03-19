@@ -140,8 +140,9 @@ class FunctionType(pytype.PyType):
                 value_types |= types
 
         # Create new dict container
+        str_type = next(iter(self.__env.lookup("str"))).create_and_init(None)
         d = self.__env.lookup_type("dict").new_container(
-            key_types={self.__env.lookup_type("str")},
+            key_types=str_type,
             value_types=value_types,
         )
         self.__env.bind(self.__kwarg, {d})

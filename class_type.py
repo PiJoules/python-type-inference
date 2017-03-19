@@ -53,3 +53,11 @@ class ClassType(pytype.PyType):
 
     def __eq__(self, other):
         return hash(self) == hash(other)
+
+
+class BuiltinClass(ClassType):
+    def __init__(self):
+        super().__init__(None)
+
+    def create_and_init(self, args):
+        raise NotImplementedError
