@@ -102,6 +102,7 @@ class ExceptionType(ValueType):
 class ValueErrorType(ExceptionType):
     def __init__(self):
         super().__init__("ValueError")
+VALUE_ERROR = ValueErrorType()
 
 
 
@@ -129,8 +130,6 @@ def load_builtin_vars():
     none_type = NoneType()
     tuple_type = TupleType()
     dict_type = DictType()
-
-    value_err = ValueErrorType()
 
     class FileType(ValueType):
         def __init__(self):
@@ -222,7 +221,7 @@ def load_builtin_vars():
     """
     class ValueErrorClass(BuiltinClass):
         def create_and_init(self, args):
-            return {value_err}
+            return {VALUE_ERROR}
     value_err_cls = ValueErrorClass()
 
 
