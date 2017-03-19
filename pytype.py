@@ -219,6 +219,16 @@ def load_builtin_vars():
             return {STR_TYPE}
     str_cls = StrClass()
 
+    class TupleClass(BuiltinClass):
+        def create_and_init(self, args):
+            return {TUPLE_TYPE}
+    tuple_cls = TupleClass()
+
+    class DictClass(BuiltinClass):
+        def create_and_init(self, args):
+            return {DICT_TYPE}
+    dict_cls = DictClass()
+
 
     """
     Exception classes
@@ -234,8 +244,8 @@ def load_builtin_vars():
         "float": {float_cls},
         "bool": {bool_cls},
         "str": {str_cls},
-        "tuple": {TUPLE_TYPE},
-        "dict": {DICT_TYPE},
+        "tuple": {tuple_cls},
+        "dict": {dict_cls},
         "print": {print_func},
         "input": {input_func},
 
