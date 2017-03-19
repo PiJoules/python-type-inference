@@ -212,6 +212,25 @@ class Environment:
             init_contents=tuple(self.eval(n) for n in node.elts)
         )}
 
+    def eval_unary_op(self, node):
+        """
+        Evaluate the node depending on the operation and operand
+
+        operations:
+            UAdd, USub: whatever the operand is
+            Not: boolean
+            Invert (~): integer
+        """
+        operation = node.op
+        if isinstance(operation, (ast.UAdd, ast.USub)):
+            return self.eval(node.operand)
+        elif isinstance(operation, ast.Not):
+            return next(iter(self.lookup("bool"))).create_and_init(None)
+        elif isinstance(operation, ast.Invert):
+            return next(iter(self.lookup("int"))).create_and_init(None)
+        else:
+            raise RuntimeError("Unknown unary operation {}".format(operation))
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -231,6 +250,8 @@ class Environment:
             return self.eval_subscript(node)
         elif isinstance(node, ast.Tuple):
             return self.eval_tuple(node)
+        elif isinstance(node, ast.UnaryOp):
+            return self.eval_unary_op(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}' on line {}".format(node, node.lineno))
 
@@ -344,6 +365,9 @@ class Environment:
         self.parse_sequence(orelse)
 
     def parse_try(self, node):
+        """
+        Parse the body, handlers, orelse, and finalbody in that order.
+        """
         body = node.body
         handlers = node.handlers
         orelse = node.orelse
@@ -351,7 +375,19 @@ class Environment:
 
         self.parse_sequence(body)
 
-        raise NotImplementedError
+        for handler in handlers:
+            exc = handler.type
+            asname = handler.name  # (str, None)
+            exc_body = handler.body
+
+            exc_types = self.eval(exc)
+            if asname is not None:
+                self.bind(asname, exc_types)
+
+            self.parse_sequence(exc_body)
+
+        self.parse_sequence(orelse)
+        self.parse_sequence(finalbody)
 
     def parse_raise(self, node):
         """

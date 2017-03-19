@@ -33,7 +33,7 @@ class PyType:
         if attr in self.__attrs:
             return self.__attrs[attr]
         else:
-            raise KeyError("Attr '{}' not in type '{}'".format(attr, self.name()))
+            raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
 
     def __ne__(self, other):
         return not (self == other)
@@ -74,6 +74,10 @@ class IntType(ValueType):
 class FloatType(ValueType):
     def __init__(self, *args, **kwargs):
         super().__init__("float", *args, **kwargs)
+FLOAT_TYPE = FloatType()
+"""
+TODO: Make all base types available at the module level to be used by other modules
+"""
 
 
 class BoolType(ValueType):
@@ -108,6 +112,9 @@ class StrType(ValueType):
     def slice(self):
         return self
 
+    def get_idx(self):
+        return {self}
+
 
 def load_builtin_vars():
     from function_type import BuiltinFunction
@@ -117,7 +124,6 @@ def load_builtin_vars():
     from dict_type import DictType
 
     int_type = IntType()
-    float_type = FloatType()
     bool_type = BoolType()
     none_type = NoneType()
     str_type = StrType()
@@ -138,14 +144,22 @@ def load_builtin_vars():
     class StripMethod(BuiltinFunction):
         def __init__(self):
             super().__init__(
-                None, None,
                 keywords=["chars"],
                 keyword_defaults=[{str_type}],
             )
         def call_and_update(self, args):
             return {str_type}
-    strip_method = StripMethod()
-    str_type.add_attr("strip", {strip_method})
+    str_type.add_attr("strip", {StripMethod()})
+
+    class FormatMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                vararg="args",
+                kwarg="kwargs",
+            )
+        def call_and_update(self, args):
+            return {str_type}
+    str_type.add_attr("format", {FormatMethod()})
 
 
     """
@@ -153,12 +167,13 @@ def load_builtin_vars():
     """
     class PrintFunction(BuiltinFunction):
         def __init__(self):
-            super().__init__(None, None,
-                             vararg="objects",
-                             kwonlyargs=["sep", "end", "file", "flush"],
-                             kwonly_defaults=[
-                                 {str_type}, {str_type}, {file_type}, {bool_type},
-                             ])
+            super().__init__(
+                vararg="objects",
+                kwonlyargs=["sep", "end", "file", "flush"],
+                kwonly_defaults=[
+                    {str_type}, {str_type}, {file_type}, {bool_type},
+                ]
+            )
 
         def call_and_update(self, args):
             return {none_type}
@@ -168,7 +183,6 @@ def load_builtin_vars():
     class InputFunction(BuiltinFunction):
         def __init__(self):
             super().__init__(
-                None, None,
                 keywords=["prompt"],
                 keyword_defaults=[{str_type}],
             )
@@ -184,7 +198,7 @@ def load_builtin_vars():
     """
     class FloatClass(BuiltinClass):
         def create_and_init(self, args):
-            return {float_type}
+            return {FLOAT_TYPE}
     float_cls = FloatClass()
 
     class IntClass(BuiltinClass):

@@ -300,6 +300,9 @@ class FunctionType(pytype.PyType):
 
 
 class BuiltinFunction(FunctionType):
+    def __init__(self, *args, **kwargs):
+        super().__init__(None, None, *args, **kwargs)
+
     def call_and_update(self, args):
         raise NotImplementedError
 
