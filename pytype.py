@@ -71,6 +71,11 @@ class IntType(ValueType):
         super().__init__("int", *args, **kwargs)
 
 
+class FloatType(ValueType):
+    def __init__(self, *args, **kwargs):
+        super().__init__("float", *args, **kwargs)
+
+
 class BoolType(ValueType):
     def __init__(self):
         super().__init__("bool")
@@ -85,13 +90,18 @@ class StrType(ValueType):
     def __init__(self):
         super().__init__("str")
 
+    def slice(self):
+        return self
+
 
 def load_builtin_vars():
     from function_type import BuiltinFunction
+    from class_type import ClassType
     from tuple_type import TupleType
     from dict_type import DictType
 
     int_type = IntType()
+    float_type = FloatType()
     bool_type = BoolType()
     none_type = NoneType()
     str_type = StrType()
@@ -149,8 +159,23 @@ def load_builtin_vars():
     input_func = InputFunction()
 
 
+    """
+    Builtin classes
+
+    TODO: Add the other builtin classes for builtin types
+    """
+    class FloatClass(ClassType):
+        def __init__(self):
+            super().__init__(None)
+
+        def create_and_init(self, args):
+            return {float_type}
+    float_cls = FloatClass()
+
+
     return {
         "int": {int_type},
+        "float": {float_cls},
         "bool": {bool_type},
         "None": {none_type},
         "str": {str_type},

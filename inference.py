@@ -84,10 +84,28 @@ class Environment:
         raise KeyError(typename)
 
     def unpack_assign(self, target, types):
+        """
+        Args:
+            target (ast node)
+            types (set[pytype.PyType])
+        """
         if isinstance(target, ast.Name):
             self.bind(target.id, types)
         elif isinstance(target, ast.Attribute):
             self.bind_attr(target, types)
+        elif isinstance(target, ast.Tuple):
+            # Iterate through each tuple value and set the nth content to
+            # the nth target
+            for t in types:
+                assert len(target.elts) == len(t.contents())
+
+            src_types = [set() for i in target.elts]
+            for t in types:
+                for i in range(len(src_types)):
+                    src_types[i] |= t.contents()[i]
+
+            for i, elt in enumerate(target.elts):
+                self.unpack_assign(elt, src_types[i])
         else:
             raise NotImplementedError("Unable to assign to target node '{}'".format(target))
 
@@ -121,7 +139,7 @@ class Environment:
                 elif isinstance(func, class_type.ClassType):
                     ret_types |= func.create_and_init(args)
                 else:
-                    raise RuntimeError("Unknown callable type '{}'".format(type(func)))
+                    raise RuntimeError("Unknown callable type '{}' from node {} on line {}".format(type(func), node, node.lineno))
                 self.__call_stack.remove(func)
 
         return ret_types
@@ -166,8 +184,15 @@ class Environment:
 
         ret_types = set()
         for value in values:
-            ret_types |= value.get_idx(idx_values)
+            ret_types |= value.get_idx()
         return ret_types
+
+    def eval_subscript_slice(self, node):
+        """
+        Slices will return a new pointer to the original container.
+        """
+        values = self.eval(node.value)
+        return {v.slice() for v in values}
 
     def eval_subscript(self, node):
         slice = node.slice
@@ -299,6 +324,33 @@ class Environment:
             else:
                 raise NotImplementedError("No logic implemented yet for handling importing aliases")
 
+    def parse_for(self, node):
+        target = node.target
+        iter_node = node.iter
+        body = node.body
+        orelse = node.orelse
+
+        # Bind target to whatever is yielded by the iter
+        iter_types = self.eval(iter_node)
+        contents = set()
+        for t in iter_types:
+            contents |= t.all_contents()
+        self.unpack_assign(target, contents)
+
+        # Parse both the body and orelse
+        self.parse_sequence(body)
+        self.parse_sequence(orelse)
+
+    def parse_try(self, node):
+        body = node.body
+        handlers = node.handlers
+        orelse = node.orelse
+        finalbody = node.finalbody
+
+        self.parse_sequence(body)
+
+        raise NotImplementedError
+
     def parse(self, node):
         if isinstance(node, ast.Assign):
             self.parse_assign(node)
@@ -314,6 +366,10 @@ class Environment:
             self.parse_expr(node)
         elif isinstance(node, ast.Import):
             self.parse_import(node)
+        elif isinstance(node, ast.For):
+            self.parse_for(node)
+        elif isinstance(node, ast.Try):
+            self.parse_try(node)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 

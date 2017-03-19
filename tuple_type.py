@@ -16,8 +16,23 @@ class TupleType(pytype.PyType):
             assert isinstance(types, set)
             assert all(isinstance(x, pytype.PyType) for x in types)
 
+    def slice(self):
+        return TuplePointer(
+            init_contents=self.contents(),
+        )
+
     def contents(self):
         return self.__contents
+
+    def all_contents(self):
+        """
+        Returns:
+            set[pytype.PyType]: Set of all types in the contents
+        """
+        ret_types = set()
+        for types in self.contents():
+            ret_types |= types
+        return ret_types
 
     def new_container(self, **kwargs):
         """
@@ -26,7 +41,7 @@ class TupleType(pytype.PyType):
         """
         return TuplePointer(self, **kwargs)
 
-    def get_idx(self, keys):
+    def get_idx(self):
         types = set()
         for content_types in self.contents():
             types |= content_types

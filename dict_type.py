@@ -27,7 +27,7 @@ class DictType(pytype.PyType):
     def new_container(self, **kwargs):
         return DictPointer(self, **kwargs)
 
-    def get_idx(self, keys):
+    def get_idx(self):
         return self.value_types()
 
     def __hash__(self):
