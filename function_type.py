@@ -219,7 +219,7 @@ class FunctionType(pytype.PyType):
                 # Parse everything else
                 self.__env.parse(node)
 
-        return returns or {self.__env.lookup_type("None")}
+        return returns or {pytype.NONE_TYPE}
 
     def call_and_update(self, args):
         """

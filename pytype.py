@@ -74,10 +74,6 @@ class IntType(ValueType):
 class FloatType(ValueType):
     def __init__(self, *args, **kwargs):
         super().__init__("float", *args, **kwargs)
-FLOAT_TYPE = FloatType()
-"""
-TODO: Make all base types available at the module level to be used by other modules
-"""
 
 
 class BoolType(ValueType):
@@ -89,6 +85,10 @@ class NoneType(ValueType):
     def __init__(self):
         super().__init__("None")
 
+
+class FileType(ValueType):
+    def __init__(self):
+        super().__init__("File")
 
 """
 Exceptions
@@ -102,7 +102,6 @@ class ExceptionType(ValueType):
 class ValueErrorType(ExceptionType):
     def __init__(self):
         super().__init__("ValueError")
-VALUE_ERROR = ValueErrorType()
 
 
 
@@ -115,7 +114,23 @@ class StrType(ValueType):
 
     def get_idx(self):
         return {self}
+
+
+"""
+Builtin types
+"""
+INT_TYPE = IntType()
+FLOAT_TYPE = FloatType()
 STR_TYPE = StrType()
+BOOL_TYPE = BoolType()
+NONE_TYPE = NoneType()
+FILE_TYPE = FileType()
+
+
+"""
+Exceptions
+"""
+VALUE_ERROR = ValueErrorType()
 
 
 def load_builtin_vars():
@@ -125,16 +140,8 @@ def load_builtin_vars():
     from tuple_type import TupleType
     from dict_type import DictType
 
-    int_type = IntType()
-    bool_type = BoolType()
-    none_type = NoneType()
     tuple_type = TupleType()
     dict_type = DictType()
-
-    class FileType(ValueType):
-        def __init__(self):
-            super().__init__("File")
-    file_type = FileType()
 
 
     """
@@ -170,12 +177,12 @@ def load_builtin_vars():
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
-                    {STR_TYPE}, {STR_TYPE}, {file_type}, {bool_type},
+                    {STR_TYPE}, {STR_TYPE}, {FILE_TYPE}, {BOOL_TYPE},
                 ]
             )
 
         def call_and_update(self, args):
-            return {none_type}
+            return {NONE_TYPE}
     print_func = PrintFunction()
 
 
@@ -202,12 +209,12 @@ def load_builtin_vars():
 
     class IntClass(BuiltinClass):
         def create_and_init(self, args):
-            return {int_type}
+            return {INT_TYPE}
     int_cls = IntClass()
 
     class BoolClass(BuiltinClass):
         def create_and_init(self, args):
-            return {bool_type}
+            return {BOOL_TYPE}
     bool_cls = BoolClass()
 
     class StrClass(BuiltinClass):
@@ -229,7 +236,6 @@ def load_builtin_vars():
         "int": {int_cls},
         "float": {float_cls},
         "bool": {bool_cls},
-        "None": {none_type},
         "str": {str_cls},
         "tuple": {tuple_type},
         "dict": {dict_type},

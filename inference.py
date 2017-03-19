@@ -117,9 +117,9 @@ class Environment:
     def eval_num(self, node):
         n = node.n
         if isinstance(n, int):
-            return next(iter(self.lookup("int"))).create_and_init(None)
+            return {pytype.INT_TYPE}
         elif isinstance(n, float):
-            return next(iter(self.lookup("float"))).create_and_init(None)
+            return {pytype.FLOAT_TYPE}
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
@@ -164,7 +164,7 @@ class Environment:
 
     def eval_compare(self, node):
         """Always returns bools"""
-        return next(iter(self.lookup("bool"))).create_and_init(None)
+        return {pytype.BOOL_TYPE}
 
     def eval_attr(self, node):
         value = node.value
@@ -225,9 +225,9 @@ class Environment:
         if isinstance(operation, (ast.UAdd, ast.USub)):
             return self.eval(node.operand)
         elif isinstance(operation, ast.Not):
-            return next(iter(self.lookup("bool"))).create_and_init(None)
+            return {pytype.BOOL_TYPE}
         elif isinstance(operation, ast.Invert):
-            return next(iter(self.lookup("int"))).create_and_init(None)
+            return {pytype.INT_TYPE}
         else:
             raise RuntimeError("Unknown unary operation {}".format(operation))
 
