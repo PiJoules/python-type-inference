@@ -9,6 +9,7 @@ import arguments
 import function_type
 import class_type
 import module_type
+import tuple_type
 
 
 class Environment:
@@ -70,18 +71,6 @@ class Environment:
             return self.__parent.lookup(varname)
 
         raise KeyError(varname)
-
-    def exclusive_lookup_type(self, typename):
-        return self.__types[typename]
-
-    def lookup_type(self, typename):
-        if typename in self.__types:
-            return self.exclusive_lookup_type(typename)
-
-        if self.__parent:
-            return self.__parent.lookup_type(typename)
-
-        raise KeyError(typename)
 
     def unpack_assign(self, target, types):
         """
@@ -208,9 +197,11 @@ class Environment:
             raise RuntimeError("Unknown slice type '{}'".format(slice))
 
     def eval_tuple(self, node):
-        return {self.lookup_type("tuple").new_container(
-            init_contents=tuple(self.eval(n) for n in node.elts)
-        )}
+        return {
+            tuple_type.TUPLE_TYPE.new_container(
+                init_contents=tuple(self.eval(n) for n in node.elts)
+            )
+        }
 
     def eval_unary_op(self, node):
         """

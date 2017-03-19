@@ -137,11 +137,8 @@ def load_builtin_vars():
     from function_type import BuiltinFunction
     from class_type import BuiltinClass
     from instance_type import InstanceType
-    from tuple_type import TupleType
-    from dict_type import DictType
-
-    tuple_type = TupleType()
-    dict_type = DictType()
+    from tuple_type import TUPLE_TYPE
+    from dict_type import DICT_TYPE
 
 
     """
@@ -237,8 +234,8 @@ def load_builtin_vars():
         "float": {float_cls},
         "bool": {bool_cls},
         "str": {str_cls},
-        "tuple": {tuple_type},
-        "dict": {dict_type},
+        "tuple": {TUPLE_TYPE},
+        "dict": {DICT_TYPE},
         "print": {print_func},
         "input": {input_func},
 

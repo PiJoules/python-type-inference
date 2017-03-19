@@ -80,3 +80,5 @@ class TuplePointer(TupleType):
     def add_attr(self, attr, types):
         return self.__original.add_attr(attr, types)
 
+
+TUPLE_TYPE = TupleType()

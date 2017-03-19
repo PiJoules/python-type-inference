@@ -2,6 +2,8 @@ import ast
 
 import inference
 import pytype
+import tuple_type
+import dict_type
 
 
 class FunctionType(pytype.PyType):
@@ -119,8 +121,9 @@ class FunctionType(pytype.PyType):
                 and keyword arguments.
         """
         pos_args = args.pos_args()
-        tup = self.__env.lookup_type("tuple").new_container(
-            init_contents=tuple(pos_args[counted_pos_args:]))
+        tup = tuple_type.TUPLE_TYPE.new_container(
+            init_contents=tuple(pos_args[counted_pos_args:])
+        )
         self.__env.bind(self.__vararg, {tup})
 
     def _update_kwonly_args(self, args):
@@ -141,7 +144,7 @@ class FunctionType(pytype.PyType):
 
         # Create new dict container
         str_type = next(iter(self.__env.lookup("str"))).create_and_init(None)
-        d = self.__env.lookup_type("dict").new_container(
+        d = dict_type.DICT_TYPE.new_container(
             key_types=str_type,
             value_types=value_types,
         )
