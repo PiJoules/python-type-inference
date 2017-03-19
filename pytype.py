@@ -114,6 +114,7 @@ class StrType(ValueType):
 
     def get_idx(self):
         return {self}
+STR_TYPE = StrType()
 
 
 def load_builtin_vars():
@@ -126,7 +127,6 @@ def load_builtin_vars():
     int_type = IntType()
     bool_type = BoolType()
     none_type = NoneType()
-    str_type = StrType()
     tuple_type = TupleType()
     dict_type = DictType()
 
@@ -145,11 +145,11 @@ def load_builtin_vars():
         def __init__(self):
             super().__init__(
                 keywords=["chars"],
-                keyword_defaults=[{str_type}],
+                keyword_defaults=[{STR_TYPE}],
             )
         def call_and_update(self, args):
-            return {str_type}
-    str_type.add_attr("strip", {StripMethod()})
+            return {STR_TYPE}
+    STR_TYPE.add_attr("strip", {StripMethod()})
 
     class FormatMethod(BuiltinFunction):
         def __init__(self):
@@ -158,8 +158,8 @@ def load_builtin_vars():
                 kwarg="kwargs",
             )
         def call_and_update(self, args):
-            return {str_type}
-    str_type.add_attr("format", {FormatMethod()})
+            return {STR_TYPE}
+    STR_TYPE.add_attr("format", {FormatMethod()})
 
 
     """
@@ -171,7 +171,7 @@ def load_builtin_vars():
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
-                    {str_type}, {str_type}, {file_type}, {bool_type},
+                    {STR_TYPE}, {STR_TYPE}, {file_type}, {bool_type},
                 ]
             )
 
@@ -184,10 +184,10 @@ def load_builtin_vars():
         def __init__(self):
             super().__init__(
                 keywords=["prompt"],
-                keyword_defaults=[{str_type}],
+                keyword_defaults=[{STR_TYPE}],
             )
         def call_and_update(self, args):
-            return {str_type}
+            return {STR_TYPE}
     input_func = InputFunction()
 
 
@@ -213,7 +213,7 @@ def load_builtin_vars():
 
     class StrClass(BuiltinClass):
         def create_and_init(self, args):
-            return {str_type}
+            return {STR_TYPE}
     str_cls = StrClass()
 
 

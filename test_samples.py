@@ -1,6 +1,7 @@
 import unittest
 
 from inference import ModuleEnv
+from tuple_type import TupleType
 from test_inference import first
 from pytype import *
 
@@ -37,4 +38,11 @@ class TestSamples(unittest.TestCase):
     def test_degrees(self):
         """Testing degrees.py"""
         env = self.__get_module_env("samples/degrees.py")
+
+        # Variables under the if __name__ == "__main__"
+        tup = TupleType(init_contents=tuple([{STR_TYPE}, {STR_TYPE}]))
+        self.assertSetEqual(
+            env.exclusive_lookup("input_lines"),
+            {tup}
+        )
 
