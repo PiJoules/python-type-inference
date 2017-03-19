@@ -148,3 +148,6 @@ class TestSamples(unittest.TestCase):
             env.lookup("ValueError")
         )
 
+
+if __name__ == "__main__":
+    unittest.main()

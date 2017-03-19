@@ -167,7 +167,7 @@ class Environment:
         return types
 
     def eval_str(self, node):
-        return next(iter(self.lookup("str"))).create_and_init(None)
+        return {pytype.STR_TYPE}
 
     def eval_subscript_index(self, node):
         idx_values = self.eval(node.slice.value)
@@ -418,6 +418,7 @@ class Environment:
 
     def parse_module(self, node):
         self.parse_sequence(node.body)
+        assert not self.__call_stack
 
     def parse_code(self, code):
         self.parse_module(ast.parse(code))
