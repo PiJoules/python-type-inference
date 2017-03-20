@@ -38,6 +38,7 @@ class ClassType(pytype.PyType):
         return {self.instance()}
 
     def instance(self):
+        """Getter for getting the instance this class produces without calling init."""
         if self.__inst is None:
             self.__inst = instance_type.InstanceType(self)
         return self.__inst
