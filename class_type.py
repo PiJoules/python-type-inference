@@ -13,6 +13,9 @@ class ClassType(pytype.PyType):
     @classmethod
     def from_node_and_env(cls, node, parent_env):
         """
+        This method is used for creating from a cusotm class defined in
+        python code.
+
         Interperet the contents of the class and add any assignments as
         attributes of the class.
         """
@@ -30,17 +33,8 @@ class ClassType(pytype.PyType):
             return None
         return self.__ref_node.name
 
-    def create_instance(self):
-        return instance_type.InstanceType.from_class_type(self)
-
-    def call_init(self, args):
-        """
-        Call the __init__ method of this class
-        """
-        raise NotImplementedError
-
     def create_and_init(self, args):
-        inst_type = self.create_instance()
+        inst_type = instance_type.InstanceType.from_class_type(self)
         inst_type.call_init(args)
         return {inst_type}
 

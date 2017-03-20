@@ -6,12 +6,16 @@ import bound_method
 class InstanceType(pytype.PyType):
     INIT_METHOD = "__init__"
 
+    def __init__(self, name, cls_type=None):
+        super().__init__(name)
+        self.__class = cls_type
+
     @classmethod
     def from_class_type(cls, cls_type):
         """
         Bind all methods to the instance as bound methods.
         """
-        inst = cls(cls_type.ref_node().name)
+        inst = cls(cls_type.ref_node().name, cls_type)
 
         for attr, types in cls_type.attrs().items():
             # Create bound methods

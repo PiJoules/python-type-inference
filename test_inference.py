@@ -7,11 +7,11 @@ from tuple_type import TupleType
 from dict_type import DictType
 
 
-def first(x):
-    return next(iter(x))
-
-
 class TestInference(unittest.TestCase):
+    def first(self, container):
+        self.assertEqual(len(container), 1)
+        return next(iter(container))
+
     def test_assign(self):
         """
         Test variable assignment
@@ -45,7 +45,7 @@ x = func(5)
         )
 
         # Function
-        func = first(env.lookup("func"))
+        func = self.first(env.lookup("func"))
         self.assertSetEqual(
             func.returns(),
             {IntType()}
@@ -78,7 +78,7 @@ x = fib(5)
         )
 
         # Function env
-        func = first(env.exclusive_lookup("fib"))
+        func = self.first(env.exclusive_lookup("fib"))
         self.assertSetEqual(
             func.env().exclusive_lookup("n"),
             {IntType()}
@@ -126,8 +126,8 @@ y = x.func()
         )
 
         # Class functions
-        cls = first(env.exclusive_lookup("A"))
-        init_func = first(cls.get_attr("__init__"))
+        cls = self.first(env.exclusive_lookup("A"))
+        init_func = self.first(cls.get_attr("__init__"))
         self.assertSetEqual(
             init_func.env().exclusive_lookup("a"),
             {IntType()}
@@ -139,7 +139,7 @@ y = x.func()
         self.assertRaises(KeyError, cls.get_attr, "_a")
 
         # Instance attributes
-        inst = first(env.exclusive_lookup("x"))
+        inst = self.first(env.exclusive_lookup("x"))
         self.assertSetEqual(
             inst.get_attr("_a"),
             {IntType()}
@@ -165,7 +165,7 @@ y = func("b")
             {StrType(), IntType()}
         )
 
-        func = first(env.exclusive_lookup("func"))
+        func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("a"),
             {StrType(), IntType()}
@@ -197,7 +197,7 @@ y = func2(1, "a")
         )
 
         # func
-        func = first(env.exclusive_lookup("func"))
+        func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("args"),
             tup
@@ -208,7 +208,7 @@ y = func2(1, "a")
         )
 
         # func2
-        func2 = first(env.exclusive_lookup("func2"))
+        func2 = self.first(env.exclusive_lookup("func2"))
         self.assertSetEqual(
             func2.env().exclusive_lookup("args"),
             tup
@@ -238,7 +238,7 @@ y = func(a=2, b=2)
             {IntType()}
         )
 
-        func = first(env.exclusive_lookup("func"))
+        func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("a"),
             {IntType()}
@@ -296,7 +296,7 @@ b = func2(a="str")
         )
 
         # func()
-        func = first(env.exclusive_lookup("func"))
+        func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("kwargs"),
             d_types
@@ -307,7 +307,7 @@ b = func2(a="str")
         )
 
         # func2()
-        func2 = first(env.exclusive_lookup("func2"))
+        func2 = self.first(env.exclusive_lookup("func2"))
         self.assertSetEqual(
             func2.env().exclusive_lookup("kwargs"),
             d_types
@@ -315,6 +315,57 @@ b = func2(a="str")
         self.assertSetEqual(
             func2.returns(),
             d_types
+        )
+
+    def test_multiple_instances(self):
+        """
+        Test that changes in different instances affect all instances.
+        """
+        code = """
+class A:
+    def __init__(self, a):
+        self._a = a
+    def func(self):
+        return self._a
+x = A(1)
+y = A("1")
+        """
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        # Instance variables
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {InstanceType("A")}
+        )
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {InstanceType("A")}
+        )
+
+        # Class functions
+        cls = self.first(env.exclusive_lookup("A"))
+        init_func = self.first(cls.get_attr("__init__"))
+        self.assertSetEqual(
+            init_func.env().exclusive_lookup("a"),
+            {INT_TYPE, STR_TYPE}
+        )
+        self.assertSetEqual(
+            init_func.env().exclusive_lookup("self"),
+            {InstanceType("A")}
+        )
+        self.assertRaises(KeyError, cls.get_attr, "_a")
+
+        # Instance attributes
+        x_inst = self.first(env.exclusive_lookup("x"))
+        self.assertSetEqual(
+            x_inst.get_attr("_a"),
+            {INT_TYPE, STR_TYPE}
+        )
+        y_inst = self.first(env.exclusive_lookup("y"))
+        self.assertSetEqual(
+            y_inst.get_attr("_a"),
+            {INT_TYPE, STR_TYPE}
         )
 
 
