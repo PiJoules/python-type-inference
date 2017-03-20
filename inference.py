@@ -108,7 +108,8 @@ class Environment:
         if isinstance(n, int):
             return {pytype.INT_TYPE}
         elif isinstance(n, float):
-            return {pytype.FLOAT_TYPE}
+            from float_type import FLOAT_CLASS
+            return {FLOAT_CLASS.instance()}
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 

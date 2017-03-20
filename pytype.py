@@ -74,11 +74,6 @@ class IntType(ValueType):
         super().__init__("int", *args, **kwargs)
 
 
-class FloatType(ValueType):
-    def __init__(self, *args, **kwargs):
-        super().__init__("float", *args, **kwargs)
-
-
 class BoolType(ValueType):
     def __init__(self):
         super().__init__("bool")
@@ -123,7 +118,6 @@ class StrType(ValueType):
 Builtin types
 """
 INT_TYPE = IntType()
-FLOAT_TYPE = FloatType()
 STR_TYPE = StrType()
 BOOL_TYPE = BoolType()
 NONE_TYPE = NoneType()
@@ -142,6 +136,7 @@ def load_builtin_vars():
     from instance_type import InstanceType
     from tuple_type import TUPLE_TYPE
     from dict_type import DICT_TYPE
+    from float_type import FLOAT_CLASS
 
 
     """
@@ -202,10 +197,6 @@ def load_builtin_vars():
 
     TODO: Add the other builtin classes for builtin types
     """
-    class FloatClass(BuiltinClass):
-        def call(self, args):
-            return {FLOAT_TYPE}
-    float_cls = FloatClass()
 
     class IntClass(BuiltinClass):
         def call(self, args):
@@ -244,7 +235,7 @@ def load_builtin_vars():
 
     return {
         "int": {int_cls},
-        "float": {float_cls},
+        "float": {FLOAT_CLASS},
         "bool": {bool_cls},
         "str": {str_cls},
         "tuple": {tuple_cls},

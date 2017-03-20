@@ -30,13 +30,17 @@ class ClassType(pytype.PyType):
         return cls(node.name, init_attrs=env.variables())
 
     def defined_name(self):
+        """The name for the type of instances this class produces."""
         return self.__defined_name
 
     def call(self, args):
+        self.instance().call_init(args)
+        return {self.instance()}
+
+    def instance(self):
         if self.__inst is None:
             self.__inst = instance_type.InstanceType(self)
-        self.__inst.call_init(args)
-        return {self.__inst}
+        return self.__inst
 
     def __hash__(self):
         # All classes are unique

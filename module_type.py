@@ -64,10 +64,10 @@ class MathModuleType(ModuleType):
 
 
 def load_builtin_modules():
-    from pytype import FLOAT_TYPE
+    from float_type import FLOAT_CLASS
 
     math_mod = MathModuleType()
-    math_mod.add_attr("pi", {FLOAT_TYPE})
+    math_mod.add_attr("pi", {FLOAT_CLASS.instance()})
 
     return {
         "math": math_mod,

@@ -4,6 +4,7 @@ from inference import ModuleEnv
 from tuple_type import TupleType
 from module_type import *
 from pytype import *
+from float_type import FLOAT_CLASS
 
 
 class TestSamples(unittest.TestCase):
@@ -53,32 +54,32 @@ class TestSamples(unittest.TestCase):
         d2r_env = self.first(env.exclusive_lookup("degrees_to_radians")).env()
         self.assertSetEqual(
             d2r_env.exclusive_lookup("degrees"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         r2d_env = self.first(env.exclusive_lookup("radians_to_degrees")).env()
         self.assertSetEqual(
             r2d_env.exclusive_lookup("radians"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         f2c_env = self.first(env.exclusive_lookup("fahrenheit_to_celsius")).env()
         self.assertSetEqual(
             f2c_env.exclusive_lookup("f"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         c2f_env = self.first(env.exclusive_lookup("celsius_to_fahrenheit")).env()
         self.assertSetEqual(
             c2f_env.exclusive_lookup("c"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         c2k_env = self.first(env.exclusive_lookup("celsius_to_kelvin")).env()
         self.assertSetEqual(
             c2k_env.exclusive_lookup("c"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         k2c_env = self.first(env.exclusive_lookup("kelvin_to_celsius")).env()
         self.assertSetEqual(
             k2c_env.exclusive_lookup("k"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
 
         # read_input()
@@ -96,7 +97,7 @@ class TestSamples(unittest.TestCase):
         pil_env = self.first(env.exclusive_lookup("parse_input_line")).env()
         self.assertSetEqual(
             pil_env.exclusive_lookup("value"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         self.assertSetEqual(
             pil_env.exclusive_lookup("units"),
@@ -107,7 +108,7 @@ class TestSamples(unittest.TestCase):
         convert_env = self.first(env.exclusive_lookup("convert")).env()
         self.assertSetEqual(
             convert_env.exclusive_lookup("value"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         self.assertSetEqual(
             convert_env.exclusive_lookup("units"),
@@ -118,7 +119,7 @@ class TestSamples(unittest.TestCase):
         pl_env = self.first(env.exclusive_lookup("process_line")).env()
         self.assertSetEqual(
             pl_env.exclusive_lookup("value"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("units"),
@@ -126,7 +127,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result"),
-            {FLOAT_TYPE}
+            {FLOAT_CLASS.instance()}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result_units"),
