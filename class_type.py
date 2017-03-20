@@ -6,10 +6,10 @@ import instance_type
 
 
 class ClassType(pytype.PyType):
-    def __init__(self, ref_node, *args, **kwargs):
+    def __init__(self, defined_name, *args, **kwargs):
         super().__init__("type", *args, **kwargs)
-        self.__ref_node = ref_node
         self.__inst = None
+        self.__defined_name = defined_name
 
     @classmethod
     def from_node_and_env(cls, node, parent_env):
@@ -27,21 +27,16 @@ class ClassType(pytype.PyType):
         env.parse_sequence(node.body)
 
         # Convert all saved variables to attributes
-        return cls(node, init_attrs=env.variables())
+        return cls(node.name, init_attrs=env.variables())
 
     def defined_name(self):
-        if self.__ref_node is None:
-            return None
-        return self.__ref_node.name
+        return self.__defined_name
 
     def call(self, args):
         if self.__inst is None:
-            self.__inst = instance_type.InstanceType.from_class_type(self)
+            self.__inst = instance_type.InstanceType(self)
         self.__inst.call_init(args)
         return {self.__inst}
-
-    def ref_node(self):
-        return self.__ref_node
 
     def __hash__(self):
         # All classes are unique
@@ -55,5 +50,5 @@ class BuiltinClass(ClassType):
     def __init__(self):
         super().__init__(None)
 
-    def create_and_init(self, args):
+    def call(self, args):
         raise NotImplementedError

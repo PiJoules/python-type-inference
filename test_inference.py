@@ -2,7 +2,7 @@ import unittest
 
 from inference import ModuleEnv
 from pytype import *
-from instance_type import InstanceType
+from instance_type import InstanceMock
 from tuple_type import TupleType
 from dict_type import DictType
 
@@ -118,7 +118,7 @@ y = x.func()
         # Stored vars
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {InstanceType("A")}
+            {InstanceMock("A")}
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
@@ -134,7 +134,7 @@ y = x.func()
         )
         self.assertSetEqual(
             init_func.env().exclusive_lookup("self"),
-            {InstanceType("A")}
+            {InstanceMock("A")}
         )
         self.assertRaises(KeyError, cls.get_attr, "_a")
 
@@ -338,11 +338,11 @@ x.b = 2
         # Instance variables
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {InstanceType("A")}
+            {InstanceMock("A")}
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {InstanceType("A")}
+            {InstanceMock("A")}
         )
 
         # Class functions
@@ -354,7 +354,7 @@ x.b = 2
         )
         self.assertSetEqual(
             init_func.env().exclusive_lookup("self"),
-            {InstanceType("A")}
+            {InstanceMock("A")}
         )
         self.assertRaises(KeyError, cls.get_attr, "_a")
 

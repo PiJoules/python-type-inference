@@ -3,32 +3,34 @@ import function_type
 import bound_method
 
 
-class InstanceType(pytype.PyType):
+class InstanceMixin(pytype.PyType):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    def __hash__(self):
+        return hash(self.name())
+
+    def __eq__(self, other):
+        return isinstance(other, InstanceMixin)
+
+
+class InstanceType(InstanceMixin):
     INIT_METHOD = "__init__"
 
-    def __init__(self, name, cls_type=None):
-        super().__init__(name)
+    def __init__(self, cls_type):
+        super().__init__(cls_type.defined_name())
         self.__class = cls_type
-
-    @classmethod
-    def from_class_type(cls, cls_type):
-        """
-        Bind all methods to the instance as bound methods.
-        """
-        inst = cls(cls_type.ref_node().name, cls_type)
 
         for attr, types in cls_type.attrs().items():
             # Create bound methods
             inst_attr_types = set()
             for t in types:
                 if isinstance(t, function_type.FunctionType):
-                    bound_meth = bound_method.BoundMethod.from_function_type(t, inst)
+                    bound_meth = bound_method.BoundMethod.from_function_type(t, self)
                     inst_attr_types.add(bound_meth)
                 else:
                     inst_attr_types.add(t)
-            inst.add_attr(attr, inst_attr_types)
-
-        return inst
+            self.add_attr(attr, inst_attr_types)
 
     def get_attr(self, attr):
         """
@@ -44,9 +46,9 @@ class InstanceType(pytype.PyType):
             for t in self.attrs()[self.INIT_METHOD]:
                 t.call(args)
 
-    def __hash__(self):
-        return hash(self.name())
 
-    def __eq__(self, other):
-        return isinstance(other, type(self))
+class InstanceMock(InstanceMixin):
+    """Class for checking that a pytype is some instance when debugging."""
+    def __init__(self, name):
+        super().__init__(name)
 

@@ -35,6 +35,9 @@ class PyType:
         else:
             raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
 
+    def call(self, args):
+        raise NotImplementedError("This pytype '{}' is not callable".format(self.name()))
+
     def __ne__(self, other):
         return not (self == other)
 
