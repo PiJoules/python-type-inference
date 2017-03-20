@@ -329,6 +329,8 @@ class A:
         return self._a
 x = A(1)
 y = A("1")
+z = x
+x.b = 2
         """
         env = ModuleEnv()
         env.parse_code(code)
@@ -362,10 +364,27 @@ y = A("1")
             x_inst.get_attr("_a"),
             {INT_TYPE, STR_TYPE}
         )
+        self.assertSetEqual(
+            x_inst.get_attr("b"),
+            {INT_TYPE}
+        )
         y_inst = self.first(env.exclusive_lookup("y"))
         self.assertSetEqual(
             y_inst.get_attr("_a"),
             {INT_TYPE, STR_TYPE}
+        )
+        self.assertSetEqual(
+            y_inst.get_attr("b"),
+            {INT_TYPE}
+        )
+        z_inst = self.first(env.exclusive_lookup("z"))
+        self.assertSetEqual(
+            z_inst.get_attr("_a"),
+            {INT_TYPE, STR_TYPE}
+        )
+        self.assertSetEqual(
+            z_inst.get_attr("b"),
+            {INT_TYPE}
         )
 
 

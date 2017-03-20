@@ -34,7 +34,7 @@ class ClassType(pytype.PyType):
             return None
         return self.__ref_node.name
 
-    def create_and_init(self, args):
+    def call(self, args):
         if self.__inst is None:
             self.__inst = instance_type.InstanceType.from_class_type(self)
         self.__inst.call_init(args)

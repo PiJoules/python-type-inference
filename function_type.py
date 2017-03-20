@@ -223,7 +223,7 @@ class FunctionType(pytype.PyType):
 
         return returns or {pytype.NONE_TYPE}
 
-    def call_and_update(self, args):
+    def call(self, args):
         """
         Call this function, update its environment based on the arguments,
         and return possible return types of this function.
@@ -305,6 +305,6 @@ class BuiltinFunction(FunctionType):
     def __init__(self, *args, **kwargs):
         super().__init__(None, None, *args, **kwargs)
 
-    def call_and_update(self, args):
+    def call(self, args):
         raise NotImplementedError
 

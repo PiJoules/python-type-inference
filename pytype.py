@@ -150,7 +150,7 @@ def load_builtin_vars():
                 keywords=["chars"],
                 keyword_defaults=[{STR_TYPE}],
             )
-        def call_and_update(self, args):
+        def call(self, args):
             return {STR_TYPE}
     STR_TYPE.add_attr("strip", {StripMethod()})
 
@@ -160,7 +160,7 @@ def load_builtin_vars():
                 vararg="args",
                 kwarg="kwargs",
             )
-        def call_and_update(self, args):
+        def call(self, args):
             return {STR_TYPE}
     STR_TYPE.add_attr("format", {FormatMethod()})
 
@@ -178,7 +178,7 @@ def load_builtin_vars():
                 ]
             )
 
-        def call_and_update(self, args):
+        def call(self, args):
             return {NONE_TYPE}
     print_func = PrintFunction()
 
@@ -189,7 +189,7 @@ def load_builtin_vars():
                 keywords=["prompt"],
                 keyword_defaults=[{STR_TYPE}],
             )
-        def call_and_update(self, args):
+        def call(self, args):
             return {STR_TYPE}
     input_func = InputFunction()
 
@@ -200,32 +200,32 @@ def load_builtin_vars():
     TODO: Add the other builtin classes for builtin types
     """
     class FloatClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {FLOAT_TYPE}
     float_cls = FloatClass()
 
     class IntClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {INT_TYPE}
     int_cls = IntClass()
 
     class BoolClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {BOOL_TYPE}
     bool_cls = BoolClass()
 
     class StrClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {STR_TYPE}
     str_cls = StrClass()
 
     class TupleClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {TUPLE_TYPE}
     tuple_cls = TupleClass()
 
     class DictClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {DICT_TYPE}
     dict_cls = DictClass()
 
@@ -234,7 +234,7 @@ def load_builtin_vars():
     Exception classes
     """
     class ValueErrorClass(BuiltinClass):
-        def create_and_init(self, args):
+        def call(self, args):
             return {VALUE_ERROR}
     value_err_cls = ValueErrorClass()
 
