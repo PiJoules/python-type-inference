@@ -9,6 +9,7 @@ class ClassType(pytype.PyType):
     def __init__(self, ref_node, *args, **kwargs):
         super().__init__("type", *args, **kwargs)
         self.__ref_node = ref_node
+        self.__inst = None
 
     @classmethod
     def from_node_and_env(cls, node, parent_env):
@@ -34,9 +35,10 @@ class ClassType(pytype.PyType):
         return self.__ref_node.name
 
     def create_and_init(self, args):
-        inst_type = instance_type.InstanceType.from_class_type(self)
-        inst_type.call_init(args)
-        return {inst_type}
+        if self.__inst is None:
+            self.__inst = instance_type.InstanceType.from_class_type(self)
+        self.__inst.call_init(args)
+        return {self.__inst}
 
     def ref_node(self):
         return self.__ref_node
