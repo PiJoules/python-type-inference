@@ -5,6 +5,7 @@ from tuple_type import TupleType
 from module_type import *
 from pytype import *
 from float_type import FLOAT_CLASS
+from int_type import INT_CLASS
 
 
 class TestSamples(unittest.TestCase):
@@ -26,18 +27,18 @@ class TestSamples(unittest.TestCase):
         main = self.first(env.exclusive_lookup("main"))
         self.assertSetEqual(
             main.returns(),
-            {IntType()}
+            {INT_CLASS.instance()}
         )
 
         # fib()
         fib = self.first(env.exclusive_lookup("fib"))
         self.assertSetEqual(
             fib.env().exclusive_lookup("n"),
-            {IntType()}
+            {INT_CLASS.instance()}
         )
         self.assertSetEqual(
             fib.returns(),
-            {IntType()}
+            {INT_CLASS.instance()}
         )
 
     def test_degrees(self):

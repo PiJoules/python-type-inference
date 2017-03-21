@@ -106,7 +106,8 @@ class Environment:
     def eval_num(self, node):
         n = node.n
         if isinstance(n, int):
-            return {pytype.INT_TYPE}
+            from int_type import INT_CLASS
+            return {INT_CLASS.instance()}
         elif isinstance(n, float):
             from float_type import FLOAT_CLASS
             return {FLOAT_CLASS.instance()}
@@ -214,7 +215,8 @@ class Environment:
         elif isinstance(operation, ast.Not):
             return {pytype.BOOL_TYPE}
         elif isinstance(operation, ast.Invert):
-            return {pytype.INT_TYPE}
+            from int_type import INT_CLASS
+            return {INT_CLASS.instance()}
         else:
             raise RuntimeError("Unknown unary operation {}".format(operation))
 

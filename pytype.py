@@ -117,7 +117,6 @@ class StrType(ValueType):
 """
 Builtin types
 """
-INT_TYPE = IntType()
 STR_TYPE = StrType()
 BOOL_TYPE = BoolType()
 NONE_TYPE = NoneType()
@@ -137,6 +136,7 @@ def load_builtin_vars():
     from tuple_type import TUPLE_TYPE
     from dict_type import DICT_TYPE
     from float_type import FLOAT_CLASS
+    from int_type import INT_CLASS
 
 
     """
@@ -200,7 +200,7 @@ def load_builtin_vars():
 
     class IntClass(BuiltinClass):
         def call(self, args):
-            return {INT_TYPE}
+            return {INT_CLASS.instance()}
     int_cls = IntClass()
 
     class BoolClass(BuiltinClass):
