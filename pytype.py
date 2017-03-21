@@ -69,21 +69,6 @@ class ValueType(PyType):
         return isinstance(other, type(self))
 
 
-class IntType(ValueType):
-    def __init__(self, *args, **kwargs):
-        super().__init__("int", *args, **kwargs)
-
-
-class BoolType(ValueType):
-    def __init__(self):
-        super().__init__("bool")
-
-
-class NoneType(ValueType):
-    def __init__(self):
-        super().__init__("None")
-
-
 class FileType(ValueType):
     def __init__(self):
         super().__init__("File")
@@ -118,8 +103,6 @@ class StrType(ValueType):
 Builtin types
 """
 STR_TYPE = StrType()
-BOOL_TYPE = BoolType()
-NONE_TYPE = NoneType()
 FILE_TYPE = FileType()
 
 
@@ -137,6 +120,8 @@ def load_builtin_vars():
     from dict_type import DICT_TYPE
     from float_type import FLOAT_CLASS
     from int_type import INT_CLASS
+    from bool_type import BOOL_CLASS
+    from none_type import NONE_CLASS
 
 
     """
@@ -172,12 +157,12 @@ def load_builtin_vars():
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
-                    {STR_TYPE}, {STR_TYPE}, {FILE_TYPE}, {BOOL_TYPE},
+                    {STR_TYPE}, {STR_TYPE}, {FILE_TYPE}, {BOOL_CLASS.instance()},
                 ]
             )
 
         def call(self, args):
-            return {NONE_TYPE}
+            return {NONE_CLASS.instance()}
     print_func = PrintFunction()
 
 
@@ -197,16 +182,6 @@ def load_builtin_vars():
 
     TODO: Add the other builtin classes for builtin types
     """
-
-    class IntClass(BuiltinClass):
-        def call(self, args):
-            return {INT_CLASS.instance()}
-    int_cls = IntClass()
-
-    class BoolClass(BuiltinClass):
-        def call(self, args):
-            return {BOOL_TYPE}
-    bool_cls = BoolClass()
 
     class StrClass(BuiltinClass):
         def call(self, args):
@@ -234,9 +209,9 @@ def load_builtin_vars():
 
 
     return {
-        "int": {int_cls},
+        "int": {INT_CLASS},
         "float": {FLOAT_CLASS},
-        "bool": {bool_cls},
+        "bool": {BOOL_CLASS},
         "str": {str_cls},
         "tuple": {tuple_cls},
         "dict": {dict_cls},

@@ -150,7 +150,8 @@ class Environment:
 
     def eval_compare(self, node):
         """Always returns bools"""
-        return {pytype.BOOL_TYPE}
+        from bool_type import BOOL_CLASS
+        return {BOOL_CLASS.instance()}
 
     def eval_attr(self, node):
         value = node.value
@@ -213,7 +214,8 @@ class Environment:
         if isinstance(operation, (ast.UAdd, ast.USub)):
             return self.eval(node.operand)
         elif isinstance(operation, ast.Not):
-            return {pytype.BOOL_TYPE}
+            from bool_type import BOOL_CLASS
+            return {BOOL_CLASS.instance()}
         elif isinstance(operation, ast.Invert):
             from int_type import INT_CLASS
             return {INT_CLASS.instance()}

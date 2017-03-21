@@ -221,7 +221,8 @@ class FunctionType(pytype.PyType):
                 # Parse everything else
                 self.__env.parse(node)
 
-        return returns or {pytype.NONE_TYPE}
+        from none_type import NONE_CLASS
+        return returns or {NONE_CLASS.instance()}
 
     def call(self, args):
         """
