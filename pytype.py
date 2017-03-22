@@ -36,7 +36,27 @@ class PyType:
             raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
 
     def call(self, args):
-        raise NotImplementedError("This pytype '{}' is not callable".format(self.name()))
+        """
+        Returns:
+            set[PyType]
+        """
+        return set()
+
+    """
+    Methods for calling specific functions owned by this type.
+    """
+    def call_attr(self, attr, args):
+        types = set()
+        if self.INIT_METHOD in self.attrs():
+            for t in self.attrs()[attr]:
+                types |= t.call(args)
+        return types
+
+    def call_init(self, args=None):
+        return self.call_attr(self.INIT_METHOD, args)
+
+    def call_getitem(self, args=None):
+        return self.call_attr(self.GETITEM_METHOD, args)
 
     def __ne__(self, other):
         return not (self == other)
@@ -92,8 +112,8 @@ class StrType(ValueType):
     def __init__(self):
         super().__init__("str")
 
-    def slice(self):
-        return self
+    def call_getitem(self, args=None):
+        return {self}
 
     def get_idx(self):
         return {self}

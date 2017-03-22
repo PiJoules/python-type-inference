@@ -16,10 +16,12 @@ class TupleType(pytype.PyType):
             assert isinstance(types, set)
             assert all(isinstance(x, pytype.PyType) for x in types)
 
-    def slice(self):
-        return TuplePointer(
-            init_contents=self.contents(),
-        )
+    def call_getitem(self, args=None):
+        return {
+            TuplePointer(
+                init_contents=self.contents(),
+            )
+        }
 
     def contents(self):
         return self.__contents

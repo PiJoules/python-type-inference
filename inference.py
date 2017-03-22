@@ -181,7 +181,10 @@ class Environment:
         Slices will return a new pointer to the original container.
         """
         values = self.eval(node.value)
-        return {v.slice() for v in values}
+        result = set()
+        for v in values:
+            result |= v.call_getitem()
+        return result
 
     def eval_subscript(self, node):
         slice = node.slice

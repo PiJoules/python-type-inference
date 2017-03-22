@@ -41,11 +41,6 @@ class InstanceType(InstanceMixin):
         else:
             return super().get_attr(attr)
 
-    def call_init(self, args):
-        if self.INIT_METHOD in self.attrs():
-            for t in self.attrs()[self.INIT_METHOD]:
-                t.call(args)
-
 
 class InstanceMock(InstanceMixin):
     """Class for checking that a pytype is some instance when debugging."""
