@@ -15,8 +15,6 @@ class InstanceMixin(pytype.PyType):
 
 
 class InstanceType(InstanceMixin):
-    INIT_METHOD = "__init__"
-
     def __init__(self, cls_type):
         super().__init__(cls_type.defined_name())
         self.__class = cls_type

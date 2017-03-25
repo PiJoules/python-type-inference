@@ -173,7 +173,7 @@ class Environment:
 
         ret_types = set()
         for value in values:
-            ret_types |= value.get_idx()
+            ret_types |= value.call_getitem()
         return ret_types
 
     def eval_subscript_slice(self, node):

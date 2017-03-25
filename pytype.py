@@ -3,6 +3,9 @@ import inference
 
 
 class PyType:
+    INIT_METHOD = "__init__"
+    GETITEM_METHOD = "__getitem__"
+
     def __init__(self, name, init_attrs=None, parents=None):
         """
         Args:
@@ -113,9 +116,6 @@ class StrType(ValueType):
         super().__init__("str")
 
     def call_getitem(self, args=None):
-        return {self}
-
-    def get_idx(self):
         return {self}
 
 

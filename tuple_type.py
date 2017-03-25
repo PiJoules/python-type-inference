@@ -16,7 +16,7 @@ class TupleType(pytype.PyType):
             assert isinstance(types, set)
             assert all(isinstance(x, pytype.PyType) for x in types)
 
-    def call_getitem(self, args=None):
+    def call(self, args=None):
         return {
             TuplePointer(
                 init_contents=self.contents(),
@@ -43,7 +43,7 @@ class TupleType(pytype.PyType):
         """
         return TuplePointer(self, **kwargs)
 
-    def get_idx(self):
+    def call_getitem(self, args=None):
         types = set()
         for content_types in self.contents():
             types |= content_types
