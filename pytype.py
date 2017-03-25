@@ -93,11 +93,6 @@ class ValueType(PyType):
     def __eq__(self, other):
         return isinstance(other, type(self))
 
-
-class FileType(ValueType):
-    def __init__(self):
-        super().__init__("File")
-
 """
 Exceptions
 """
@@ -111,11 +106,6 @@ class ValueErrorType(ExceptionType):
     def __init__(self):
         super().__init__("ValueError")
 
-
-"""
-Builtin types
-"""
-FILE_TYPE = FileType()
 
 
 """
@@ -135,6 +125,7 @@ def load_builtin_vars():
     from bool_type import BOOL_CLASS
     from none_type import NONE_CLASS
     from str_type import STR_CLASS
+    from file_type import FILE_CLASS
 
 
     """
@@ -146,7 +137,10 @@ def load_builtin_vars():
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
-                    {STR_CLASS.instance()}, {STR_CLASS.instance()}, {FILE_TYPE}, {BOOL_CLASS.instance()},
+                    {STR_CLASS.instance()},
+                    {STR_CLASS.instance()},
+                    {FILE_CLASS.instance()},
+                    {BOOL_CLASS.instance()},
                 ]
             )
 
