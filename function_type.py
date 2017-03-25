@@ -136,6 +136,8 @@ class FunctionType(pytype.PyType):
         All keyowrds provided in the arguments but not in the keyword/kwonly
         args go here.
         """
+        from str_type import STR_CLASS
+
         value_types = set()
         expected_keywords = set(self.__keywords + self.__kwonlyargs)
         for arg, types in args.keyword_args().items():
@@ -144,7 +146,7 @@ class FunctionType(pytype.PyType):
 
         # Create new dict container
         d = dict_type.DICT_TYPE.new_container(
-            key_types={pytype.STR_TYPE},
+            key_types={STR_CLASS.instance()},
             value_types=value_types,
         )
         self.__env.bind(self.__kwarg, {d})
@@ -306,6 +308,6 @@ class BuiltinFunction(FunctionType):
     def __init__(self, *args, **kwargs):
         super().__init__(None, None, *args, **kwargs)
 
-    def call(self, args):
+    def call(self, args=None):
         raise NotImplementedError
 

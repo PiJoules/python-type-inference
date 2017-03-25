@@ -36,7 +36,7 @@ class PyType:
         if attr in self.__attrs:
             return self.__attrs[attr]
         else:
-            raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
+            raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.defined_name()))
 
     def call(self, args):
         """
@@ -50,13 +50,15 @@ class PyType:
     """
     def call_attr(self, attr, args):
         types = set()
-        if self.INIT_METHOD in self.attrs():
-            for t in self.attrs()[attr]:
-                types |= t.call(args)
+        for t in self.get_attr(attr):
+            types |= t.call(args)
         return types
 
     def call_init(self, args=None):
-        return self.call_attr(self.INIT_METHOD, args)
+        if self.INIT_METHOD in self.attrs():
+            return self.call_attr(self.INIT_METHOD, args)
+        else:
+            return set()
 
     def call_getitem(self, args=None):
         return self.call_attr(self.GETITEM_METHOD, args)
@@ -110,19 +112,9 @@ class ValueErrorType(ExceptionType):
         super().__init__("ValueError")
 
 
-
-class StrType(ValueType):
-    def __init__(self):
-        super().__init__("str")
-
-    def call_getitem(self, args=None):
-        return {self}
-
-
 """
 Builtin types
 """
-STR_TYPE = StrType()
 FILE_TYPE = FileType()
 
 
@@ -142,30 +134,7 @@ def load_builtin_vars():
     from int_type import INT_CLASS
     from bool_type import BOOL_CLASS
     from none_type import NONE_CLASS
-
-
-    """
-    Add methods to types
-    """
-    class StripMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                keywords=["chars"],
-                keyword_defaults=[{STR_TYPE}],
-            )
-        def call(self, args):
-            return {STR_TYPE}
-    STR_TYPE.add_attr("strip", {StripMethod()})
-
-    class FormatMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                vararg="args",
-                kwarg="kwargs",
-            )
-        def call(self, args):
-            return {STR_TYPE}
-    STR_TYPE.add_attr("format", {FormatMethod()})
+    from str_type import STR_CLASS
 
 
     """
@@ -177,7 +146,7 @@ def load_builtin_vars():
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
-                    {STR_TYPE}, {STR_TYPE}, {FILE_TYPE}, {BOOL_CLASS.instance()},
+                    {STR_CLASS.instance()}, {STR_CLASS.instance()}, {FILE_TYPE}, {BOOL_CLASS.instance()},
                 ]
             )
 
@@ -190,10 +159,10 @@ def load_builtin_vars():
         def __init__(self):
             super().__init__(
                 keywords=["prompt"],
-                keyword_defaults=[{STR_TYPE}],
+                keyword_defaults=[{STR_CLASS.instance()}],
             )
         def call(self, args):
-            return {STR_TYPE}
+            return {STR_CLASS.instance()}
     input_func = InputFunction()
 
 
@@ -202,11 +171,6 @@ def load_builtin_vars():
 
     TODO: Add the other builtin classes for builtin types
     """
-
-    class StrClass(BuiltinClass):
-        def call(self, args):
-            return {STR_TYPE}
-    str_cls = StrClass()
 
     class TupleClass(BuiltinClass):
         def call(self, args):
@@ -232,7 +196,7 @@ def load_builtin_vars():
         "int": {INT_CLASS},
         "float": {FLOAT_CLASS},
         "bool": {BOOL_CLASS},
-        "str": {str_cls},
+        "str": {STR_CLASS},
         "tuple": {tuple_cls},
         "dict": {dict_cls},
         "print": {print_func},

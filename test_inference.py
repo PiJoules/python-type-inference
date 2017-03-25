@@ -6,6 +6,7 @@ from instance_type import InstanceMock
 from tuple_type import TupleType
 from dict_type import DictType
 from int_type import INT_CLASS
+from str_type import STR_CLASS
 
 
 class TestInference(unittest.TestCase):
@@ -163,13 +164,13 @@ y = func("b")
         )
         self.assertSetEqual(
             env.lookup("y"),
-            {StrType(), INT_CLASS.instance()}
+            {STR_CLASS.instance(), INT_CLASS.instance()}
         )
 
         func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("a"),
-            {StrType(), INT_CLASS.instance()}
+            {STR_CLASS.instance(), INT_CLASS.instance()}
         )
 
     def test_vararg(self):
@@ -185,12 +186,12 @@ y = func2(1, "a")
         env = ModuleEnv()
         env.parse_code(code)
 
-        tup = {TupleType(init_contents=({INT_CLASS.instance()}, {StrType()}))}
+        tup = {TupleType(init_contents=({INT_CLASS.instance()}, {STR_CLASS.instance()}))}
 
         # Stored vars
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance(), StrType()}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
@@ -205,7 +206,7 @@ y = func2(1, "a")
         )
         self.assertSetEqual(
             func.returns(),
-            {INT_CLASS.instance(), StrType()}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
 
         # func2
@@ -266,12 +267,12 @@ b = func2(a="str")
 
         d_types ={
             DictType(
-                key_types={StrType()},
+                key_types={STR_CLASS.instance()},
                 value_types={INT_CLASS.instance()}
             ),
             DictType(
-                key_types={StrType()},
-                value_types={StrType()}
+                key_types={STR_CLASS.instance()},
+                value_types={STR_CLASS.instance()}
             )
         }
 
@@ -282,12 +283,12 @@ b = func2(a="str")
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {INT_CLASS.instance(), StrType()}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
         self.assertSetEqual(
             env.exclusive_lookup("a"),
             {DictType(
-                key_types={StrType()},
+                key_types={STR_CLASS.instance()},
                 value_types={INT_CLASS.instance()}
             )}
         )
@@ -304,7 +305,7 @@ b = func2(a="str")
         )
         self.assertSetEqual(
             func.returns(),
-            {INT_CLASS.instance(), StrType()}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
 
         # func2()
@@ -351,7 +352,7 @@ x.b = 2
         init_func = self.first(cls.get_attr("__init__"))
         self.assertSetEqual(
             init_func.env().exclusive_lookup("a"),
-            {INT_CLASS.instance(), STR_TYPE}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
         self.assertSetEqual(
             init_func.env().exclusive_lookup("self"),
@@ -363,7 +364,7 @@ x.b = 2
         x_inst = self.first(env.exclusive_lookup("x"))
         self.assertSetEqual(
             x_inst.get_attr("_a"),
-            {INT_CLASS.instance(), STR_TYPE}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
         self.assertSetEqual(
             x_inst.get_attr("b"),
@@ -372,7 +373,7 @@ x.b = 2
         y_inst = self.first(env.exclusive_lookup("y"))
         self.assertSetEqual(
             y_inst.get_attr("_a"),
-            {INT_CLASS.instance(), STR_TYPE}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
         self.assertSetEqual(
             y_inst.get_attr("b"),
@@ -381,7 +382,7 @@ x.b = 2
         z_inst = self.first(env.exclusive_lookup("z"))
         self.assertSetEqual(
             z_inst.get_attr("_a"),
-            {INT_CLASS.instance(), STR_TYPE}
+            {INT_CLASS.instance(), STR_CLASS.instance()}
         )
         self.assertSetEqual(
             z_inst.get_attr("b"),

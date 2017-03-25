@@ -6,6 +6,7 @@ from module_type import *
 from pytype import *
 from float_type import FLOAT_CLASS
 from int_type import INT_CLASS
+from str_type import STR_CLASS
 
 
 class TestSamples(unittest.TestCase):
@@ -87,11 +88,11 @@ class TestSamples(unittest.TestCase):
         read_input_env = self.first(env.exclusive_lookup("read_input")).env()
         self.assertSetEqual(
             read_input_env.exclusive_lookup("input_line"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
         self.assertSetEqual(
             read_input_env.exclusive_lookup("output_line"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
 
         # parse_input_line()
@@ -102,7 +103,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pil_env.exclusive_lookup("units"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
 
         # convert()
@@ -113,7 +114,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             convert_env.exclusive_lookup("units"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
 
         # process_line()
@@ -124,7 +125,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("units"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result"),
@@ -132,18 +133,18 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result_units"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
 
         # Variables under the if __name__ == "__main__"
-        tup = TupleType(init_contents=tuple([{STR_TYPE}, {STR_TYPE}]))
+        tup = TupleType(init_contents=tuple([{STR_CLASS.instance()}, {STR_CLASS.instance()}]))
         self.assertSetEqual(
             env.exclusive_lookup("input_lines"),
             {tup}
         )
         self.assertSetEqual(
             env.exclusive_lookup("line"),
-            {STR_TYPE}
+            {STR_CLASS.instance()}
         )
         self.assertSetEqual(
             env.exclusive_lookup("e"),

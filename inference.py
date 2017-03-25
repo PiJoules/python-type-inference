@@ -165,7 +165,8 @@ class Environment:
         return types
 
     def eval_str(self, node):
-        return {pytype.STR_TYPE}
+        from str_type import STR_CLASS
+        return {STR_CLASS.instance()}
 
     def eval_subscript_index(self, node):
         idx_values = self.eval(node.slice.value)
