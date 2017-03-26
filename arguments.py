@@ -1,6 +1,5 @@
 import sys
 import ast
-import pytype
 
 
 class Arguments:

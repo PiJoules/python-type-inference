@@ -1,7 +1,7 @@
 import ast
+import pytype
 
 import inference
-import pytype
 import tuple_type
 import dict_type
 

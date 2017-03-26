@@ -1,6 +1,4 @@
-import pytype
 import function_type
-import instance_type
 
 
 class BoundMethod(function_type.FunctionType):

@@ -1,7 +1,3 @@
-import ast
-import inference
-
-
 class PyType:
     INIT_METHOD = "__init__"
     GETITEM_METHOD = "__getitem__"
@@ -43,7 +39,7 @@ class PyType:
         Returns:
             set[PyType]
         """
-        return set()
+        raise RuntimeError("pytype '{}' is not callable".format(self.name()))
 
     """
     Methods for calling specific functions owned by this type.
@@ -198,4 +194,3 @@ def load_builtin_vars():
 
         "ValueError": {value_err_cls},
     }
-

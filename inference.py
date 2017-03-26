@@ -98,7 +98,6 @@ class Environment:
         else:
             raise NotImplementedError("Unable to assign to target node '{}'".format(target))
 
-
     """
     Type evaluation
     """
@@ -437,5 +436,3 @@ class ModuleEnv(Environment):
         # Also add this location to the pythonpath
         if module_location is not None:
             sys.path.insert(1, os.path.dirname(module_location))
-
-

@@ -83,4 +83,19 @@ class TuplePointer(TupleType):
         return self.__original.add_attr(attr, types)
 
 
+def create_class():
+    from class_type import ClassType
+
+    class TupleClass(ClassType):
+        def __init__(self):
+            super().__init__("tuple")
+
+        def call(self, args=None):
+            return {TUPLE_TYPE}
+
+    cls = TupleClass()
+
+    return cls
+
+
 TUPLE_TYPE = TupleType()

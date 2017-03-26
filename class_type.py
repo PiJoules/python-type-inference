@@ -1,5 +1,3 @@
-import ast
-
 import inference
 import pytype
 import instance_type
