@@ -1,6 +1,4 @@
 import pytype
-import function_type
-import bound_method
 
 
 class InstanceMixin(pytype.PyType):
@@ -16,6 +14,9 @@ class InstanceMixin(pytype.PyType):
 
 class InstanceType(InstanceMixin):
     def __init__(self, cls_type):
+        from bound_method import BoundMethod
+        from function_type import FunctionType
+
         super().__init__(cls_type.defined_name())
         self.__class = cls_type
 
@@ -23,8 +24,8 @@ class InstanceType(InstanceMixin):
             # Create bound methods
             inst_attr_types = set()
             for t in types:
-                if isinstance(t, function_type.FunctionType):
-                    bound_meth = bound_method.BoundMethod.from_function_type(t, self)
+                if isinstance(t, FunctionType):
+                    bound_meth = BoundMethod.from_function_type(t, self)
                     inst_attr_types.add(bound_meth)
                 else:
                     inst_attr_types.add(t)

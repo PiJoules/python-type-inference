@@ -1,10 +1,6 @@
 import ast
 import pytype
 
-import inference
-import tuple_type
-import dict_type
-
 
 class FunctionType(pytype.PyType):
     """
@@ -120,11 +116,22 @@ class FunctionType(pytype.PyType):
             counted_pos_args (int): Number of arguments unpacked into positional
                 and keyword arguments.
         """
+        from tuple_type import TUPLE_TYPE
+
         pos_args = args.pos_args()
-        tup = tuple_type.TUPLE_TYPE.new_container(
+        tup = TUPLE_TYPE.new_container(
             init_contents=tuple(pos_args[counted_pos_args:])
         )
         self.__env.bind(self.__vararg, {tup})
+
+        """
+        Suggested code where args is an altered Arguments object adjusted
+        based on previous actions done in prior argument unpacking
+
+        from tuple_type import TUPLE_CLASS
+        tup = TUPLE_CLASS.call(args)
+        self.__env.bind(self.__vararg, {tup})
+        """
 
     def _update_kwonly_args(self, args):
         kw_args = args.keyword_args()
@@ -137,6 +144,7 @@ class FunctionType(pytype.PyType):
         args go here.
         """
         from str_type import STR_CLASS
+        from dict_type import DICT_TYPE
 
         value_types = set()
         expected_keywords = set(self.__keywords + self.__kwonlyargs)
@@ -145,7 +153,7 @@ class FunctionType(pytype.PyType):
                 value_types |= types
 
         # Create new dict container
-        d = dict_type.DICT_TYPE.new_container(
+        d = DICT_TYPE.new_container(
             key_types={STR_CLASS.instance()},
             value_types=value_types,
         )
@@ -246,7 +254,9 @@ class FunctionType(pytype.PyType):
             node (ast.FunctionDef)
             parent_env (inference.Environment)
         """
-        env = inference.Environment(parent_env=parent_env)
+        from inference import Environment
+
+        env = Environment(parent_env=parent_env)
 
         # Add the arguments as variables
         env.parse_arguments(node.args)

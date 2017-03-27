@@ -6,10 +6,6 @@ import os
 import astor
 import pytype
 import arguments
-import function_type
-import class_type
-import module_type
-import tuple_type
 
 
 class Environment:
@@ -198,8 +194,9 @@ class Environment:
             raise RuntimeError("Unknown slice type '{}'".format(slice))
 
     def eval_tuple(self, node):
+        from tuple_type import TUPLE_TYPE
         return {
-            tuple_type.TUPLE_TYPE.new_container(
+            TUPLE_TYPE.new_container(
                 init_contents=tuple(self.eval(n) for n in node.elts)
             )
         }
@@ -305,11 +302,13 @@ class Environment:
         """
         Add a function type to the variables.
         """
-        func_type = function_type.FunctionType.from_node_and_env(node, self)
+        from function_type import FunctionType
+        func_type = FunctionType.from_node_and_env(node, self)
         self.bind(node.name, {func_type})
 
     def parse_class_def(self, node):
-        cls_type = class_type.ClassType.from_node_and_env(node, self)
+        from class_type import ClassType
+        cls_type = ClassType.from_node_and_env(node, self)
         self.bind(node.name, {cls_type})
 
     def parse_if(self, node):
@@ -328,9 +327,10 @@ class Environment:
         Parse the imported module and make all variable assignments attributes
         of a new module type.
         """
+        from module_type import load_module
         name = node.name
         asname = node.asname or name
-        mod_t = module_type.load_module(name)
+        mod_t = load_module(name)
         self.bind(asname, {mod_t})
 
     def parse_import(self, node):

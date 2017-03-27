@@ -114,7 +114,7 @@ def load_builtin_vars():
     from function_type import BuiltinFunction
     from class_type import BuiltinClass
     from instance_type import InstanceType
-    from tuple_type import TUPLE_TYPE
+    from tuple_type import TUPLE_CLASS
     from dict_type import DICT_TYPE
     from float_type import FLOAT_CLASS
     from int_type import INT_CLASS
@@ -162,11 +162,6 @@ def load_builtin_vars():
     TODO: Add the other builtin classes for builtin types
     """
 
-    class TupleClass(BuiltinClass):
-        def call(self, args):
-            return {TUPLE_TYPE}
-    tuple_cls = TupleClass()
-
     class DictClass(BuiltinClass):
         def call(self, args):
             return {DICT_TYPE}
@@ -187,7 +182,7 @@ def load_builtin_vars():
         "float": {FLOAT_CLASS},
         "bool": {BOOL_CLASS},
         "str": {STR_CLASS},
-        "tuple": {tuple_cls},
+        "tuple": {TUPLE_CLASS},
         "dict": {dict_cls},
         "print": {print_func},
         "input": {input_func},

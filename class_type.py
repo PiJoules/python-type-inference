@@ -1,6 +1,4 @@
-import inference
 import pytype
-import instance_type
 
 
 class ClassType(pytype.PyType):
@@ -18,8 +16,10 @@ class ClassType(pytype.PyType):
         Interperet the contents of the class and add any assignments as
         attributes of the class.
         """
+        from inference import Environment
+
         # Create an env to find assigned variables
-        env = inference.Environment(parent_env=parent_env)
+        env = Environment(parent_env=parent_env)
 
         # Parse the class body
         env.parse_sequence(node.body)
@@ -38,7 +38,8 @@ class ClassType(pytype.PyType):
     def instance(self):
         """Getter for getting the instance this class produces without calling init."""
         if self.__inst is None:
-            self.__inst = instance_type.InstanceType(self)
+            from instance_type import InstanceType
+            self.__inst = InstanceType(self)
         return self.__inst
 
     def __hash__(self):
