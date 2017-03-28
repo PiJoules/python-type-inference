@@ -33,13 +33,13 @@ class Arguments:
             kwarg (Optional[pytype.PyType])
         """
         from tuple_type import TUPLE_CLASS
-        from dict_type import DICT_TYPE
+        from dict_type import DICT_CLASS
         from str_type import STR_CLASS
 
         self.__pos_args = pos_args
         self.__vararg = vararg or TUPLE_CLASS.instance()
         self.__keyword_args = keyword_args
-        self.__kwarg = kwarg or DICT_TYPE.new_container()
+        self.__kwarg = kwarg or DICT_CLASS.instance()
 
         # Type checks
         assert isinstance(self.__pos_args, list)
@@ -49,7 +49,7 @@ class Arguments:
         assert all(isinstance(x, set) for x in self.__pos_args)
 
         assert isinstance(self.__vararg, type(TUPLE_CLASS.instance()))
-        assert isinstance(self.__kwarg, type(DICT_TYPE))
+        assert isinstance(self.__kwarg, type(DICT_CLASS.instance()))
         for types in self.__kwarg.key_types():
             assert isinstance(types, set)
             assert all(x == STR_CLASS.instance() for x in types)
@@ -168,13 +168,13 @@ class Arguments:
 
     def unpack_kwargs(self, func):
         from str_type import STR_CLASS
-        from dict_type import DICT_TYPE
+        from dict_type import DICT_CLASS
 
         value_types = set()
         for types in self.keyword_args().values():
             value_types |= types
 
-        d = DICT_TYPE.new_container(
+        d = DICT_CLASS.instance().new_container(
             key_types={STR_CLASS.instance()},
             value_types=value_types | self.kwarg().value_types()
         )

@@ -1,4 +1,5 @@
 import pytype
+import class_type
 
 
 class DictType(pytype.PyType):
@@ -23,6 +24,16 @@ class DictType(pytype.PyType):
 
     def value_types(self):
         return self.__value_types
+
+    def add_keys(self, keys):
+        self.__key_types |= keys
+
+    def add_values(self, values):
+        self.__value_types |= values
+
+    def merge_dict(self, dict_type):
+        self.add_keys(dict_type.key_types())
+        self.add_values(dict_type.value_types())
 
     def new_container(self, **kwargs):
         return DictPointer(self, **kwargs)
@@ -53,4 +64,56 @@ class DictPointer(DictType):
         return self.__original.add_attr(attr, types)
 
 
-DICT_TYPE = DictType()
+class DictClass(class_type.ClassType):
+    def __init__(self):
+        super().__init__("dict")
+        self.__dict = DictType()
+
+    def instance(self):
+        return self.__dict
+
+    def call(self, args=None):
+        """
+        Arguments can be nothing, **kwargs, a dict and **kwargs, or an iterable and
+        **kwargs where the iterable is a list of pairs (like the output of zip).
+        """
+        from tuple_type import TUPLE_CLASS
+
+        if not args:
+            return {self.instance().new_container()}
+        else:
+            kwargs_dict = self.instance().new_container(
+                key_types=args.kwarg().key_types(),
+                value_types=args.kwarg().value_types()
+            )
+
+            pos_args = args.pos_args()
+            if len(pos_args) != 1:
+                raise RuntimeError("dict expects 1 positional argument")
+
+            types = pos_args[0]
+            ret_types = set()
+            for t in types:
+                if isinstance(t, type(self.instance())):
+                    # Dict type
+                    new_d = self.instance().new_container(
+                        key_types=t.key_types(),
+                        value_types=t.value_types()
+                    )
+                    new_d.merge_dict(kwargs_dict)
+                    ret_types.add(new_d)
+                elif isinstance(t, type(TUPLE_CLASS.instance())):
+                    # Iterable type
+                    raise NotImplementedError("TODO: Implement logic for creating dict from an iterable type")
+                else:
+                    raise RuntimeError("Expected either mapping or iterable for dict argument")
+            return ret_types
+
+
+def create_class():
+    cls = DictClass()
+
+    return cls
+
+
+DICT_CLASS = create_class()

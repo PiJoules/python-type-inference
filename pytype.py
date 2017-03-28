@@ -115,7 +115,7 @@ def load_builtin_vars():
     from class_type import BuiltinClass
     from instance_type import InstanceType
     from tuple_type import TUPLE_CLASS
-    from dict_type import DICT_TYPE
+    from dict_type import DICT_CLASS
     from float_type import FLOAT_CLASS
     from int_type import INT_CLASS
     from bool_type import BOOL_CLASS
@@ -157,18 +157,6 @@ def load_builtin_vars():
 
 
     """
-    Builtin classes
-
-    TODO: Add the other builtin classes for builtin types
-    """
-
-    class DictClass(BuiltinClass):
-        def call(self, args):
-            return {DICT_TYPE}
-    dict_cls = DictClass()
-
-
-    """
     Exception classes
     """
     class ValueErrorClass(BuiltinClass):
@@ -183,7 +171,7 @@ def load_builtin_vars():
         "bool": {BOOL_CLASS},
         "str": {STR_CLASS},
         "tuple": {TUPLE_CLASS},
-        "dict": {dict_cls},
+        "dict": {DICT_CLASS},
         "print": {print_func},
         "input": {input_func},
 
