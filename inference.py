@@ -194,9 +194,9 @@ class Environment:
             raise RuntimeError("Unknown slice type '{}'".format(slice))
 
     def eval_tuple(self, node):
-        from tuple_type import TUPLE_TYPE
+        from tuple_type import TUPLE_CLASS
         return {
-            TUPLE_TYPE.new_container(
+            TUPLE_CLASS.instance().new_container(
                 init_contents=tuple(self.eval(n) for n in node.elts)
             )
         }

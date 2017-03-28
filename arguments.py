@@ -32,12 +32,12 @@ class Arguments:
             vararg (Optional[pytype.PyType])
             kwarg (Optional[pytype.PyType])
         """
-        from tuple_type import TUPLE_TYPE
+        from tuple_type import TUPLE_CLASS
         from dict_type import DICT_TYPE
         from str_type import STR_CLASS
 
         self.__pos_args = pos_args
-        self.__vararg = vararg or TUPLE_TYPE.new_container()
+        self.__vararg = vararg or TUPLE_CLASS.instance()
         self.__keyword_args = keyword_args
         self.__kwarg = kwarg or DICT_TYPE.new_container()
 
@@ -48,7 +48,7 @@ class Arguments:
         assert isinstance(self.__keyword_args, dict)
         assert all(isinstance(x, set) for x in self.__pos_args)
 
-        assert isinstance(self.__vararg, type(TUPLE_TYPE))
+        assert isinstance(self.__vararg, type(TUPLE_CLASS.instance()))
         assert isinstance(self.__kwarg, type(DICT_TYPE))
         for types in self.__kwarg.key_types():
             assert isinstance(types, set)
@@ -151,10 +151,10 @@ class Arguments:
         """
         Add any remaining positional arguments then the unpacked vararg.
         """
-        from tuple_type import TUPLE_TYPE
+        from tuple_type import TUPLE_CLASS
 
         pos_args = self.pos_args()
-        tup = TUPLE_TYPE.new_container(
+        tup = TUPLE_CLASS.instance().new_container(
             init_contents=tuple(pos_args) + self.vararg().contents()
         )
         func.env().bind(func.vararg(), {tup})

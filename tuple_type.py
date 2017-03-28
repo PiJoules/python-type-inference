@@ -87,9 +87,19 @@ class TuplePointer(TupleType):
 class TupleClass(class_type.ClassType):
     def __init__(self):
         super().__init__("tuple")
+        self.__tup = TupleType()
+
+    def instance(self):
+        return self.__tup
 
     def call(self, args=None):
-        return {self.instance()}
+        if args:
+            if len(args.pos_args()) != 1:
+                raise RuntimeError("Tuple only accepts up to 1 argument.")
+            types = args.pos_args()[0]
+            return {self.instance().new_container(init_contents=t.contents()) for t in types}
+        else:
+            return {self.instance().new_container()}
 
 
 def create_class():
@@ -98,5 +108,4 @@ def create_class():
     return cls
 
 
-TUPLE_TYPE = TupleType()
 TUPLE_CLASS = create_class()
