@@ -24,24 +24,35 @@ class Arguments:
     so the ast combines keywords and keyword only args into the same field.
     """
 
-    def __init__(self, pos_args, vararg, keyword_args, kwarg):
+    def __init__(self, pos_args, keyword_args, vararg=None, kwarg=None):
         """
         Args:
             pos_args (list[set[pytype.PyType]])
-            vararg (Optional[pytype.PyType])
             keyword_args (dict[str, set[pytype.PyType]])
+            vararg (Optional[pytype.PyType])
             kwarg (Optional[pytype.PyType])
         """
-        assert isinstance(pos_args, list)
-        assert all(isinstance(x, set) for x in pos_args)
-
-        assert isinstance(keyword_args, dict)
-        assert all(isinstance(x, set) for x in pos_args)
+        from tuple_type import TUPLE_TYPE
+        from dict_type import DICT_TYPE
+        from str_type import STR_CLASS
 
         self.__pos_args = pos_args
-        self.__vararg = vararg
+        self.__vararg = vararg or TUPLE_TYPE.new_container()
         self.__keyword_args = keyword_args
-        self.__kwarg = kwarg
+        self.__kwarg = kwarg or DICT_TYPE.new_container()
+
+        # Type checks
+        assert isinstance(self.__pos_args, list)
+        assert all(isinstance(x, set) for x in self.__pos_args)
+
+        assert isinstance(self.__keyword_args, dict)
+        assert all(isinstance(x, set) for x in self.__pos_args)
+
+        assert isinstance(self.__vararg, type(TUPLE_TYPE))
+        assert isinstance(self.__kwarg, type(DICT_TYPE))
+        for types in self.__kwarg.key_types():
+            assert isinstance(types, set)
+            assert all(x == STR_CLASS.instance() for x in types)
 
     def pos_args(self):
         return self.__pos_args
@@ -57,7 +68,7 @@ class Arguments:
 
     @classmethod
     def from_call_node_v3_4_older(cls, node, ref_env):
-        raise NotImplementedError("Implement logic for evaluating calls in 3.4")
+        raise NotImplementedError("Implement logic for evaluating calls in v3.4 or older")
 
     @classmethod
     def from_call_node_v3_5_newer(cls, node, ref_env):
@@ -86,7 +97,7 @@ class Arguments:
                 # Kwargs
                 kwarg = ref_env.eval(val)
 
-        return cls(pos_args, vararg, keyword_args, kwarg)
+        return cls(pos_args, keyword_args, vararg=vararg, kwarg=kwarg)
 
     @classmethod
     def from_call_node(cls, node, ref_env):
@@ -100,4 +111,83 @@ class Arguments:
             return cls.from_call_node_v3_4_older(node, ref_env)
 
         return cls(pos_args, vararg, keyword_args, kwarg)
+
+    """
+    Argument unpacking into function args. These functions mutate this
+    arguments object by removing the pytypes held under the pos_args and
+    keyword args.
+    """
+
+    def unpack_positional_args(self, func):
+        """
+        Binds this object's positional arguments to the arguments in the
+        function's environment. This mutates the Arguments object by removing
+        the positional arguments from this object to indicate it was already
+        binded to a function arg.
+
+        Args:
+            func (function_type.FunctionType)
+        """
+        env = func.env()
+        pos_args = self.pos_args()
+        for i, arg in enumerate(func.pos_args()):
+            env.bind(arg, pos_args.pop(0))
+
+    def unpack_keyword_args(self, func):
+        """
+        Unpack any remaining positional args then use the rest for keywords.
+        """
+        env = func.env()
+        kw_defs = func.keyword_defaults()
+        pos_args = self.pos_args()
+        kw_args = self.keyword_args()
+        for i, arg in enumerate(func.keywords()):
+            if pos_args:
+                env.bind(arg, pos_args.pop(0))
+            else:
+                env.bind(arg, kw_args.pop(arg, kw_defs[i]))
+
+    def unpack_vararg(self, func):
+        """
+        Add any remaining positional arguments then the unpacked vararg.
+        """
+        from tuple_type import TUPLE_TYPE
+
+        pos_args = self.pos_args()
+        tup = TUPLE_TYPE.new_container(
+            init_contents=tuple(pos_args) + self.vararg().contents()
+        )
+        func.env().bind(func.vararg(), {tup})
+
+    def unpack_kwonly_args(self, func):
+        kw_args = self.keyword_args()
+        env = func.env()
+        kwonlw_defs = func.kwonly_defaults()
+        for i, arg in enumerate(func.kwonlyargs()):
+            env.bind(arg, kw_args.pop(arg, kwonlw_defs[i]))
+
+    def unpack_kwargs(self, func):
+        from str_type import STR_CLASS
+        from dict_type import DICT_TYPE
+
+        value_types = set()
+        for types in self.keyword_args().values():
+            value_types |= types
+
+        d = DICT_TYPE.new_container(
+            key_types={STR_CLASS.instance()},
+            value_types=value_types | self.kwarg().value_types()
+        )
+        func.env().bind(func.kwarg(), {d})
+
+    def prepend_owner(self, owner):
+        """
+        Adds 'self' as the first positional argument for a bounded method in
+        an instance.
+
+        Args:
+            owner (instance_type.InstanceType)
+        """
+        self.__pos_args.insert(0, {owner})
+
 

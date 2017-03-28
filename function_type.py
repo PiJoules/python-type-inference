@@ -85,80 +85,6 @@ class FunctionType(pytype.PyType):
     def __eq__(self, other):
         return hash(self) == hash(other)
 
-    def _update_positional_args(self, args):
-        """
-        Returns:
-            set[str]: Arguments defined as positional args
-        """
-        defined_args = set()
-        pos_args = args.pos_args()
-        for i, arg in enumerate(self.__pos_args):
-            self.__env.bind(arg, pos_args[i])
-            defined_args.add(arg)
-        return defined_args
-
-    def _update_keyword_args(self, args, defined_args):
-        # Make sure the positional args are fully exhausted first
-        pos_args = args.pos_args()
-        kw_args = args.keyword_args()
-        for i, arg in enumerate(self.__keywords):
-            if len(pos_args) > len(defined_args):
-                self.__env.bind(arg, pos_args[len(defined_args)])
-                defined_args.add(arg)
-            else:
-                self.__env.bind(arg, kw_args.get(arg, self.__keyword_defaults[i]))
-        return defined_args
-
-    def _update_vararg(self, args, counted_pos_args):
-        """
-        Args:
-            args (arguments.Arguments)
-            counted_pos_args (int): Number of arguments unpacked into positional
-                and keyword arguments.
-        """
-        from tuple_type import TUPLE_TYPE
-
-        pos_args = args.pos_args()
-        tup = TUPLE_TYPE.new_container(
-            init_contents=tuple(pos_args[counted_pos_args:])
-        )
-        self.__env.bind(self.__vararg, {tup})
-
-        """
-        Suggested code where args is an altered Arguments object adjusted
-        based on previous actions done in prior argument unpacking
-
-        from tuple_type import TUPLE_CLASS
-        tup = TUPLE_CLASS.call(args)
-        self.__env.bind(self.__vararg, {tup})
-        """
-
-    def _update_kwonly_args(self, args):
-        kw_args = args.keyword_args()
-        for i, arg in enumerate(self.__kwonlyargs):
-            self.__env.bind(arg, kw_args.get(arg, self.__kwonly_defaults[i]))
-
-    def _update_kwargs(self, args):
-        """
-        All keyowrds provided in the arguments but not in the keyword/kwonly
-        args go here.
-        """
-        from str_type import STR_CLASS
-        from dict_type import DICT_TYPE
-
-        value_types = set()
-        expected_keywords = set(self.__keywords + self.__kwonlyargs)
-        for arg, types in args.keyword_args().items():
-            if arg not in expected_keywords:
-                value_types |= types
-
-        # Create new dict container
-        d = DICT_TYPE.new_container(
-            key_types={STR_CLASS.instance()},
-            value_types=value_types,
-        )
-        self.__env.bind(self.__kwarg, {d})
-
     def update_args(self, args):
         """
         Update this env based on the arguments provided.
@@ -172,34 +98,13 @@ class FunctionType(pytype.PyType):
         func(1, 2, c=3, e=5) -> a = 1, b = 2, c=3, e=5
         func(1,2,3,4,5) -> a=1,b=2,c=3,d=(4,5)
         """
-        env = self.__env
-        defined_args = set()
-
-        # Positional args
-        defined_args = self._update_positional_args(args)
-
-        # Keyword args
-        # Make sure the positional args are fully exhausted first
-        defined_args = self._update_keyword_args(args, defined_args)
-
-        # Vararg
-        if self.__vararg:
-            self._update_vararg(args, len(defined_args))
-        elif len(args.pos_args()) > len(defined_args):
-            # There are still extra positonal arguments, but not vararg given
-            raise RuntimeError("Too many arguments provided for function")
-
-        if args.vararg() or args.kwarg():
-            raise NotImplementedError
-
-        # Keyword only args
-        self._update_kwonly_args(args)
-
-        # Kwarg
-        if self.__kwarg:
-            self._update_kwargs(args)
-        elif len(args.keyword_args()) > len(self.__keywords + self.__kwonlyargs):
-            raise RuntimeError("Too many keyword arguments provided for function")
+        args.unpack_positional_args(self)
+        args.unpack_keyword_args(self)
+        if self.vararg():
+            args.unpack_vararg(self)
+        args.unpack_kwonly_args(self)
+        if self.kwarg():
+            args.unpack_kwargs(self)
 
     def returns(self):
         """

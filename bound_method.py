@@ -16,24 +16,13 @@ class BoundMethod(function_type.FunctionType):
                    kwarg=func_type.kwarg())
         return func
 
-    def _update_positional_args(self, args):
+    def update_args(self, args):
         """
-        The first argument is automatically bounded to the instance this
-        belongs to. The arguments passed to this method are unpacked among the
-        remaining defined positional and keyword arguments.
+        Add the owner as the first positional arg then pass to regular
+        update_args.
         """
-        defined_args = set()
-        pos_args = args.pos_args()
-
-        # First is always a reference to self
-        self.env().bind(self.pos_args()[0], {self.owner()})
-        defined_args.add(self.pos_args()[0])
-
-        for i, arg in enumerate(self.pos_args()[1:]):
-            self.env().bind(arg, pos_args[i])
-            defined_args.add(arg)
-
-        return defined_args
+        args.prepend_owner(self.owner())
+        super().update_args(args)
 
     def owner(self):
         """
