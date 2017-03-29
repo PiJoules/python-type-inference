@@ -18,12 +18,6 @@ class Environment:
         else:
             self.__call_stack = set()
 
-        # Initialize types known in the env
-        self.__types = {}  # dict[str, pytype.PyType]
-        for types in self.__variables.values():
-            for t in types:
-                self.__types[t.name()] = t
-
         # Modules
         self.__module_location = module_location
 
@@ -34,6 +28,13 @@ class Environment:
         return self.__variables
 
     def bind(self, varname, types):
+        """
+        Set a variable to be a set of types.
+
+        Args:
+            varname (str)
+            types (set[pytype.PyType])
+        """
         assert isinstance(varname, str)
         assert isinstance(types, set)
         assert all(isinstance(x, pytype.PyType) for x in types)
@@ -45,6 +46,8 @@ class Environment:
 
     def bind_attr(self, node, types):
         """
+        Bind the attribute of a type to a set of types.
+
         Args:
             node (ast.Attribute)
             types (set[pytype.PyType])
@@ -57,16 +60,23 @@ class Environment:
             t.add_attr(attr, types)
 
     def exclusive_lookup(self, varname):
+        """
+        Lookup a variable only in this environment.
+        """
         return self.__variables[varname]
 
     def lookup(self, varname):
+        """
+        Lookup a variable in this environment, then lookup in the parent env
+        if it is not in this env.
+        """
         if varname in self.__variables:
             return self.exclusive_lookup(varname)
 
         if self.__parent:
             return self.__parent.lookup(varname)
 
-        raise KeyError(varname)
+        raise KeyError("'{}' does not exist in this environment".format(varname))
 
     def unpack_assign(self, target, types):
         """

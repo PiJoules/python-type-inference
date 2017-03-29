@@ -70,46 +70,6 @@ class PyType:
 
 
 
-
-"""
-Create builtin variables
-"""
-
-class ValueType(PyType):
-    def __init__(self, name, *args, value=None, **kwargs):
-        super().__init__(name, *args, **kwargs)
-        self.__value = value
-
-    def value(self):
-        return self.__value
-
-    def __hash__(self):
-        return id(self.name())
-
-    def __eq__(self, other):
-        return isinstance(other, type(self))
-
-"""
-Exceptions
-"""
-
-class ExceptionType(ValueType):
-    def __init__(self, name="Exception", *args, **kwargs):
-        super().__init__(name, *args, **kwargs)
-
-
-class ValueErrorType(ExceptionType):
-    def __init__(self):
-        super().__init__("ValueError")
-
-
-
-"""
-Exceptions
-"""
-VALUE_ERROR = ValueErrorType()
-
-
 def load_builtin_vars():
     from function_type import BuiltinFunction
     from class_type import BuiltinClass
@@ -122,6 +82,8 @@ def load_builtin_vars():
     from none_type import NONE_CLASS
     from str_type import STR_CLASS
     from file_type import FILE_CLASS
+
+    from value_error_type import VALUE_ERROR_CLASS
 
 
     """
@@ -156,15 +118,6 @@ def load_builtin_vars():
     input_func = InputFunction()
 
 
-    """
-    Exception classes
-    """
-    class ValueErrorClass(BuiltinClass):
-        def call(self, args):
-            return {VALUE_ERROR}
-    value_err_cls = ValueErrorClass()
-
-
     return {
         "int": {INT_CLASS},
         "float": {FLOAT_CLASS},
@@ -175,5 +128,5 @@ def load_builtin_vars():
         "print": {print_func},
         "input": {input_func},
 
-        "ValueError": {value_err_cls},
+        "ValueError": {VALUE_ERROR_CLASS},
     }
