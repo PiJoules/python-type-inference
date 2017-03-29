@@ -14,25 +14,36 @@ class PyType:
         self.__parents = parents or []
 
     def name(self):
+        """
+        The name of this type. This is equivalent to the result
+        of obj.__class__.
+        """
         return self.__name
 
     def attrs(self):
+        """
+        Returns:
+            dict[str, set[PyType]]
+        """
         return self.__attrs
 
     def add_attr(self, attr, types):
         assert isinstance(types, set)
         assert all(isinstance(x, PyType) for x in types)
 
-        if attr in self.__attrs:
+        if self.has_attr(attr):
             self.__attrs[attr] |= types
         else:
             self.__attrs[attr] = set(types)
 
     def get_attr(self, attr):
-        if attr in self.__attrs:
+        if self.has_attr(attr):
             return self.__attrs[attr]
         else:
-            raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.defined_name()))
+            raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
+
+    def has_attr(self, attr):
+        return attr in self.__attrs
 
     def call(self, args):
         """
@@ -44,6 +55,7 @@ class PyType:
     """
     Methods for calling specific functions owned by this type.
     """
+
     def call_attr(self, attr, args):
         types = set()
         for t in self.get_attr(attr):
