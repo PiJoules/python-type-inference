@@ -29,7 +29,7 @@ class InstanceType(InstanceMixin):
                     inst_attr_types.add(bound_meth)
                 else:
                     inst_attr_types.add(t)
-            self.add_attr(attr, inst_attr_types)
+            self.set_attr(attr, inst_attr_types)
 
     def get_attr(self, attr):
         """

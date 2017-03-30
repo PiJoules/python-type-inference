@@ -42,9 +42,9 @@ def create_class():
         def call(self, args=None):
             return {cls.instance()}
 
-    cls.add_attr("strip", {StripMethod()})
-    cls.add_attr("format", {FormatMethod()})
-    cls.add_attr("__getitem__", {GetItemMethod()})
+    cls.set_attr("strip", {StripMethod()})
+    cls.set_attr("format", {FormatMethod()})
+    cls.set_attr("__getitem__", {GetItemMethod()})
 
     return cls
 

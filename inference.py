@@ -57,7 +57,9 @@ class Environment:
 
         value_types = self.eval(value)
         for t in value_types:
-            t.add_attr(attr, types)
+            if t.has_attr(pytype.PyType.SETATTR_METHOD):
+                raise RuntimeError("TODO: Implement logic for custom defined __setattr__ methods")
+            t.set_attr(attr, types)
 
     def exclusive_lookup(self, varname):
         """
@@ -166,6 +168,8 @@ class Environment:
 
         types = set()
         for t in value_types:
+            if t.has_attr(pytype.PyType.GETATTRIBUTE_METHOD):
+                raise RuntimeError("TODO: Need to implement logic for handling custom __getattribute__ methods.")
             types |= t.get_attr(attr)
         return types
 
@@ -179,7 +183,7 @@ class Environment:
 
         ret_types = set()
         for value in values:
-            ret_types |= value.call_getitem()
+            ret_types |= value.call_getitem(arguments.EMPTY_ARGS)
         return ret_types
 
     def eval_subscript_slice(self, node):
@@ -189,7 +193,7 @@ class Environment:
         values = self.eval(node.value)
         result = set()
         for v in values:
-            result |= v.call_getitem()
+            result |= v.call_getitem(arguments.EMPTY_ARGS)
         return result
 
     def eval_subscript(self, node):

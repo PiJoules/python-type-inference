@@ -44,7 +44,7 @@ class TupleType(pytype.PyType):
         """
         return TuplePointer(self, **kwargs)
 
-    def call_getitem(self, args=None):
+    def call_getitem(self, args):
         types = set()
         for content_types in self.contents():
             types |= content_types
@@ -80,8 +80,8 @@ class TuplePointer(TupleType):
     def get_attr(self, attr):
         return self.__original.get_attr(attr)
 
-    def add_attr(self, attr, types):
-        return self.__original.add_attr(attr, types)
+    def set_attr(self, attr, types):
+        return self.__original.set_attr(attr, types)
 
 
 class TupleClass(class_type.ClassType):

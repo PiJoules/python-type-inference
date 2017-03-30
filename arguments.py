@@ -66,6 +66,13 @@ class Arguments:
     def kwarg(self):
         return self.__kwarg
 
+    def __bool__(self):
+        """True if contains any arguments."""
+        return (self.pos_args() or
+                self.keyword_args() or
+                self.vararg() or
+                self.kwarg())
+
     @classmethod
     def from_call_node_v3_4_older(cls, node, ref_env):
         raise NotImplementedError("Implement logic for evaluating calls in v3.4 or older")
@@ -189,5 +196,8 @@ class Arguments:
             owner (instance_type.InstanceType)
         """
         self.__pos_args.insert(0, {owner})
+
+
+EMPTY_ARGS = Arguments([], {})
 
 

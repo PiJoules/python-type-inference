@@ -38,7 +38,7 @@ class DictType(pytype.PyType):
     def new_container(self, **kwargs):
         return DictPointer(self, **kwargs)
 
-    def call_getitem(self):
+    def call_getitem(self, args):
         return self.value_types()
 
     def __hash__(self):
@@ -60,8 +60,8 @@ class DictPointer(DictType):
     def get_attr(self, attr):
         return self.__original.get_attr(attr)
 
-    def add_attr(self, attr, types):
-        return self.__original.add_attr(attr, types)
+    def set_attr(self, attr, types):
+        return self.__original.set_attr(attr, types)
 
 
 class DictClass(class_type.ClassType):
