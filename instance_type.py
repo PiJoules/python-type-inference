@@ -14,7 +14,6 @@ class InstanceMixin(pytype.PyType):
 
 class InstanceType(InstanceMixin):
     def __init__(self, cls_type):
-        from bound_method import BoundMethod
         from function_type import FunctionType
 
         super().__init__(cls_type.defined_name())
@@ -25,10 +24,8 @@ class InstanceType(InstanceMixin):
             inst_attr_types = set()
             for t in types:
                 if isinstance(t, FunctionType):
-                    bound_meth = BoundMethod.from_function_type(t, self)
-                    inst_attr_types.add(bound_meth)
-                else:
-                    inst_attr_types.add(t)
+                    t.bind_owner(self)
+                inst_attr_types.add(t)
             self.set_attr(attr, inst_attr_types)
 
     def get_attr(self, attr):
@@ -39,6 +36,9 @@ class InstanceType(InstanceMixin):
             return self.__class.get_attr(attr)
         else:
             return super().get_attr(attr)
+
+    def __str__(self):
+        return self.name()
 
 
 class InstanceMock(InstanceMixin):

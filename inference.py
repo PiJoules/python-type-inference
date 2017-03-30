@@ -151,9 +151,17 @@ class Environment:
 
         TODO: Check the __op__ method of the left node
         """
+        op = node.op
         left = self.eval(node.left)
         right = self.eval(node.right)
-        return left | right
+
+        results = set()
+        if isinstance(op, ast.Add):
+            for t in left:
+                results |= t.call_add(arguments.Arguments([right]))
+            return results
+        else:
+            return left | right
 
     def eval_compare(self, node):
         """Always returns bools"""

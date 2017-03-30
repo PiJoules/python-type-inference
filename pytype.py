@@ -25,6 +25,8 @@ class PyType:
 
     GETITEM_METHOD = "__getitem__"
 
+    ADD_METHOD = "__add__"
+
     def __init__(self, name, init_attrs=None, parents=None):
         """
         Args:
@@ -70,7 +72,11 @@ class PyType:
         if self.has_attr(attr):
             return self.__attrs[attr]
         else:
-            raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
+            from class_type import ClassType
+            if isinstance(self, ClassType):
+                raise KeyError("Attribute '{}' not in class '{}'".format(attr, self.defined_name()))
+            else:
+                raise KeyError("Attribute '{}' not in pytype '{}'".format(attr, self.name()))
 
     def call_attr(self, attr, args):
         """
@@ -254,8 +260,19 @@ class PyType:
         from tuple_type import TUPLE_CLASS
         return self._call_and_check_return(self.DIR_METHOD, TUPLE_CLASS.instance().new_container(), args)
 
+    """
+    Emulating container types
+    """
+
     def call_getitem(self, args):
         return self.call_attr(self.GETITEM_METHOD, args)
+
+    """
+    Emulating numeric types
+    """
+
+    def call_add(self, args):
+        return self.call_attr(self.ADD_METHOD, args)
 
     def __ne__(self, other):
         return not (self == other)

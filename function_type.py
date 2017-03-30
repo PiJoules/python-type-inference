@@ -36,6 +36,7 @@ class FunctionType(pytype.PyType):
 
         self.__keyword_defaults = keyword_defaults or []
         self.__kwonly_defaults = kwonly_defaults or []
+        self.__owner = None
 
         # Type checks
         assert len(self.__keywords) == len(self.__keyword_defaults)
@@ -98,6 +99,9 @@ class FunctionType(pytype.PyType):
         func(1, 2, c=3, e=5) -> a = 1, b = 2, c=3, e=5
         func(1,2,3,4,5) -> a=1,b=2,c=3,d=(4,5)
         """
+        if self.__owner:
+            # For bound methods
+            args.prepend_owner(self.__owner)
         args.unpack_positional_args(self)
         args.unpack_keyword_args(self)
         if self.vararg():
@@ -218,11 +222,14 @@ class FunctionType(pytype.PyType):
     def ref_node(self):
         return self.__ref_node
 
+    def bind_owner(self, owner):
+        self.__owner = owner
+
 
 class BuiltinFunction(FunctionType):
     def __init__(self, *args, **kwargs):
         super().__init__(None, None, *args, **kwargs)
 
-    def call(self, args=None):
+    def call(self, args):
         raise NotImplementedError
 

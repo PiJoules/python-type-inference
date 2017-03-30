@@ -24,11 +24,11 @@ class Arguments:
     so the ast combines keywords and keyword only args into the same field.
     """
 
-    def __init__(self, pos_args, keyword_args, vararg=None, kwarg=None):
+    def __init__(self, pos_args=None, keyword_args=None, vararg=None, kwarg=None):
         """
         Args:
-            pos_args (list[set[pytype.PyType]])
-            keyword_args (dict[str, set[pytype.PyType]])
+            pos_args (Optional[list[set[pytype.PyType]]])
+            keyword_args (Optional[dict[str, set[pytype.PyType]][])
             vararg (Optional[pytype.PyType])
             kwarg (Optional[pytype.PyType])
         """
@@ -36,9 +36,9 @@ class Arguments:
         from dict_type import DICT_CLASS
         from str_type import STR_CLASS
 
-        self.__pos_args = pos_args
+        self.__pos_args = pos_args or []
+        self.__keyword_args = keyword_args or {}
         self.__vararg = vararg or TUPLE_CLASS.instance()
-        self.__keyword_args = keyword_args
         self.__kwarg = kwarg or DICT_CLASS.instance()
 
         # Type checks
@@ -196,6 +196,14 @@ class Arguments:
             owner (instance_type.InstanceType)
         """
         self.__pos_args.insert(0, {owner})
+
+    def __str__(self):
+        return "{}, {}, {}, {}".format(
+            [set(map(str, x)) for x in self.pos_args()],
+            self.keyword_args(),
+            self.vararg(),
+            self.kwarg()
+        )
 
 
 EMPTY_ARGS = Arguments([], {})
