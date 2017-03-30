@@ -26,6 +26,9 @@ class PyType:
     GETITEM_METHOD = "__getitem__"
 
     ADD_METHOD = "__add__"
+    SUB_METHOD = "__sub__"
+    MUL_METHOD = "__mul__"
+    TRUEDIV_METHOD = "__truediv__"
 
     def __init__(self, name, init_attrs=None, parents=None):
         """
@@ -273,6 +276,15 @@ class PyType:
 
     def call_add(self, args):
         return self.call_attr(self.ADD_METHOD, args)
+
+    def call_sub(self, args):
+        return self.call_attr(self.SUB_METHOD, args)
+
+    def call_mul(self, args):
+        return self.call_attr(self.MUL_METHOD, args)
+
+    def call_truediv(self, args):
+        return self.call_attr(self.TRUEDIV_METHOD, args)
 
     def __ne__(self, other):
         return not (self == other)

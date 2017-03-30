@@ -159,9 +159,19 @@ class Environment:
         if isinstance(op, ast.Add):
             for t in left:
                 results |= t.call_add(arguments.Arguments([right]))
-            return results
+        elif isinstance(op, ast.Sub):
+            for t in left:
+                results |= t.call_sub(arguments.Arguments([right]))
+        elif isinstance(op, ast.Mult):
+            for t in left:
+                results |= t.call_mul(arguments.Arguments([right]))
+        elif isinstance(op, ast.Div):
+            for t in left:
+                results |= t.call_truediv(arguments.Arguments([right]))
         else:
-            return left | right
+            raise NotImplementedError("No logic for handling operation {}".format(op))
+
+        return results
 
     def eval_compare(self, node):
         """Always returns bools"""
