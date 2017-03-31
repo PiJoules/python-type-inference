@@ -110,6 +110,24 @@ class FunctionType(pytype.PyType):
         if self.kwarg():
             args.unpack_kwargs(self)
 
+        # Ensure the arguments are exhausted
+        if args:
+            raise RuntimeError("""Arguments for call to function '{}' were not fully exhausted.
+Expected {} positional arguments, {} keyword arguments, {} variable positional argument,
+and {} variable keyword argument.
+{} positional arguments, {} keyword arguments, {} variable positional argument,
+and {} variable keyword argument were left unhandled.
+""".format(self.defined_name(),
+           len(self.pos_args()),
+           len(self.keywords()) + len(self.kwonlyargs()),
+           "1" if self.vararg() else "no",
+           "1" if self.kwarg() else "no",
+           len(args.pos_args()),
+           len(args.keyword_args()),
+           "1" if args.vararg() else "no",
+           "1" if args.kwarg() else "no",
+           ))
+
     def returns(self):
         """
         Find the return types of this function.

@@ -7,6 +7,8 @@ import astor
 import pytype
 import arguments
 
+from str_type import STR_CLASS
+
 
 class Environment:
     def __init__(self, init_vars=None, parent_env=None,
@@ -110,6 +112,10 @@ class Environment:
     Type evaluation
     """
 
+    """
+    Literals
+    """
+
     def eval_num(self, node):
         n = node.n
         if isinstance(n, int):
@@ -120,6 +126,12 @@ class Environment:
             return {FLOAT_CLASS.instance()}
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
+
+    def eval_str(self, node):
+        return {STR_CLASS.instance()}
+
+    def eval_bytes(self, node):
+        return {BYTES_CLASS.instance()}
 
     def eval_call(self, node):
         """
@@ -229,10 +241,6 @@ class Environment:
             types |= t.get_attr(attr)
         return types
 
-    def eval_str(self, node):
-        from str_type import STR_CLASS
-        return {STR_CLASS.instance()}
-
     def eval_subscript_index(self, node):
         idx_values = self.eval(node.slice.value)
         values = self.eval(node.value)
@@ -295,6 +303,12 @@ class Environment:
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
+        elif isinstance(node, ast.Str):
+            return self.eval_str(node)
+        elif isinstance(node, ast.Bytes):
+            return self.eval_bytes(node)
+        elif isinstance(node, ast.Tuple):
+            return self.eval_tuple(node)
         elif isinstance(node, ast.Call):
             return self.eval_call(node)
         elif isinstance(node, ast.Name):
@@ -305,12 +319,8 @@ class Environment:
             return self.eval_compare(node)
         elif isinstance(node, ast.Attribute):
             return self.eval_attr(node)
-        elif isinstance(node, ast.Str):
-            return self.eval_str(node)
         elif isinstance(node, ast.Subscript):
             return self.eval_subscript(node)
-        elif isinstance(node, ast.Tuple):
-            return self.eval_tuple(node)
         elif isinstance(node, ast.UnaryOp):
             return self.eval_unary_op(node)
         else:

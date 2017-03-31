@@ -21,7 +21,7 @@ def create_class():
                 keywords=["chars"],
                 keyword_defaults=[{cls.instance()}],
             )
-        def call(self, args=None):
+        def call(self, args):
             return {cls.instance()}
 
     class FormatMethod(BuiltinFunction):
@@ -31,7 +31,7 @@ def create_class():
                 vararg="args",
                 kwarg="kwargs",
             )
-        def call(self, args=None):
+        def call(self, args):
             return {cls.instance()}
 
     class GetItemMethod(BuiltinFunction):
@@ -39,7 +39,7 @@ def create_class():
             super().__init__(
                 pos_args=["self", "key"]
             )
-        def call(self, args=None):
+        def call(self, args):
             return {cls.instance()}
 
     cls.set_attr("strip", {StripMethod()})

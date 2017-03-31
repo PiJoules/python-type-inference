@@ -51,6 +51,9 @@ class DictType(pytype.PyType):
         return (self.key_types() == other.key_types() and
                 self.value_types() == other.value_types())
 
+    def __bool__(self):
+        return bool(self.key_types()) or bool(self.value_types())
+
 
 class DictPointer(DictType):
     def __init__(self, original, **kwargs):

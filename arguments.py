@@ -68,10 +68,10 @@ class Arguments:
 
     def __bool__(self):
         """True if contains any arguments."""
-        return (self.pos_args() or
-                self.keyword_args() or
-                self.vararg() or
-                self.kwarg())
+        return bool(self.pos_args() or
+                    self.keyword_args() or
+                    self.vararg() or
+                    self.kwarg())
 
     @classmethod
     def from_call_node_v3_4_older(cls, node, ref_env):
@@ -165,6 +165,8 @@ class Arguments:
             init_contents=tuple(pos_args) + self.vararg().contents()
         )
         func.env().bind(func.vararg(), {tup})
+        self.__pos_args.clear()
+        self.__vararg = TUPLE_CLASS.instance()
 
     def unpack_kwonly_args(self, func):
         kw_args = self.keyword_args()
@@ -186,6 +188,8 @@ class Arguments:
             value_types=value_types | self.kwarg().value_types()
         )
         func.env().bind(func.kwarg(), {d})
+        self.__keyword_args.clear()
+        self.__kwarg = DICT_CLASS.instance()
 
     def prepend_owner(self, owner):
         """

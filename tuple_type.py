@@ -71,6 +71,9 @@ class TupleType(pytype.PyType):
 
         return True
 
+    def __bool__(self):
+        return bool(self.contents())
+
 
 class TuplePointer(TupleType):
     def __init__(self, original, **kwargs):
@@ -83,6 +86,9 @@ class TuplePointer(TupleType):
     def set_attr(self, attr, types):
         return self.__original.set_attr(attr, types)
 
+    def has_attr(self, attr):
+        return self.__original.has_attr(attr)
+
 
 class TupleClass(class_type.ClassType):
     def __init__(self):
@@ -92,7 +98,7 @@ class TupleClass(class_type.ClassType):
     def instance(self):
         return self.__tup
 
-    def call(self, args=None):
+    def call(self, args):
         if args:
             if len(args.pos_args()) != 1:
                 raise RuntimeError("Tuple only accepts up to 1 argument.")
@@ -103,7 +109,22 @@ class TupleClass(class_type.ClassType):
 
 
 def create_class():
+    from function_type import BuiltinFunction
+
     cls = TupleClass()
+
+    class GetItemMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                pos_args=["self", "key"],
+            )
+            def call(self, args):
+                """
+                Args
+                """
+                print(args)
+
+    cls.set_attr(cls.GETITEM_METHOD, {GetItemMethod()})
 
     return cls
 
