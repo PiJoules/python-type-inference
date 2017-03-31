@@ -274,17 +274,45 @@ class PyType:
     Emulating numeric types
     """
 
+    def _rmethod(self, method):
+        assert method.startswith("__")
+        assert method.endswith("__")
+        return "__r" + method[2:-2] + "__"
+
+    def _call_numeric_op(self, method, args):
+        from arguments import Arguments
+
+        if self.has_attr(method):
+            return self.call_attr(method, args)
+        else:
+            # Get the reflected magic method
+            r_meth = self._rmethod(method)
+
+            # Get the right side typs
+            pos_args = args.pos_args()
+            if len(pos_args) != 1:
+                raise RuntimeError("Expected 1 argument for numeric operation")
+            right_types = pos_args.pop()
+
+            results = set()
+            for t in right_types:
+                if t.has_attr(r_meth):
+                    results |= t.call_attr(r_meth, Arguments([self]))
+                else:
+                    raise RuntimeError("No support for {} or {} on types '{}' and '{}'".format(method, r_method, self, t))
+            return results
+
     def call_add(self, args):
-        return self.call_attr(self.ADD_METHOD, args)
+        return self._call_numeric_op(self.ADD_METHOD, args)
 
     def call_sub(self, args):
-        return self.call_attr(self.SUB_METHOD, args)
+        return self._call_numeric_op(self.SUB_METHOD, args)
 
     def call_mul(self, args):
-        return self.call_attr(self.MUL_METHOD, args)
+        return self._call_numeric_op(self.MUL_METHOD, args)
 
     def call_truediv(self, args):
-        return self.call_attr(self.TRUEDIV_METHOD, args)
+        return self._call_numeric_op(self.TRUEDIV_METHOD, args)
 
     def __ne__(self, other):
         return not (self == other)
@@ -295,6 +323,13 @@ class PyType:
     def __eq__(self, other):
         raise NotImplementedError("Must implement __eq__ for pytype '{}'".format(type(self)))
 
+
+def load_buultin_constants():
+    from str_type import STR_CLASS
+
+    return {
+        "__name__": {STR_CLASS.instance()},
+    }
 
 
 def load_builtin_vars():
@@ -344,8 +379,7 @@ def load_builtin_vars():
             return {STR_CLASS.instance()}
     input_func = InputFunction()
 
-
-    return {
+    builtins = {
         "int": {INT_CLASS},
         "float": {FLOAT_CLASS},
         "bool": {BOOL_CLASS},
@@ -357,3 +391,7 @@ def load_builtin_vars():
 
         "ValueError": {VALUE_ERROR_CLASS},
     }
+    builtins.update(load_buultin_constants())
+
+    return builtins
+

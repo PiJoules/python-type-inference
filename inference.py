@@ -146,11 +146,7 @@ class Environment:
         return set(self.lookup(node.id))
 
     def eval_bin_op(self, node):
-        """
-        For now, just make the type the set containing both parts' types.
-
-        TODO: Check the __op__ method of the left node
-        """
+        """Call the appropriate magic method of each type."""
         op = node.op
         left = self.eval(node.left)
         right = self.eval(node.right)
@@ -173,10 +169,52 @@ class Environment:
 
         return results
 
+    def eval_single_compare(self, left, op, right):
+        """
+        Perform a comparison on a single node
+        """
+        results = set()
+        left_types = self.eval(left)
+        right_types = self.eval(right)
+        if isinstance(op, ast.Eq):
+            for t in left_types:
+                results |= t.call_eq(arguments.Arguments([right_types]))
+        elif isinstance(op, ast.Lt):
+            for t in left_types:
+                results |= t.call_lt(arguments.Arguments([right_types]))
+        else:
+            raise NotImplementedError("No logic for comparing with operation {}".format(op))
+        return results
+
     def eval_compare(self, node):
-        """Always returns bools"""
-        from bool_type import BOOL_CLASS
-        return {BOOL_CLASS.instance()}
+        """
+        x < y > z is equivalent to (x < y) and (y > z), so the methods __lt__,
+        __gt__, and __and__ and will need to be called for each appropriate
+        instance.
+
+        Returns:
+            set[PyType]
+        """
+        left = node.left
+        if len(node.ops) == 1:
+            # Equivalent to just calling one of the comparison magic methods
+            # No conjunctions
+            return self.eval_single_compare(left, node.ops[0], node.comparators[0])
+
+        results = set()
+        comp_results = []  # Save the comparisons for testing the overall conjunction
+        for i, op in enumerate(node.ops):
+            right = node.comparators[i]
+            comp_results.append(self.eval_single_compare(left, op, right))
+            left = right
+
+        # Perform the and-ing
+        for i in range(len(comp_results)-1):
+            result_types = comp_results[i]  # set[pytype.Pytype]
+            for t in result_types:
+                results |= t.call_and(arguments.Arguments([comp_results[i+1]]))
+
+        return results
 
     def eval_attr(self, node):
         value = node.value

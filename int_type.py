@@ -9,6 +9,7 @@ class IntClass(class_type.ClassType):
 def create_class():
     from function_type import BuiltinFunction
     from float_type import FLOAT_CLASS
+    from bool_type import BOOL_CLASS
 
     # Create the class
     cls = IntClass()
@@ -50,10 +51,20 @@ def create_class():
         def call(self, args):
             return {FLOAT_CLASS.instance()}
 
+    class LtMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                pos_args=["self", "other"]
+            )
+
+        def call(self, args):
+            return {BOOL_CLASS.instance()}
+
     cls.set_attr(cls.ADD_METHOD, {AddMethod()})
     cls.set_attr(cls.SUB_METHOD, {SubMethod()})
     cls.set_attr(cls.MUL_METHOD, {MulMethod()})
     cls.set_attr(cls.TRUEDIV_METHOD, {TrueDivMethod()})
+    cls.set_attr(cls.LT_METHOD, {LtMethod()})
 
     return cls
 
