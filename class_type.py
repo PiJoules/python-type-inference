@@ -39,8 +39,13 @@ class ClassType(pytype.PyType):
         """Getter for getting the instance this class produces without calling init."""
         if self.__inst is None:
             from instance_type import InstanceType
-            self.__inst = InstanceType(self)
+            self.__inst = InstanceType(self.defined_name(), parents=[self])
         return self.__inst
+
+    def bind_instance(self, inst):
+        from instance_type import InstanceType
+        assert isinstance(inst, InstanceType)
+        self.__inst = inst
 
     def __hash__(self):
         # All classes are unique

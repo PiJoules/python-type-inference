@@ -13,32 +13,19 @@ class InstanceMixin(pytype.PyType):
 
 
 class InstanceType(InstanceMixin):
-    def __init__(self, cls_type):
-        from function_type import FunctionType
-
-        super().__init__(cls_type.defined_name())
-        self.__class = cls_type
-
-        for attr, types in cls_type.attrs().items():
-            # Create bound methods
-            inst_attr_types = set()
-            for t in types:
-                if isinstance(t, FunctionType):
-                    t.bind_owner(self)
-                inst_attr_types.add(t)
-            self.set_attr(attr, inst_attr_types)
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        assert self.parents(), "PyType '{}' does not have a ClassType to create it".format(self.name())
 
     def get_attr(self, attr):
-        """
-        Check self first. If not in self, check the class.
-        """
-        if attr not in self.attrs():
-            return self.__class.get_attr(attr)
-        else:
-            return super().get_attr(attr)
+        from function_type import FunctionType
 
-    def __str__(self):
-        return self.name()
+        types = super().get_attr(attr)
+        for t in types:
+            if isinstance(t, FunctionType):
+                t.bind_method(self)
+
+        return types
 
 
 class InstanceMock(InstanceMixin):

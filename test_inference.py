@@ -3,7 +3,7 @@ import unittest
 from inference import ModuleEnv
 from pytype import *
 from instance_type import InstanceMock
-from tuple_type import TupleType
+from tuple_type import TUPLE_CLASS
 from dict_type import DictType
 from int_type import INT_CLASS
 from str_type import STR_CLASS
@@ -186,7 +186,7 @@ y = func2(1, "a")
         env = ModuleEnv()
         env.parse_code(code)
 
-        tup = {TupleType(init_contents=({INT_CLASS.instance()}, {STR_CLASS.instance()}))}
+        tup = {TUPLE_CLASS.instance().new_container(init_contents=({INT_CLASS.instance()}, {STR_CLASS.instance()}))}
 
         # Stored vars
         self.assertSetEqual(

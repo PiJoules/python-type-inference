@@ -37,9 +37,14 @@ class PyType:
             init_attrs (Optional[dict[str, set[PyType]]])
             parents (Optional[list[PyType]])
         """
+        assert isinstance(name, str)
+
         self.__name = name
         self.__attrs = init_attrs or {}  # dict[str, set[PyType]]
         self.__parents = parents or []
+
+    def parents(self):
+        return self.__parents
 
     def name(self):
         """
@@ -53,9 +58,27 @@ class PyType:
         Returns:
             dict[str, set[PyType]]
         """
-        return self.__attrs
+        attrs = {}
+
+        for parent in self.parents():
+            for attr, types in parent.attrs().items():
+                if attr in attrs:
+                    attrs[attr] |= types
+                else:
+                    attrs[attr] = set(types)
+
+        for attr, types in self.__attrs.items():
+            if attr in attrs:
+                attrs[attr] |= types
+            else:
+                attrs[attr] = set(types)
+
+        return attrs
 
     def has_attr(self, attr):
+        return attr in self.attrs()
+
+    def exclusive_has_attr(self, attr):
         return attr in self.__attrs
 
     """
@@ -66,14 +89,14 @@ class PyType:
         assert isinstance(types, set)
         assert all(isinstance(x, PyType) for x in types)
 
-        if self.has_attr(attr):
+        if self.exclusive_has_attr(attr):
             self.__attrs[attr] |= types
         else:
             self.__attrs[attr] = set(types)
 
     def get_attr(self, attr):
         if self.has_attr(attr):
-            return self.__attrs[attr]
+            return self.attrs()[attr]
         else:
             from class_type import ClassType
             if isinstance(self, ClassType):
@@ -92,7 +115,8 @@ class PyType:
             set[PyType]
         """
         types = set()
-        for t in self.get_attr(attr):
+        attrs = self.get_attr(attr)
+        for t in attrs:
             types |= t.call(args)
         return types
 
@@ -299,7 +323,7 @@ class PyType:
                 if t.has_attr(r_meth):
                     results |= t.call_attr(r_meth, Arguments([self]))
                 else:
-                    raise RuntimeError("No support for {} or {} on types '{}' and '{}'".format(method, r_method, self, t))
+                    raise RuntimeError("No support for {} or {} on types '{}' and '{}'".format(method, r_meth, self, t))
             return results
 
     def call_add(self, args):
@@ -322,6 +346,9 @@ class PyType:
 
     def __eq__(self, other):
         raise NotImplementedError("Must implement __eq__ for pytype '{}'".format(type(self)))
+
+    def __str__(self):
+        return self.name()
 
 
 def load_buultin_constants():

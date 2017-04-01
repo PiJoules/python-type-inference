@@ -8,6 +8,7 @@ import pytype
 import arguments
 
 from str_type import STR_CLASS
+from function_type import FunctionType
 
 
 class Environment:
@@ -141,12 +142,14 @@ class Environment:
 
         func_types = self.eval(node.func)  # set[PyType]
 
-        args = arguments.Arguments.from_call_node(node, self)
-
         for func in func_types:
             if func not in self.__call_stack:
                 self.__call_stack.add(func)
+
+                # Create new arguments since these are mutated
+                args = arguments.Arguments.from_call_node(node, self)
                 ret_types |= func.call(args)
+
                 self.__call_stack.remove(func)
 
         return ret_types
@@ -247,7 +250,8 @@ class Environment:
 
         ret_types = set()
         for value in values:
-            ret_types |= value.call_getitem(arguments.EMPTY_ARGS)
+            args = arguments.Arguments([idx_values])
+            ret_types |= value.call_getitem(args)
         return ret_types
 
     def eval_subscript_slice(self, node):
@@ -382,7 +386,6 @@ class Environment:
         """
         Add a function type to the variables.
         """
-        from function_type import FunctionType
         func_type = FunctionType.from_node_and_env(node, self)
         self.bind(node.name, {func_type})
 

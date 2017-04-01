@@ -38,8 +38,8 @@ class Arguments:
 
         self.__pos_args = pos_args or []
         self.__keyword_args = keyword_args or {}
-        self.__vararg = vararg or TUPLE_CLASS.instance()
-        self.__kwarg = kwarg or DICT_CLASS.instance()
+        self.__vararg = vararg or TUPLE_CLASS.instance().new_container()
+        self.__kwarg = kwarg or DICT_CLASS.instance().new_container()
 
         # Type checks
         assert isinstance(self.__pos_args, list)
@@ -166,7 +166,7 @@ class Arguments:
         )
         func.env().bind(func.vararg(), {tup})
         self.__pos_args.clear()
-        self.__vararg = TUPLE_CLASS.instance()
+        self.__vararg = TUPLE_CLASS.instance().new_container()
 
     def unpack_kwonly_args(self, func):
         kw_args = self.keyword_args()

@@ -8,7 +8,9 @@ class FunctionType(pytype.PyType):
     """
     def __init__(self, env, node, *args, pos_args=None, keywords=None,
                  vararg=None, kwonlyargs=None, kwarg=None,
-                 keyword_defaults=None, kwonly_defaults=None, **kwargs):
+                 keyword_defaults=None, kwonly_defaults=None,
+                 defined_name=None,
+                 **kwargs):
         """
         Args:
             name (str)
@@ -27,6 +29,13 @@ class FunctionType(pytype.PyType):
         super().__init__("function", *args, **kwargs)
         self.__env = env  # inference.Environment
         self.__ref_node = node
+
+        if defined_name:
+            self.__defined_name = defined_name
+        elif node:
+            self.__defined_name = node.name
+        else:
+            self.__defined_name = None
 
         self.__pos_args = pos_args or []
         self.__keywords = keywords or []
@@ -55,9 +64,7 @@ class FunctionType(pytype.PyType):
     """
 
     def defined_name(self):
-        if self.__ref_node is None:
-            return None
-        return self.__ref_node.name
+        return self.__defined_name
 
     def pos_args(self):
         return self.__pos_args
@@ -86,7 +93,7 @@ class FunctionType(pytype.PyType):
     def __eq__(self, other):
         return hash(self) == hash(other)
 
-    def update_args(self, args):
+    def update_env(self, args):
         """
         Update this env based on the arguments provided.
 
@@ -99,9 +106,6 @@ class FunctionType(pytype.PyType):
         func(1, 2, c=3, e=5) -> a = 1, b = 2, c=3, e=5
         func(1,2,3,4,5) -> a=1,b=2,c=3,d=(4,5)
         """
-        if self.__owner:
-            # For bound methods
-            args.prepend_owner(self.__owner)
         args.unpack_positional_args(self)
         args.unpack_keyword_args(self)
         if self.vararg():
@@ -166,7 +170,11 @@ and {} variable keyword argument were left unhandled.
         Call this function, update its environment based on the arguments,
         and return possible return types of this function.
         """
-        self.update_args(args)
+        if self.is_bound_method():
+            args.prepend_owner(self.owner())
+        self.update_env(args)
+        if self.is_bound_method():
+            self.unbind_method()
         return self.returns()
 
     def env(self):
@@ -240,14 +248,22 @@ and {} variable keyword argument were left unhandled.
     def ref_node(self):
         return self.__ref_node
 
-    def bind_owner(self, owner):
+    def bind_method(self, owner):
+        from instance_type import InstanceType
+        assert isinstance(owner, InstanceType)
         self.__owner = owner
+
+    def unbind_method(self):
+        self.__owner = None
+
+    def is_bound_method(self):
+        return self.__owner is not None
+
+    def owner(self):
+        return self.__owner
 
 
 class BuiltinFunction(FunctionType):
     def __init__(self, *args, **kwargs):
         super().__init__(None, None, *args, **kwargs)
-
-    def call(self, args):
-        raise NotImplementedError
 
