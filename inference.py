@@ -9,6 +9,9 @@ import arguments
 
 from str_type import STR_CLASS
 from function_type import FunctionType
+from tuple_type import TUPLE_CLASS
+from list_type import LIST_CLASS
+from slice_type import SLICE_CLASS
 
 
 class Environment:
@@ -134,6 +137,20 @@ class Environment:
     def eval_bytes(self, node):
         return {BYTES_CLASS.instance()}
 
+    def eval_list(self, node):
+        return {
+            LIST_CLASS.instance(
+                init_contents=list(map(self.eval, node.elts))
+            )
+        }
+
+    def eval_tuple(self, node):
+        return {
+            TUPLE_CLASS.create_tuple(
+                init_contents=tuple(self.eval(n) for n in node.elts)
+            )
+        }
+
     def eval_call(self, node):
         """
         Call, update, and evaluate the function.
@@ -244,44 +261,25 @@ class Environment:
             types |= t.get_attr(attr)
         return types
 
-    def eval_subscript_index(self, node):
-        idx_values = self.eval(node.slice.value)
+    def eval_subscript(self, node):
+        key_types = self.eval(node.slice)
         values = self.eval(node.value)
 
         ret_types = set()
         for value in values:
-            args = arguments.Arguments([idx_values])
+            args = arguments.Arguments([key_types])
             ret_types |= value.call_getitem(args)
         return ret_types
 
-    def eval_subscript_slice(self, node):
-        """
-        Slices will return a new pointer to the original container.
-        """
-        values = self.eval(node.value)
-        result = set()
-        for v in values:
-            result |= v.call_getitem(arguments.EMPTY_ARGS)
-        return result
+    def eval_index(self, node):
+        return self.eval(node.value)
 
-    def eval_subscript(self, node):
-        slice = node.slice
-        if isinstance(slice, ast.Index):
-            return self.eval_subscript_index(node)
-        elif isinstance(slice, ast.Slice):
-            return self.eval_subscript_slice(node)
-        elif isinstance(slice, ast.ExtSlice):
-            return self.eval_subscript_extslice(node)
-        else:
-            raise RuntimeError("Unknown slice type '{}'".format(slice))
+    def eval_slice(self, node):
+        """Create a slice type."""
+        return {SLICE_CLASS.instance()}
 
-    def eval_tuple(self, node):
-        from tuple_type import TUPLE_CLASS
-        return {
-            TUPLE_CLASS.instance().new_container(
-                init_contents=tuple(self.eval(n) for n in node.elts)
-            )
-        }
+    def eval_ext_slice(self, node):
+        raise NotImplementedError
 
     def eval_unary_op(self, node):
         """
@@ -311,6 +309,8 @@ class Environment:
             return self.eval_str(node)
         elif isinstance(node, ast.Bytes):
             return self.eval_bytes(node)
+        elif isinstance(node, ast.List):
+            return self.eval_list(node)
         elif isinstance(node, ast.Tuple):
             return self.eval_tuple(node)
         elif isinstance(node, ast.Call):
@@ -325,6 +325,12 @@ class Environment:
             return self.eval_attr(node)
         elif isinstance(node, ast.Subscript):
             return self.eval_subscript(node)
+        elif isinstance(node, ast.Index):
+            return self.eval_index(node)
+        elif isinstance(node, ast.Slice):
+            return self.eval_slice(node)
+        elif isinstance(node, ast.ExtSlice):
+            return self.eval_ext_slice(node)
         elif isinstance(node, ast.UnaryOp):
             return self.eval_unary_op(node)
         else:

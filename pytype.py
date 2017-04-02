@@ -361,7 +361,6 @@ def load_buultin_constants():
 
 def load_builtin_vars():
     from function_type import BuiltinFunction
-    from class_type import BuiltinClass
     from instance_type import InstanceType
     from tuple_type import TUPLE_CLASS
     from dict_type import DICT_CLASS

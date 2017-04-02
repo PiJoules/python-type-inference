@@ -18,13 +18,6 @@ class TupleType(instance_type.InstanceType):
             assert isinstance(types, set)
             assert all(isinstance(x, pytype.PyType) for x in types)
 
-    def call(self, args=None):
-        return {
-            TuplePointer(
-                init_contents=self.contents(),
-            )
-        }
-
     def contents(self):
         return self.__contents
 
@@ -37,13 +30,6 @@ class TupleType(instance_type.InstanceType):
         for types in self.contents():
             ret_types |= types
         return ret_types
-
-    def new_container(self, **kwargs):
-        """
-        Create a new tuple that points to the original tuple when adding/getting
-        attributes so that all attributes added to any tuple affect all tuples.
-        """
-        return TuplePointer(self, **kwargs)
 
     def __hash__(self):
         # Tuple hash depends on hashs of contents
@@ -70,63 +56,51 @@ class TupleType(instance_type.InstanceType):
         return bool(self.contents())
 
     def __str__(self):
-        str_contents = tuple(set(map(str, types)) for types in self.contents())
-        return "tuple[{}]".format(str_contents)
+        str_contents = list(set(map(str, types)) for types in self.contents())
+        return "tuple{}".format(str_contents)
 
 
-class TuplePointer(TupleType):
-    def __init__(self, original, **kwargs):
-        super().__init__(**kwargs, parents=original.parents())
-        self.__original = original
+class TupleClass(class_type.InstanceWrapperClass):
+    def create_tuple(self, **kwargs):
+        return TupleType(parents=[self], **kwargs)
 
-    def get_attr(self, attr):
-        return self.__original.get_attr(attr)
-
-    def set_attr(self, attr, types):
-        return self.__original.set_attr(attr, types)
-
-    def has_attr(self, attr):
-        return self.__original.has_attr(attr)
-
-    def call_getitem(self, args):
-        return self.all_contents()
-
-
-class TupleClass(class_type.ClassType):
     def call(self, args):
         if args:
             if len(args.pos_args()) != 1:
                 raise RuntimeError("Tuple only accepts up to 1 argument.")
             types = args.pos_args()[0]
-            return {self.instance().new_container(init_contents=t.contents()) for t in types}
+            return {self.create_tuple(init_contents=t.contents()) for t in types}
         else:
-            return {self.instance().new_container()}
+            return {self.create_tuple()}
 
     def instance(self):
-        return super().instance().new_container()
+        return self.create_tuple()
 
 
 def create_class():
-    from function_type import BuiltinFunction
+    from getitem_method import GetItemMethod
+    from int_type import INT_CLASS
 
     cls = TupleClass("tuple")
-    inst = TupleType(parents=[cls])
-    cls.bind_instance(inst)
 
-    class GetItemMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                defined_name=cls.GETITEM_METHOD,
-                pos_args=["self", "key"],
-            )
+    class TupleGetItemMethod(GetItemMethod):
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
 
-        def update_env(self, args):
-            raise NotImplementedError
+            results = set()
+            self_types, key_types = args.pos_args()
 
-        def returns(self):
-            raise NotImplementedError
+            for self_t in self_types:
+                for key_t in key_types:
+                    if key_t == INT_CLASS.instance():
+                        # Accessing 1 item in the tuple
+                        results |= self_t.all_contents()
+                    else:
+                        raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
 
-    cls.set_attr(cls.GETITEM_METHOD, {GetItemMethod()})
+            return results
+
+    cls.set_attr(cls.GETITEM_METHOD, {TupleGetItemMethod()})
 
     return cls
 

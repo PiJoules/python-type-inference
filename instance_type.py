@@ -1,18 +1,7 @@
 import pytype
 
 
-class InstanceMixin(pytype.PyType):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-    def __hash__(self):
-        return hash(self.name())
-
-    def __eq__(self, other):
-        return isinstance(other, InstanceMixin)
-
-
-class InstanceType(InstanceMixin):
+class InstanceType(pytype.PyType):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         assert self.parents(), "PyType '{}' does not have a ClassType to create it".format(self.name())
@@ -27,9 +16,8 @@ class InstanceType(InstanceMixin):
 
         return types
 
+    def __hash__(self):
+        return hash(self.name())
 
-class InstanceMock(InstanceMixin):
-    """Class for checking that a pytype is some instance when debugging."""
-    def __init__(self, name):
-        super().__init__(name)
-
+    def __eq__(self, other):
+        return self.name() == other.name()

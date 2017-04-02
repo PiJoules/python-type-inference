@@ -137,7 +137,7 @@ class TestSamples(unittest.TestCase):
         )
 
         # Variables under the if __name__ == "__main__"
-        tup = TUPLE_CLASS.instance().new_container(init_contents=tuple([{STR_CLASS.instance()}, {STR_CLASS.instance()}]))
+        tup = TUPLE_CLASS.create_tuple(init_contents=tuple([{STR_CLASS.instance()}, {STR_CLASS.instance()}]))
         self.assertSetEqual(
             env.exclusive_lookup("input_lines"),
             {tup}

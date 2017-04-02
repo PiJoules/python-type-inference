@@ -38,7 +38,7 @@ class Arguments:
 
         self.__pos_args = pos_args or []
         self.__keyword_args = keyword_args or {}
-        self.__vararg = vararg or TUPLE_CLASS.instance().new_container()
+        self.__vararg = vararg or TUPLE_CLASS.instance()
         self.__kwarg = kwarg or DICT_CLASS.instance().new_container()
 
         # Type checks
@@ -161,12 +161,12 @@ class Arguments:
         from tuple_type import TUPLE_CLASS
 
         pos_args = self.pos_args()
-        tup = TUPLE_CLASS.instance().new_container(
+        tup = TUPLE_CLASS.create_tuple(
             init_contents=tuple(pos_args) + self.vararg().contents()
         )
         func.env().bind(func.vararg(), {tup})
         self.__pos_args.clear()
-        self.__vararg = TUPLE_CLASS.instance().new_container()
+        self.__vararg = TUPLE_CLASS.create_tuple()
 
     def unpack_kwonly_args(self, func):
         kw_args = self.keyword_args()

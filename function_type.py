@@ -165,6 +165,14 @@ and {} variable keyword argument were left unhandled.
         from none_type import NONE_CLASS
         return returns or {NONE_CLASS.instance()}
 
+    def adjusted_call(self, args):
+        """
+        The args passed to this method are adjusted to include self as the
+        first positional argument if called by an instance.
+        """
+        self.update_env(args)
+        return self.returns()
+
     def call(self, args):
         """
         Call this function, update its environment based on the arguments,
@@ -172,10 +180,12 @@ and {} variable keyword argument were left unhandled.
         """
         if self.is_bound_method():
             args.prepend_owner(self.owner())
-        self.update_env(args)
+
+        results = self.adjusted_call(args)
+
         if self.is_bound_method():
             self.unbind_method()
-        return self.returns()
+        return results
 
     def env(self):
         return self.__env
@@ -266,4 +276,23 @@ and {} variable keyword argument were left unhandled.
 class BuiltinFunction(FunctionType):
     def __init__(self, *args, **kwargs):
         super().__init__(None, None, *args, **kwargs)
+
+    def check_pos_args(self, args):
+        """
+        Assert the number of positional arguments provided matches the number
+        provided.
+        """
+        if not self.vararg():
+            pos_provided = len(args.pos_args())
+            pos_defined = len(self.pos_args())
+            if pos_provided != pos_defined:
+                raise RuntimeError("Function '{}' accepts {} positional arguments. {} were provided.".format(self.defined_name(), pos_defined, pos_provided))
+
+    def check_keyword_args(self, args):
+        if not self.kwarg():
+            kwarg_provided = len(args.keyword_args())
+            kwarg_defined = len(self.keywords()) + len(self.kwonlyargs())
+            if kwarg_provided != kwarg_defined:
+                raise RuntimeError("Function '{}' accepts {} keyword arguments. {} were provided.".format(self.defined_name(), kwarg_defined, kwarg_provided))
+
 

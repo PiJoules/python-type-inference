@@ -2,10 +2,10 @@ import pytype
 
 
 class ClassType(pytype.PyType):
-    def __init__(self, defined_name, *args, **kwargs):
+    def __init__(self, defined_name=None, inst=None, *args, **kwargs):
         super().__init__("type", *args, **kwargs)
-        self.__inst = None
-        self.__defined_name = defined_name
+        self.__inst = inst
+        self.__defined_name = inst.name() if inst else defined_name
 
     @classmethod
     def from_node_and_env(cls, node, parent_env):
@@ -42,11 +42,6 @@ class ClassType(pytype.PyType):
             self.__inst = InstanceType(self.defined_name(), parents=[self])
         return self.__inst
 
-    def bind_instance(self, inst):
-        from instance_type import InstanceType
-        assert isinstance(inst, InstanceType)
-        self.__inst = inst
-
     def __hash__(self):
         # All classes are unique
         return id(self)
@@ -55,9 +50,10 @@ class ClassType(pytype.PyType):
         return hash(self) == hash(other)
 
 
-class BuiltinClass(ClassType):
-    def __init__(self):
-        super().__init__(None)
-
+class InstanceWrapperClass(ClassType):
     def call(self, args):
-        raise NotImplementedError
+        raise NotImplementedError("Instance wrapper must return the custom instance each time")
+
+    def instance(self, *args, **kwargs):
+        raise NotImplementedError("Instance wrapper must return the custom instance each time")
+
