@@ -356,7 +356,7 @@ class PyType:
         return not (self == other)
 
     def __hash__(self):
-        raise NotImplementedError("Must implement __hash__ for pytype '{}'".format(type(self)))
+        return hash(self.name())
 
     def __eq__(self, other):
         raise NotImplementedError("Must implement __eq__ for pytype '{}'".format(type(self)))

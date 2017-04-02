@@ -46,7 +46,7 @@ class Arguments:
         assert all(isinstance(x, set) for x in self.__pos_args)
 
         assert isinstance(self.__keyword_args, dict)
-        assert all(isinstance(x, set) for x in self.__pos_args)
+        assert all(isinstance(x, set) for x in self.__keyword_args.values())
 
         assert isinstance(self.__vararg, type(TUPLE_CLASS.instance()))
         assert isinstance(self.__kwarg, type(DICT_CLASS.instance()))

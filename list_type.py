@@ -1,5 +1,6 @@
 from instance_type import InstanceType
 from class_type import ClassType
+from pytype import PyType
 
 
 class IterableType(InstanceType):
@@ -25,10 +26,20 @@ class ListType(IterableType):
 
         # Combine all contents into one set. Order will not matter for
         # indexing lists.
+        init_contents = init_contents or []
+        assert isinstance(init_contents, list)
+        for types in init_contents:
+            assert isinstance(types, set)
+            assert all(isinstance(x, PyType) for x in types)
+
         contents = set()
-        for types in init_contents or []:
+        for types in init_contents:
             contents |= types
         self.__contents = contents
+
+    def append(self, item):
+        assert isinstance(item, PyType)
+        self.__contents.add(item)
 
     def contents(self):
         """
@@ -38,8 +49,7 @@ class ListType(IterableType):
         return self.__contents
 
     def __hash__(self):
-        # Let the hash of a list type be determined by the contents
-        return hash(frozenset(self.contents()))
+        return hash(self.name())
 
     def __eq__(self, other):
         if not isinstance(other, ListType):
@@ -74,6 +84,8 @@ class ListClass(ClassType):
 def create_class():
     from int_type import INT_CLASS
     from slice_type import SLICE_CLASS
+    from none_type import NONE_CLASS
+    from function_type import BuiltinFunction
     from getitem_method import GetItemMethod
     from add_method import AddMethod
 
@@ -114,8 +126,28 @@ def create_class():
 
             return results
 
+    class ListAppendMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="append",
+                pos_args=["self", "x"],
+            )
+
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+
+            self_types, val_types = args.pos_args()
+
+            for self_t in self_types:
+                assert self_t.is_type(cls.instance())
+                for val_t in val_types:
+                    self_t.append(val_t)
+
+            return {NONE_CLASS.instance()}
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
+    cls.set_attr("append", {ListAppendMethod()})
 
     return cls
 

@@ -128,6 +128,28 @@ x = [1] + [3.0]
             ])}
         )
 
+    def test_list_appending(self):
+        """Test appending to a list."""
+        code = """
+y = [3]
+x = []
+x.append(2)
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            env.exclusive_lookup("y")
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[
+                {INT_CLASS.instance()}
+            ])}
+        )
+
 
 
 if __name__ == "__main__":

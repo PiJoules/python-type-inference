@@ -33,7 +33,7 @@ class TupleType(instance_type.InstanceType):
 
     def __hash__(self):
         # Tuple hash depends on hashs of contents
-        return hash(tuple(hash(frozenset(x)) for x in self.contents()))
+        return hash(self.name())
 
     def __eq__(self, other):
         # Tuples are equal if the contents are equal
