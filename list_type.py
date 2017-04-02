@@ -59,11 +59,23 @@ class ListClass(ClassType):
     def instance(self, *args, **kwargs):
         return ListType(parents=[self], *args, **kwargs)
 
+    def inst_from_list(self, lst):
+        return self.instance(init_contents=[lst.contents()])
+
+    def merge_lists(self, *lsts):
+        contents = set()
+        for lst in lsts:
+            contents |= lst.contents()
+        return self.instance(
+            init_contents=[contents]
+        )
+
 
 def create_class():
-    from getitem_method import GetItemMethod
     from int_type import INT_CLASS
     from slice_type import SLICE_CLASS
+    from getitem_method import GetItemMethod
+    from add_method import AddMethod
 
     cls = ListClass()
 
@@ -76,17 +88,34 @@ def create_class():
 
             for self_t in self_types:
                 for key_t in key_types:
-                    if key_t == INT_CLASS.instance():
+                    if key_t.is_type(INT_CLASS.instance()):
                         # Accessing 1 item in the tuple
                         results |= self_t.contents()
-                    elif key_t == SLICE_CLASS.instance():
-                        results.add(cls.instance(init_contents=[self_t.contents()]))
+                    elif key_t.is_type(SLICE_CLASS.instance()):
+                        results.add(cls.inst_from_list(self_t))
                     else:
                         raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
 
             return results
 
+    class ListAddMethod(AddMethod):
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+
+            results = set()
+            self_types, other_types = args.pos_args()
+
+            for self_t in self_types:
+                for other_t in other_types:
+                    if other_t.is_type(cls.instance()):
+                        results.add(cls.merge_lists(self_t, other_t))
+                    else:
+                        raise RuntimeError("Unable to concatenate list with {}".format(other_t))
+
+            return results
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
+    cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
 
     return cls
 

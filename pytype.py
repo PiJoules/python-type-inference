@@ -81,6 +81,20 @@ class PyType:
     def exclusive_has_attr(self, attr):
         return attr in self.__attrs
 
+    def is_type(self, other):
+        """
+        Args:
+            other (class_type.ClassType)
+        """
+        if self.name() == other.name():
+            return True
+
+        for parent in self.parents():
+            if parent.is_type(other):
+                return True
+
+        return False
+
     """
     Wrappers for magic methods that affect this pytype.
     """
