@@ -237,6 +237,25 @@ z = x.pop(1)
             {FLOAT_CLASS.instance()}
         )
 
+    def test_list_clear(self):
+        """Test clearing a list."""
+        code = """
+x = [2.0]
+y = x.clear()
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {NONE_CLASS.instance()}
+        )
+
 
 
 if __name__ == "__main__":

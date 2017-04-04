@@ -241,6 +241,17 @@ def create_class():
 
             return results
 
+    class ListClearMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="clear",
+                pos_args=["self"]
+            )
+
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+            return {NONE_CLASS.instance()}
+
 
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
@@ -250,6 +261,7 @@ def create_class():
     cls.set_attr("insert", {ListInsertMethod()})
     cls.set_attr("remove", {ListRemoveMethod()})
     cls.set_attr("pop", {ListPopMethod()})
+    cls.set_attr("clear", {ListClearMethod()})
 
     return cls
 
