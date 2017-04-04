@@ -156,24 +156,24 @@ z = x.append(2)
             {NONE_CLASS.instance()}
         )
 
-#    def test_list_extend(self):
-#        """Test extending a list with an iterable."""
-#        code = """
-#x = []
-#y = x.extend([1])
-#"""
-#        env = ModuleEnv()
-#        env.parse_code(code)
-#
-#        self.assertSetEqual(
-#            env.exclusive_lookup("y"),
-#            {NONE_CLASS.instance()}
-#        )
-#
-#        self.assertSetEqual(
-#            env.exclusive_lookup("x"),
-#            {INT_CLASS.instance()}
-#        )
+    def test_list_extend(self):
+        """Test extending a list with an iterable."""
+        code = """
+x = []
+y = x.extend([1])
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {NONE_CLASS.instance()}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{INT_CLASS.instance()}])}
+        )
 
 
 

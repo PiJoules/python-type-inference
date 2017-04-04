@@ -1,6 +1,8 @@
 from instance_type import InstanceType
 from class_type import ClassType
 from pytype import PyType
+from arguments import empty_args
+from generator_type import GENERATOR_CLASS
 
 
 class IterableClass(ClassType):
@@ -33,6 +35,10 @@ class ListType(InstanceType):
     def append(self, item):
         assert isinstance(item, PyType)
         self.__contents.add(item)
+
+    def extend(self, iterable_t):
+        for iter_t in iterable_t.call_iter(empty_args()):
+            self.__contents |= iter_t.call_next(empty_args())
 
     def contents(self):
         """
@@ -156,16 +162,34 @@ def create_class():
             self_types, iterable_types = args.pos_args()
 
             for self_t in self_types:
-                for iter_t in iterable_types:
-                    # Get an iterator from iter_t
-                    raise NotImplementedError
+                for iterable_t in iterable_types:
+                    self_t.extend(iterable_t)
 
             return {NONE_CLASS.instance()}
 
+    class ListIterMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name=self.ITER_METHOD,
+                pos_args=["self"]
+            )
+
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+            results = set()
+            self_types = args.pos_args()[0]
+
+            for self_t in self_types:
+                results |= self_t.contents()
+
+            return {GENERATOR_CLASS.instance(yields=results)}
+
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
+    cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
     cls.set_attr("append", {ListAppendMethod()})
-    #cls.set_attr("extend", {ListExtendMethod()})
+    cls.set_attr("extend", {ListExtendMethod()})
 
     return cls
 
