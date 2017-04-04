@@ -284,6 +284,17 @@ def create_class():
             return {NONE_CLASS.instance()}
 
 
+    class ListReverseMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="reverse",
+                pos_args=["self"]
+            )
+
+        def returns(self):
+            return {NONE_CLASS.instance()}
+
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
@@ -295,6 +306,7 @@ def create_class():
     cls.set_attr("clear", {ListClearMethod()})
     cls.set_attr("index", {ListIndexMethod()})
     cls.set_attr("sort", {ListSortMethod()})
+    cls.set_attr("reverse", {ListReverseMethod()})
 
     return cls
 

@@ -299,6 +299,20 @@ x.sort(key=2, reverse=True)
             {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
         )
 
+    def test_list_reverse(self):
+        """Test reversing a list."""
+        code = """
+x = [2.0]
+x.reverse()
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
