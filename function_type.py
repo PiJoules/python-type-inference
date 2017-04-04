@@ -134,15 +134,24 @@ and {} variable keyword argument were left unhandled.
 
     def returns(self):
         """
-        Find the return types of this function.
+        Returns all values returned and yielded
+        by this function.
+
+        TODO: Update to perhaps include yieldfrom and raise
+
+        Returns:
+            set[PyType] x3: Return types and yielded types.
         """
+        from none_type import NONE_CLASS
+
         returns = set()
+        yields = set()
 
         stack = list(self.__ref_node.body)[::-1]
         while stack:
             node = stack.pop()
             if isinstance(node, ast.Return):
-                returns |= self.__env.eval(node.value)
+                returns |= self.__env.eval(node)
             elif isinstance(node, (ast.If, ast.While)):
                 stack += node.body + node.orelse
                 # Evalate the test to check for function args
@@ -158,12 +167,22 @@ and {} variable keyword argument were left unhandled.
                 stack += node.body
                 for item in node.items:
                     self.__env.eval(item.context_expr)
+            elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Yield):
+                yields |= self.__env.eval(node)
             else:
                 # Parse everything else
                 self.__env.parse(node)
 
-        from none_type import NONE_CLASS
-        return returns or {NONE_CLASS.instance()}
+        # Empty returns means return None
+        returns = returns or {NONE_CLASS.instance()}
+        if yields:
+            from generator_type import GENERATOR_CLASS
+            return {GENERATOR_CLASS.instance(
+                yields=yields,
+                returns=returns
+            )}
+        else:
+            return returns
 
     def adjusted_call(self, args):
         """
@@ -286,7 +305,18 @@ class BuiltinFunction(FunctionType):
             pos_provided = len(args.pos_args())
             pos_defined = len(self.pos_args())
             if pos_provided != pos_defined:
-                raise RuntimeError("Function '{}' accepts {} positional arguments. {} were provided.".format(self.defined_name(), pos_defined, pos_provided))
+                raise RuntimeError("""
+Function '{}' accepts {} positional arguments. {} were provided.
+Defined positional args: {}
+Provided args: {}
+"""
+.format(
+    self.defined_name(),
+    pos_defined,
+    pos_provided,
+    self.pos_args(),
+    args.pos_args(),
+))
 
     def check_keyword_args(self, args):
         if not self.kwarg():

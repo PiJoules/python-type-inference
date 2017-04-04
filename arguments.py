@@ -210,6 +210,7 @@ class Arguments:
         )
 
 
-EMPTY_ARGS = Arguments([], {})
+def empty_args():
+    return Arguments([], {})
 
 

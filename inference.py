@@ -8,6 +8,7 @@ import pytype
 import arguments
 
 from str_type import STR_CLASS
+from none_type import NONE_CLASS
 from function_type import FunctionType
 from tuple_type import TUPLE_CLASS
 from list_type import LIST_CLASS
@@ -333,6 +334,13 @@ class Environment:
             return self.eval_ext_slice(node)
         elif isinstance(node, ast.UnaryOp):
             return self.eval_unary_op(node)
+        elif isinstance(node, (ast.Yield, ast.Return)):
+            if node.value:
+                return self.eval(node.value)
+            else:
+                return {NONE_CLASS.instance()}
+        elif isinstance(node, ast.Expr):
+            return self.eval(node.value)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}' on line {}".format(node, node.lineno))
 
@@ -409,7 +417,7 @@ class Environment:
         self.parse_sequence(node.orelse)
 
     def parse_expr(self, node):
-        return self.eval(node.value)
+        self.eval(node.value)
 
     def parse_regular_import_alias(self, node):
         """
@@ -440,7 +448,11 @@ class Environment:
         iter_types = self.eval(iter_node)
         contents = set()
         for t in iter_types:
-            contents |= t.all_contents()
+            #contents |= t.all_contents()
+            iterator_types = t.call_iter(arguments.empty_args())  # iterator
+            for iter_t in iterator_types:
+                # The next value
+                contents |= iter_t.call_next(arguments.empty_args())
         self.unpack_assign(target, contents)
 
         # Parse both the body and orelse
@@ -501,6 +513,8 @@ class Environment:
             self.parse_try(node)
         elif isinstance(node, ast.Raise):
             self.parse_raise(node)
+        elif isinstance(node, ast.Pass):
+            pass
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 

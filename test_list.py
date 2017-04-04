@@ -5,6 +5,7 @@ from list_type import LIST_CLASS
 from int_type import INT_CLASS
 from str_type import STR_CLASS
 from float_type import FLOAT_CLASS
+from none_type import NONE_CLASS
 
 
 class TestListType(unittest.TestCase):
@@ -133,7 +134,7 @@ x = [1] + [3.0]
         code = """
 y = [3]
 x = []
-x.append(2)
+z = x.append(2)
 """
         env = ModuleEnv()
         env.parse_code(code)
@@ -149,6 +150,30 @@ x.append(2)
                 {INT_CLASS.instance()}
             ])}
         )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("z"),
+            {NONE_CLASS.instance()}
+        )
+
+#    def test_list_extend(self):
+#        """Test extending a list with an iterable."""
+#        code = """
+#x = []
+#y = x.extend([1])
+#"""
+#        env = ModuleEnv()
+#        env.parse_code(code)
+#
+#        self.assertSetEqual(
+#            env.exclusive_lookup("y"),
+#            {NONE_CLASS.instance()}
+#        )
+#
+#        self.assertSetEqual(
+#            env.exclusive_lookup("x"),
+#            {INT_CLASS.instance()}
+#        )
 
 
 

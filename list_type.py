@@ -3,24 +3,17 @@ from class_type import ClassType
 from pytype import PyType
 
 
-class IterableType(InstanceType):
-    def __hash__(self):
-        raise NotImplementedError
+class IterableClass(ClassType):
+    pass
 
-    def __eq__(self):
-        raise NotImplementedError
 
-    def __bool__(self):
-        raise NotImplementedError
-
-    def __str__(self):
-        raise NotImplementedError
+ITERABLE_CLASS = IterableClass()
 
 
 LIST_NAME = "list"
 
 
-class ListType(IterableType):
+class ListType(InstanceType):
     def __init__(self, init_contents=None, *args, **kwargs):
         super().__init__(LIST_NAME, *args, **kwargs)
 
@@ -66,6 +59,12 @@ class ListType(IterableType):
 
 
 class ListClass(ClassType):
+    def __init__(self, *args, **kwargs):
+        super().__init__(
+            defined_name=LIST_NAME,
+            *args, **kwargs
+        )
+
     def instance(self, *args, **kwargs):
         return ListType(parents=[self], *args, **kwargs)
 
@@ -139,15 +138,34 @@ def create_class():
             self_types, val_types = args.pos_args()
 
             for self_t in self_types:
-                assert self_t.is_type(cls.instance())
                 for val_t in val_types:
                     self_t.append(val_t)
+
+            return {NONE_CLASS.instance()}
+
+    class ListExtendMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="extend",
+                pos_args=["self", "iterable"]
+            )
+
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+
+            self_types, iterable_types = args.pos_args()
+
+            for self_t in self_types:
+                for iter_t in iterable_types:
+                    # Get an iterator from iter_t
+                    raise NotImplementedError
 
             return {NONE_CLASS.instance()}
 
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr("append", {ListAppendMethod()})
+    #cls.set_attr("extend", {ListExtendMethod()})
 
     return cls
 

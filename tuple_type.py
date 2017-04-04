@@ -2,6 +2,8 @@ import pytype
 import class_type
 import instance_type
 
+from generator_type import GENERATOR_CLASS
+
 
 class TupleType(instance_type.InstanceType):
     def __init__(self, *args, init_contents=None, **kwargs):
@@ -79,6 +81,7 @@ class TupleClass(class_type.InstanceWrapperClass):
 
 def create_class():
     from getitem_method import GetItemMethod
+    from function_type import BuiltinFunction
     from int_type import INT_CLASS
 
     cls = TupleClass("tuple")
@@ -100,7 +103,25 @@ def create_class():
 
             return results
 
+    class TupleIterMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name=self.ITER_METHOD,
+                pos_args=["self"]
+            )
+
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+            results = set()
+            self_types = args.pos_args()[0]
+
+            for self_t in self_types:
+                results |= self_t.all_contents()
+
+            return {GENERATOR_CLASS.instance(yields=results)}
+
     cls.set_attr(cls.GETITEM_METHOD, {TupleGetItemMethod()})
+    cls.set_attr(cls.ITER_METHOD, {TupleIterMethod()})
 
     return cls
 

@@ -25,6 +25,9 @@ class PyType:
 
     GETITEM_METHOD = "__getitem__"
 
+    NEXT_METHOD = "__next__"
+    ITER_METHOD = "__iter__"
+
     ADD_METHOD = "__add__"
     SUB_METHOD = "__sub__"
     MUL_METHOD = "__mul__"
@@ -351,6 +354,16 @@ class PyType:
 
     def call_truediv(self, args):
         return self._call_numeric_op(self.TRUEDIV_METHOD, args)
+
+    """
+    Iterator types
+    """
+
+    def call_iter(self, args):
+        return self.call_attr(self.ITER_METHOD, args)
+
+    def call_next(self, args):
+        return self.call_attr(self.NEXT_METHOD, args)
 
     def __ne__(self, other):
         return not (self == other)
