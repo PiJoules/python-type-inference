@@ -109,7 +109,7 @@ def create_class():
                         # Accessing 1 item in the tuple
                         results |= self_t.contents()
                     elif key_t.is_type(SLICE_CLASS.instance()):
-                        results.add(cls.inst_from_list(self_t))
+                        results.add(self_t)
                     else:
                         raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
 
@@ -295,6 +295,17 @@ def create_class():
             return {NONE_CLASS.instance()}
 
 
+    class ListCopyMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="copy",
+                pos_args=["self"]
+            )
+
+        def returns(self):
+            return self.env().lookup("self")
+
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
@@ -307,6 +318,7 @@ def create_class():
     cls.set_attr("index", {ListIndexMethod()})
     cls.set_attr("sort", {ListSortMethod()})
     cls.set_attr("reverse", {ListReverseMethod()})
+    cls.set_attr("copy", {ListCopyMethod()})
 
     return cls
 

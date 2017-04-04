@@ -313,6 +313,25 @@ x.reverse()
             {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
         )
 
+    def test_list_copy(self):
+        """Test copying a list."""
+        code = """
+x = [2.0]
+y = x.copy()
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            env.exclusive_lookup("y"),
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
