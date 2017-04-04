@@ -26,8 +26,9 @@ class FunctionType(pytype.PyType):
             keyword_defaults (Optional[list[set[pytype.PyType]]])
             kwonly_defaults (Optional[list[set[pytype.PyType]]])
         """
+        from inference import Environment
         super().__init__("function", *args, **kwargs)
-        self.__env = env  # inference.Environment
+        self.__env = env or Environment()
         self.__ref_node = node
 
         if defined_name:

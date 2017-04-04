@@ -7,13 +7,6 @@ import astor
 import pytype
 import arguments
 
-from str_type import STR_CLASS
-from none_type import NONE_CLASS
-from function_type import FunctionType
-from tuple_type import TUPLE_CLASS
-from list_type import LIST_CLASS
-from slice_type import SLICE_CLASS
-
 
 class Environment:
     def __init__(self, init_vars=None, parent_env=None,
@@ -133,12 +126,14 @@ class Environment:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
     def eval_str(self, node):
+        from str_type import STR_CLASS
         return {STR_CLASS.instance()}
 
     def eval_bytes(self, node):
         return {BYTES_CLASS.instance()}
 
     def eval_list(self, node):
+        from list_type import LIST_CLASS
         return {
             LIST_CLASS.instance(
                 init_contents=list(map(self.eval, node.elts))
@@ -146,6 +141,7 @@ class Environment:
         }
 
     def eval_tuple(self, node):
+        from tuple_type import TUPLE_CLASS
         return {
             TUPLE_CLASS.create_tuple(
                 init_contents=tuple(self.eval(n) for n in node.elts)
@@ -277,6 +273,7 @@ class Environment:
 
     def eval_slice(self, node):
         """Create a slice type."""
+        from slice_type import SLICE_CLASS
         return {SLICE_CLASS.instance()}
 
     def eval_ext_slice(self, node):
@@ -338,6 +335,7 @@ class Environment:
             if node.value:
                 return self.eval(node.value)
             else:
+                from none_type import NONE_CLASS
                 return {NONE_CLASS.instance()}
         elif isinstance(node, ast.Expr):
             return self.eval(node.value)
@@ -400,6 +398,7 @@ class Environment:
         """
         Add a function type to the variables.
         """
+        from function_type import FunctionType
         func_type = FunctionType.from_node_and_env(node, self)
         self.bind(node.name, {func_type})
 

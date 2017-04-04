@@ -3,13 +3,12 @@ from class_type import ClassType
 from pytype import PyType
 from arguments import empty_args
 from generator_type import GENERATOR_CLASS
+from int_type import INT_CLASS
 
 
-class IterableClass(ClassType):
-    pass
-
-
-ITERABLE_CLASS = IterableClass()
+class IntegerInterpetationError(TypeError):
+    def __init__(self, t):
+        super().__init__("'{}' object cannot be interpretted as an integer".format(t))
 
 
 LIST_NAME = "list"
@@ -185,11 +184,72 @@ def create_class():
             return {GENERATOR_CLASS.instance(yields=results)}
 
 
+    class ListInsertMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="insert",
+                pos_args=["self", "i", "x"]
+            )
+
+        def adjusted_call(self, args):
+            self.check_pos_args(args)
+            self_types, i_types, x_types = args.pos_args()
+
+            for self_t in self_types:
+                for i_t in i_types:
+                    if not i_t.is_type(INT_CLASS.instance()):
+                        raise IntegerInterpetationError(i_t)
+                    for x_t in x_types:
+                        self_t.append(x_t)
+
+            return {NONE_CLASS.instance()}
+
+
+    class ListRemoveMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="remove",
+                pos_args=["self", "x"]
+            )
+
+        def adjusted_call(self, args):
+            return {NONE_CLASS.instance()}
+
+
+    class ListPopMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="pop",
+                pos_args=["self"],
+                keywords=["i"],
+                keyword_defaults=[{INT_CLASS.instance()}],
+            )
+
+        def returns(self):
+            env = self.env()
+            self_types = env.lookup("self")
+            i_types = env.lookup("i")
+
+            results = set()
+
+            for self_t in self_types:
+                for i_t in i_types:
+                    if not i_t.is_type(INT_CLASS.instance()):
+                        raise IntegerInterpetationError(i_t)
+                    else:
+                        results |= self_t.contents()
+
+            return results
+
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
     cls.set_attr("append", {ListAppendMethod()})
     cls.set_attr("extend", {ListExtendMethod()})
+    cls.set_attr("insert", {ListInsertMethod()})
+    cls.set_attr("remove", {ListRemoveMethod()})
+    cls.set_attr("pop", {ListPopMethod()})
 
     return cls
 

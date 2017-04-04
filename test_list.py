@@ -175,6 +175,68 @@ y = x.extend([1])
             {LIST_CLASS.instance(init_contents=[{INT_CLASS.instance()}])}
         )
 
+    def test_list_insert(self):
+        """Test insertion into a list."""
+        code = """
+x = [2.0]
+y = x.insert(1, "a")
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {NONE_CLASS.instance()}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{
+                FLOAT_CLASS.instance(), STR_CLASS.instance(),
+            }])}
+        )
+
+    def test_list_remove(self):
+        """Test removing an item from a list."""
+        code = """
+x = [2.0]
+y = x.remove(2.0)
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {NONE_CLASS.instance()}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{
+                FLOAT_CLASS.instance()
+            }])}
+        )
+
+    def test_list_pop(self):
+        """Test popping from a list."""
+        code = """
+x = [2.0, 4.0]
+y = x.pop()
+z = x.pop(1)
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {FLOAT_CLASS.instance()}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("z"),
+            {FLOAT_CLASS.instance()}
+        )
+
 
 
 if __name__ == "__main__":
