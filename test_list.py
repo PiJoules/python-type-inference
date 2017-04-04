@@ -256,6 +256,31 @@ y = x.clear()
             {NONE_CLASS.instance()}
         )
 
+    def test_list_pop(self):
+        """Test popping from a list."""
+        code = """
+x = [2.0]
+y = x.index(0)
+z = x.index(0, 1)
+z2 = x.index(0, 1, 3)
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("y"),
+            {FLOAT_CLASS.instance()}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("z"),
+            {FLOAT_CLASS.instance()}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("z2"),
+            {FLOAT_CLASS.instance()}
+        )
 
 
 if __name__ == "__main__":

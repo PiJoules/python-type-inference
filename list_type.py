@@ -253,6 +253,23 @@ def create_class():
             return {NONE_CLASS.instance()}
 
 
+    class ListIndexMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="index",
+                pos_args=["self", "x"],
+                keywords=["start", "end"],
+                keyword_defaults=[{INT_CLASS.instance()}, {INT_CLASS.instance()}]
+            )
+
+        def returns(self):
+            self_types = self.env().lookup("self")
+            results = set()
+            for self_t in self_types:
+                results |= self_t.contents()
+            return results
+
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
@@ -262,6 +279,7 @@ def create_class():
     cls.set_attr("remove", {ListRemoveMethod()})
     cls.set_attr("pop", {ListPopMethod()})
     cls.set_attr("clear", {ListClearMethod()})
+    cls.set_attr("index", {ListIndexMethod()})
 
     return cls
 
