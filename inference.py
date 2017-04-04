@@ -300,6 +300,15 @@ class Environment:
         else:
             raise RuntimeError("Unknown unary operation {}".format(operation))
 
+    def eval_name_constant(self, node):
+        value = node.value
+        if value is None:
+            from none_type import NONE_CLASS
+            return {NONE_CLASS.instance()}
+        else:
+            from bool_type import BOOL_CLASS
+            return {BOOL_CLASS.instance()}
+
     def eval(self, node):
         if isinstance(node, ast.Num):
             return self.eval_num(node)
@@ -339,6 +348,8 @@ class Environment:
                 return {NONE_CLASS.instance()}
         elif isinstance(node, ast.Expr):
             return self.eval(node.value)
+        elif isinstance(node, ast.NameConstant):
+            return self.eval_name_constant(node)
         else:
             raise NotImplementedError("Unable to evaluate type for node '{}' on line {}".format(node, node.lineno))
 

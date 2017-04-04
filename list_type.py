@@ -4,6 +4,7 @@ from pytype import PyType
 from arguments import empty_args
 from generator_type import GENERATOR_CLASS
 from int_type import INT_CLASS
+from bool_type import BOOL_CLASS
 
 
 class IntegerInterpetationError(TypeError):
@@ -270,6 +271,19 @@ def create_class():
             return results
 
 
+    class ListSortMethod(BuiltinFunction):
+        def __init__(self):
+            super().__init__(
+                defined_name="sort",
+                pos_args=["self"],
+                keywords=["key", "reverse"],
+                keyword_defaults=[{NONE_CLASS.instance()}, {BOOL_CLASS.instance()}]
+            )
+
+        def returns(self):
+            return {NONE_CLASS.instance()}
+
+
     cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
@@ -280,6 +294,7 @@ def create_class():
     cls.set_attr("pop", {ListPopMethod()})
     cls.set_attr("clear", {ListClearMethod()})
     cls.set_attr("index", {ListIndexMethod()})
+    cls.set_attr("sort", {ListSortMethod()})
 
     return cls
 

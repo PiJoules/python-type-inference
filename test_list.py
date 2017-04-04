@@ -256,8 +256,8 @@ y = x.clear()
             {NONE_CLASS.instance()}
         )
 
-    def test_list_pop(self):
-        """Test popping from a list."""
+    def test_list_clear(self):
+        """Test clearing a list."""
         code = """
 x = [2.0]
 y = x.index(0)
@@ -280,6 +280,23 @@ z2 = x.index(0, 1, 3)
         self.assertSetEqual(
             env.exclusive_lookup("z2"),
             {FLOAT_CLASS.instance()}
+        )
+
+    def test_list_sort(self):
+        """Test sorting a list."""
+        code = """
+x = [2.0]
+x.sort()
+x.sort(key=2)
+x.sort(reverse=False)
+x.sort(key=2, reverse=True)
+"""
+        env = ModuleEnv()
+        env.parse_code(code)
+
+        self.assertSetEqual(
+            env.exclusive_lookup("x"),
+            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
         )
 
 
