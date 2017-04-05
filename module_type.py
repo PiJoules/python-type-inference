@@ -1,6 +1,9 @@
 import pytype
 import astor
 import pkgutil
+import sys
+
+from importlib.machinery import SourceFileLoader
 
 
 def module_path_from_name(name):
@@ -10,8 +13,8 @@ def module_path_from_name(name):
             otherwise (absolute).
     """
     loader = pkgutil.get_loader(name)
-    if loader is None:
-        return loader
+    if not isinstance(loader, SourceFileLoader):
+        return None
     return loader.path
 
 
@@ -32,18 +35,18 @@ def load_module(name):
     Raises:
         RuntimeError
     """
+    # Check the sys path first
     mod_location = module_path_from_name(name)
-    if mod_location is None:
-        raise RuntimeError("The module '{}' cannot be found on the pythonpath: {}.".format(name, sys.path))
-    mod_node = module_node_from_path(mod_location)
-    if mod_node is None:
-        # The module is probably implemented in C
-        # See if we have a ModuleType for it
-        if name not in BUILTIN_MODULES:
-            raise RuntimeError("The module '{}' is probably implemented in C and does not have a python implementation. This module should have a pre-built ModuleType.".format(name))
-        else:
-            return BUILTIN_MODULES[name]
-    return ModuleType.from_node(mod_node)
+    if mod_location:
+        mod_node = module_node_from_path(mod_location)
+        if mod_node:
+            return ModuleType.from_node(mod_node)
+
+    # Then check the builtins that were implemented
+    if name in BUILTIN_MODULES:
+        return BUILTIN_MODULES[name]
+    else:
+        raise RuntimeError("The module '{}' is probably implemented in C and does not have a python implementation. This module should have a pre-built ModuleType.".format(name))
 
 
 class ModuleType(pytype.PyType):
