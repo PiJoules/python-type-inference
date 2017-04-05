@@ -1,60 +1,40 @@
-import class_type
+from class_type import ClassType
+from function_type import BuiltinFunction
+from magic_methods import *
 
 
-class FloatClass(class_type.ClassType):
+class FloatAddMethod(AddMethod):
+    def returns(self):
+        return self.env().lookup("self")
+
+
+class FloatSubMethod(SubMethod):
+    def returns(self):
+        return self.env().lookup("self")
+
+
+class FloatMulMethod(MulMethod):
+    def returns(self):
+        return self.env().lookup("self")
+
+
+class FloatTrueDivMethod(TrueDivMethod):
+    def returns(self):
+        return self.env().lookup("self")
+
+
+class FloatClass(ClassType):
     def __init__(self):
-        super().__init__("float")
-
-
-def create_class():
-    from function_type import BuiltinFunction
-
-    # Create the class
-    cls = FloatClass()
-
-    # Add any methods
-    class AddMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                pos_args=["self", "other"]
+        super().__init__(
+            "float",
+            init_methods=(
+                FloatAddMethod(),
+                FloatSubMethod(),
+                FloatMulMethod(),
+                FloatTrueDivMethod(),
             )
-
-        def call(self, args):
-            return {cls.instance()}
-
-    class SubMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                pos_args=["self", "other"]
-            )
-
-        def call(self, args):
-            return {cls.instance()}
-
-    class MulMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                pos_args=["self", "other"]
-            )
-
-        def call(self, args):
-            return {cls.instance()}
-
-    class TrueDivMethod(BuiltinFunction):
-        def __init__(self):
-            super().__init__(
-                pos_args=["self", "other"]
-            )
-
-        def call(self, args):
-            return {cls.instance()}
-
-    cls.set_attr(cls.ADD_METHOD, {AddMethod()})
-    cls.set_attr(cls.SUB_METHOD, {SubMethod()})
-    cls.set_attr(cls.MUL_METHOD, {MulMethod()})
-    cls.set_attr(cls.TRUEDIV_METHOD, {TrueDivMethod()})
-
-    return cls
+        )
 
 
-FLOAT_CLASS = create_class()
+FLOAT_CLASS = FloatClass()
+FLOAT_TYPE = FLOAT_CLASS.instance()

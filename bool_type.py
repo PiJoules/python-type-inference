@@ -17,3 +17,4 @@ def create_class():
 
 
 BOOL_CLASS = create_class()
+BOOL_TYPE = BOOL_CLASS.instance()

@@ -25,10 +25,11 @@ class FunctionType(pytype.PyType):
             kwargs (dict)
             keyword_defaults (Optional[list[set[pytype.PyType]]])
             kwonly_defaults (Optional[list[set[pytype.PyType]]])
+            defined_name (Optional[str]): The name that comes with the definition of a function.
+                If the function is created dynamically at runtime, this may be None.
         """
         from inference import Environment
         super().__init__("function", *args, **kwargs)
-        self.__env = env or Environment()
         self.__ref_node = node
 
         if defined_name:
@@ -37,6 +38,7 @@ class FunctionType(pytype.PyType):
             self.__defined_name = node.name
         else:
             self.__defined_name = None
+        self.__env = env or Environment(self.__defined_name)
 
         self.__pos_args = pos_args or []
         self.__keywords = keywords or []
@@ -145,34 +147,9 @@ and {} variable keyword argument were left unhandled.
         """
         from none_type import NONE_CLASS
 
-        returns = set()
-        yields = set()
-
-        stack = list(self.__ref_node.body)[::-1]
-        while stack:
-            node = stack.pop()
-            if isinstance(node, ast.Return):
-                returns |= self.__env.eval(node)
-            elif isinstance(node, (ast.If, ast.While)):
-                stack += node.body + node.orelse
-                # Evalate the test to check for function args
-                self.__env.eval(node.test)
-            elif isinstance(node, ast.For):
-                stack += node.body + node.orelse
-                self.__env.eval(node.iter)
-            elif isinstance(node, ast.Try):
-                stack += node.body + node.orelse + node.finalbody
-                for handler in node.handlers:
-                    stack += handler.body
-            elif isinstance(node, ast.With):
-                stack += node.body
-                for item in node.items:
-                    self.__env.eval(item.context_expr)
-            elif isinstance(node, ast.Expr) and isinstance(node.value, ast.Yield):
-                yields |= self.__env.eval(node)
-            else:
-                # Parse everything else
-                self.__env.parse(node)
+        self.env().parse_sequence(self.__ref_node.body)
+        returns = self.env().returns()
+        yields = self.env().yields()
 
         # Empty returns means return None
         returns = returns or {NONE_CLASS.instance()}
@@ -221,7 +198,7 @@ and {} variable keyword argument were left unhandled.
         """
         from inference import Environment
 
-        env = Environment(parent_env=parent_env)
+        env = Environment(node.name, parent_env=parent_env)
 
         # Add the arguments as variables
         env.parse_arguments(node.args)
@@ -294,8 +271,11 @@ and {} variable keyword argument were left unhandled.
 
 
 class BuiltinFunction(FunctionType):
-    def __init__(self, *args, **kwargs):
-        super().__init__(None, None, *args, **kwargs)
+    def __init__(self, defined_name, *args, **kwargs):
+        super().__init__(None, None, *args, defined_name=defined_name, **kwargs)
+
+    def returns(self):
+        raise NotImplementedError
 
     def check_pos_args(self, args):
         """

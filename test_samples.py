@@ -152,6 +152,10 @@ class TestSamples(unittest.TestCase):
             env.lookup("ValueError")
         )
 
+    def test_disemvowel(self):
+        """Test disemvowel.py"""
+        env = self.create_module_env("samples/disemvowel.py")
+
 
 if __name__ == "__main__":
     unittest.main()

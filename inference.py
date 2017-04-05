@@ -5,12 +5,14 @@ import sys
 import os
 import astor
 import pytype
-import arguments
+
+from arguments import Arguments, empty_args
 
 
 class Environment:
-    def __init__(self, init_vars=None, parent_env=None,
+    def __init__(self, name, init_vars=None, parent_env=None,
                  module_location=None):
+        self.__name = name
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
         if self.__parent:
@@ -18,14 +20,34 @@ class Environment:
         else:
             self.__call_stack = set()
 
+        self.__returns = set()
+        self.__yields = set()
+
         # Modules
         self.__module_location = module_location
+
+    def returns(self):
+        return self.__returns
+
+    def yields(self):
+        return self.__yields
+
+    def name(self):
+        return self.__name
 
     def call_stack(self):
         return self.__call_stack
 
     def variables(self):
         return self.__variables
+
+    def all_variables(self):
+        """Includes variables in higher level envs."""
+        vars = {}
+        if self.__parent:
+            vars.update(self.__parent.all_variables())
+        vars.update(self.variables())
+        return vars
 
     def bind(self, varname, types):
         """
@@ -67,18 +89,20 @@ class Environment:
         """
         return self.__variables[varname]
 
-    def lookup(self, varname):
+    def lookup(self, varname, init_env=None):
         """
         Lookup a variable in this environment, then lookup in the parent env
         if it is not in this env.
         """
+        init_env = init_env or self.name()
+
         if varname in self.__variables:
             return self.exclusive_lookup(varname)
 
         if self.__parent:
-            return self.__parent.lookup(varname)
+            return self.__parent.lookup(varname, init_env=init_env)
 
-        raise KeyError("'{}' does not exist in this environment".format(varname))
+        raise KeyError("'{}' does not exist in environment of '{}'".format(varname, init_env))
 
     def unpack_assign(self, target, types):
         """
@@ -161,7 +185,7 @@ class Environment:
                 self.__call_stack.add(func)
 
                 # Create new arguments since these are mutated
-                args = arguments.Arguments.from_call_node(node, self)
+                args = Arguments.from_call_node(node, self)
                 ret_types |= func.call(args)
 
                 self.__call_stack.remove(func)
@@ -183,16 +207,16 @@ class Environment:
         results = set()
         if isinstance(op, ast.Add):
             for t in left:
-                results |= t.call_add(arguments.Arguments([right]))
+                results |= t.call_add(Arguments([right]))
         elif isinstance(op, ast.Sub):
             for t in left:
-                results |= t.call_sub(arguments.Arguments([right]))
+                results |= t.call_sub(Arguments([right]))
         elif isinstance(op, ast.Mult):
             for t in left:
-                results |= t.call_mul(arguments.Arguments([right]))
+                results |= t.call_mul(Arguments([right]))
         elif isinstance(op, ast.Div):
             for t in left:
-                results |= t.call_truediv(arguments.Arguments([right]))
+                results |= t.call_truediv(Arguments([right]))
         else:
             raise NotImplementedError("No logic for handling operation {}".format(op))
 
@@ -207,10 +231,13 @@ class Environment:
         right_types = self.eval(right)
         if isinstance(op, ast.Eq):
             for t in left_types:
-                results |= t.call_eq(arguments.Arguments([right_types]))
+                results |= t.call_eq(Arguments([right_types]))
         elif isinstance(op, ast.Lt):
             for t in left_types:
-                results |= t.call_lt(arguments.Arguments([right_types]))
+                results |= t.call_lt(Arguments([right_types]))
+        elif isinstance(op, ast.In):
+            for t in left_types:
+                results |= t.call_contains(Arguments([right_types]))
         else:
             raise NotImplementedError("No logic for comparing with operation {}".format(op))
         return results
@@ -241,7 +268,7 @@ class Environment:
         for i in range(len(comp_results)-1):
             result_types = comp_results[i]  # set[pytype.Pytype]
             for t in result_types:
-                results |= t.call_and(arguments.Arguments([comp_results[i+1]]))
+                results |= t.call_and(Arguments([comp_results[i+1]]))
 
         return results
 
@@ -264,7 +291,7 @@ class Environment:
 
         ret_types = set()
         for value in values:
-            args = arguments.Arguments([key_types])
+            args = Arguments([key_types])
             ret_types |= value.call_getitem(args)
         return ret_types
 
@@ -340,7 +367,7 @@ class Environment:
             return self.eval_ext_slice(node)
         elif isinstance(node, ast.UnaryOp):
             return self.eval_unary_op(node)
-        elif isinstance(node, (ast.Yield, ast.Return)):
+        elif isinstance(node, ast.Yield):
             if node.value:
                 return self.eval(node.value)
             else:
@@ -427,7 +454,9 @@ class Environment:
         self.parse_sequence(node.orelse)
 
     def parse_expr(self, node):
-        self.eval(node.value)
+        results = self.eval(node.value)
+        if isinstance(node.value, ast.Yield):
+            self.__yields |= results
 
     def parse_regular_import_alias(self, node):
         """
@@ -459,10 +488,10 @@ class Environment:
         contents = set()
         for t in iter_types:
             #contents |= t.all_contents()
-            iterator_types = t.call_iter(arguments.empty_args())  # iterator
+            iterator_types = t.call_iter(empty_args())  # iterator
             for iter_t in iterator_types:
                 # The next value
-                contents |= iter_t.call_next(arguments.empty_args())
+                contents |= iter_t.call_next(empty_args())
         self.unpack_assign(target, contents)
 
         # Parse both the body and orelse
@@ -525,6 +554,8 @@ class Environment:
             self.parse_raise(node)
         elif isinstance(node, ast.Pass):
             pass
+        elif isinstance(node, ast.Return):
+            self.__returns |= self.eval(node.value)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 
@@ -543,8 +574,10 @@ class Environment:
 
 class ModuleEnv(Environment):
     def __init__(self, module_location=None):
-        super().__init__(init_vars=pytype.load_builtin_vars(),
-                         module_location=module_location)
+        super().__init__(
+            "__main__",
+            init_vars=pytype.load_builtin_vars(),
+            module_location=module_location)
 
         # Also add this location to the pythonpath
         if module_location is not None:

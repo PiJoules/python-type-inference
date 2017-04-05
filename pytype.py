@@ -24,6 +24,7 @@ class PyType:
     DIR_METHOD = "__dir__"
 
     GETITEM_METHOD = "__getitem__"
+    CONTAINS_METHOD = "__contains__"
 
     NEXT_METHOD = "__next__"
     ITER_METHOD = "__iter__"
@@ -311,6 +312,9 @@ class PyType:
     def call_getitem(self, args):
         return self.call_attr(self.GETITEM_METHOD, args)
 
+    def call_contains(self, args):
+        return self.call_attr(self.CONTAINS_METHOD, args)
+
     """
     Emulating numeric types
     """
@@ -407,6 +411,7 @@ def load_builtin_vars():
     class PrintFunction(BuiltinFunction):
         def __init__(self):
             super().__init__(
+                "print",
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
@@ -425,6 +430,7 @@ def load_builtin_vars():
     class InputFunction(BuiltinFunction):
         def __init__(self):
             super().__init__(
+                "input",
                 keywords=["prompt"],
                 keyword_defaults=[{STR_CLASS.instance()}],
             )

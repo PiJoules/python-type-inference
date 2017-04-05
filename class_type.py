@@ -2,10 +2,15 @@ import pytype
 
 
 class ClassType(pytype.PyType):
-    def __init__(self, defined_name=None, inst=None, *args, **kwargs):
+    def __init__(self, defined_name=None, init_methods=None, inst=None, *args, **kwargs):
+        from function_type import FunctionType
         super().__init__("type", *args, **kwargs)
         self.__inst = inst
         self.__defined_name = inst.name() if inst else defined_name
+
+        methods = init_methods or []
+        for method in methods:
+            self.set_builtin_method(method)
 
     @classmethod
     def from_node_and_env(cls, node, parent_env):
@@ -19,7 +24,7 @@ class ClassType(pytype.PyType):
         from inference import Environment
 
         # Create an env to find assigned variables
-        env = Environment(parent_env=parent_env)
+        env = Environment(node.name, parent_env=parent_env)
 
         # Parse the class body
         env.parse_sequence(node.body)
@@ -41,6 +46,12 @@ class ClassType(pytype.PyType):
             from instance_type import InstanceType
             self.__inst = InstanceType(self.defined_name(), parents=[self])
         return self.__inst
+
+    def set_builtin_method(self, method):
+        from function_type import FunctionType
+        assert isinstance(method, FunctionType)
+        assert method.defined_name()
+        self.set_attr(method.defined_name(), {method})
 
     def __hash__(self):
         # All classes are unique
