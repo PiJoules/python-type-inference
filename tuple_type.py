@@ -75,8 +75,8 @@ class TupleClass(class_type.InstanceWrapperClass):
         else:
             return {self.create_tuple()}
 
-    def instance(self):
-        return self.create_tuple()
+    def instance(self, *args, **kwargs):
+        return self.create_tuple(*args, **kwargs)
 
 
 def create_class():

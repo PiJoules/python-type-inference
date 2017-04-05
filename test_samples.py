@@ -6,7 +6,7 @@ from module_type import *
 from pytype import *
 from float_type import FLOAT_CLASS
 from int_type import INT_CLASS
-from str_type import STR_CLASS
+from str_type import STR_TYPE
 from function_type import FunctionType
 
 
@@ -89,11 +89,11 @@ class TestSamples(unittest.TestCase):
         read_input_env = self.first(env.exclusive_lookup("read_input")).env()
         self.assertSetEqual(
             read_input_env.exclusive_lookup("input_line"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
         self.assertSetEqual(
             read_input_env.exclusive_lookup("output_line"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
 
         # parse_input_line()
@@ -104,7 +104,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pil_env.exclusive_lookup("units"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
 
         # convert()
@@ -115,7 +115,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             convert_env.exclusive_lookup("units"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
 
         # process_line()
@@ -126,7 +126,7 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("units"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result"),
@@ -134,18 +134,18 @@ class TestSamples(unittest.TestCase):
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result_units"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
 
         # Variables under the if __name__ == "__main__"
-        tup = TUPLE_CLASS.create_tuple(init_contents=tuple([{STR_CLASS.instance()}, {STR_CLASS.instance()}]))
+        tup = TUPLE_CLASS.create_tuple(init_contents=tuple([{STR_TYPE}, {STR_TYPE}]))
         self.assertSetEqual(
             env.exclusive_lookup("input_lines"),
             {tup}
         )
         self.assertSetEqual(
             env.exclusive_lookup("line"),
-            {STR_CLASS.instance()}
+            {STR_TYPE}
         )
         self.assertSetEqual(
             env.exclusive_lookup("e"),
@@ -155,6 +155,45 @@ class TestSamples(unittest.TestCase):
     def test_disemvowel(self):
         """Test disemvowel.py"""
         env = self.create_module_env("samples/disemvowel.py")
+
+        self.assertSetEqual(
+            env.exclusive_lookup("__name__"),
+            {STR_TYPE}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("words"),
+            {STR_TYPE}
+        )
+
+        self.assertSetEqual(
+            env.exclusive_lookup("words"),
+            {STR_TYPE}
+        )
+
+        disemv_func = self.first(env.exclusive_lookup("disemvowel"))
+        func_env = disemv_func.env()
+        self.assertSetEqual(
+            disemv_func.returns(),
+            {TUPLE_CLASS.instance(init_contents=(
+                {STR_TYPE}, {STR_TYPE}
+            ))}
+        )
+
+        self.assertSetEqual(
+            func_env.exclusive_lookup("vowels"),
+            {STR_TYPE}
+        )
+
+        self.assertSetEqual(
+            func_env.exclusive_lookup("consonants"),
+            {STR_TYPE}
+        )
+
+        self.assertSetEqual(
+            func_env.exclusive_lookup("c"),
+            {STR_TYPE}
+        )
 
 
 if __name__ == "__main__":
