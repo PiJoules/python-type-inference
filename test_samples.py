@@ -7,10 +7,11 @@ from pytype import *
 from float_type import FLOAT_CLASS
 from int_type import INT_CLASS
 from str_type import STR_CLASS
+from function_type import FunctionType
 
 
 class TestSamples(unittest.TestCase):
-    def get_module_env(self, filepath):
+    def create_module_env(self, filepath):
         with open(filepath, "r") as f:
             env = ModuleEnv(module_location=filepath)
             env.parse_code(f.read())
@@ -22,7 +23,7 @@ class TestSamples(unittest.TestCase):
 
     def test_fib(self):
         """Testing fib.py"""
-        env = self.get_module_env("samples/fib.py")
+        env = self.create_module_env("samples/fib.py")
 
         # main()
         main = self.first(env.exclusive_lookup("main"))
@@ -44,7 +45,7 @@ class TestSamples(unittest.TestCase):
 
     def test_degrees(self):
         """Testing degrees.py"""
-        env = self.get_module_env("samples/degrees.py")
+        env = self.create_module_env("samples/degrees.py")
 
         # math module
         self.assertSetEqual(
