@@ -22,6 +22,7 @@ class Environment:
 
         self.__returns = set()
         self.__yields = set()
+        self.__raises = set()
 
         # Modules
         self.__module_location = module_location
@@ -31,6 +32,9 @@ class Environment:
 
     def yields(self):
         return self.__yields
+
+    def raises(self):
+        return self.__raises
 
     def name(self):
         return self.__name
@@ -198,29 +202,31 @@ class Environment:
         """
         return set(self.lookup(node.id))
 
+    def eval_bin_op_from_types(self, left, op, right, aug=False):
+        results = set()
+        if isinstance(op, ast.Add):
+            for t in left:
+                results |= t.call_add(Arguments([right]), aug=aug)
+        elif isinstance(op, ast.Sub):
+            for t in left:
+                results |= t.call_sub(Arguments([right]), aug=aug)
+        elif isinstance(op, ast.Mult):
+            for t in left:
+                results |= t.call_mul(Arguments([right]), aug=aug)
+        elif isinstance(op, ast.Div):
+            for t in left:
+                results |= t.call_truediv(Arguments([right]), aug=aug)
+        else:
+            raise NotImplementedError("No logic for handling operation {}".format(op))
+
+        return results
+
     def eval_bin_op(self, node):
         """Call the appropriate magic method of each type."""
         op = node.op
         left = self.eval(node.left)
         right = self.eval(node.right)
-
-        results = set()
-        if isinstance(op, ast.Add):
-            for t in left:
-                results |= t.call_add(Arguments([right]))
-        elif isinstance(op, ast.Sub):
-            for t in left:
-                results |= t.call_sub(Arguments([right]))
-        elif isinstance(op, ast.Mult):
-            for t in left:
-                results |= t.call_mul(Arguments([right]))
-        elif isinstance(op, ast.Div):
-            for t in left:
-                results |= t.call_truediv(Arguments([right]))
-        else:
-            raise NotImplementedError("No logic for handling operation {}".format(op))
-
-        return results
+        return self.eval_bin_op_from_types(left, op, right)
 
     def eval_single_compare(self, left, op, right):
         """
@@ -523,13 +529,24 @@ class Environment:
         self.parse_sequence(orelse)
         self.parse_sequence(finalbody)
 
+    def parse_return(self, node):
+        if node.value:
+            self.__returns |= self.eval(node.value)
+
     def parse_raise(self, node):
         """
         Evaluate both the exception and cause
         """
-        self.eval(node.exc)
+        self.__raises |= self.eval(node.exc)
         if node.cause:
             self.eval(node.cause)
+
+    def parse_aug_assign(self, node):
+        targets = self.eval(node.target)
+        values = self.eval(node.value)
+        op = node.op
+        results = self.eval_bin_op_from_types(targets, op, values, aug=True)
+        self.unpack_assign(node.target, results)
 
     def parse(self, node):
         if isinstance(node, ast.Assign):
@@ -552,10 +569,12 @@ class Environment:
             self.parse_try(node)
         elif isinstance(node, ast.Raise):
             self.parse_raise(node)
-        elif isinstance(node, ast.Pass):
+        elif isinstance(node, (ast.Pass, ast.Continue, ast.Break)):
             pass
         elif isinstance(node, ast.Return):
-            self.__returns |= self.eval(node.value)
+            self.parse_return(node)
+        elif isinstance(node, ast.AugAssign):
+            self.parse_aug_assign(node)
         else:
             raise NotImplementedError("Unable to parse node '{}'".format(node))
 

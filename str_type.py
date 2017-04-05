@@ -58,6 +58,11 @@ class StrContainsMethod(ContainsMethod):
         return {BOOL_TYPE}
 
 
+class StrIAddMethod(IAddMethod):
+    def returns(self):
+        return self.env().lookup("self")
+
+
 class StrClass(ClassType):
     def __init__(self):
         super().__init__(
@@ -68,6 +73,7 @@ class StrClass(ClassType):
                 StrLowerMethod(),
                 StrIterMethod(),
                 StrContainsMethod(),
+                StrIAddMethod(),
             )
         )
 

@@ -34,6 +34,8 @@ class PyType:
     MUL_METHOD = "__mul__"
     TRUEDIV_METHOD = "__truediv__"
 
+    IADD_METHOD = "__iadd__"
+
     def __init__(self, name, init_attrs=None, parents=None):
         """
         Args:
@@ -319,13 +321,26 @@ class PyType:
     Emulating numeric types
     """
 
-    def _rmethod(self, method):
+    def _alt_method(self, alt, method):
+        """Get an alternated method."""
         assert method.startswith("__")
         assert method.endswith("__")
-        return "__r" + method[2:-2] + "__"
+        return "__" + alt + method[2:-2] + "__"
 
-    def _call_numeric_op(self, method, args):
+    def _rmethod(self, method):
+        """Get the reflected method."""
+        return self._alt_method("r", method)
+
+    def _imethod(self, method):
+        """Get the augmented (inplace) method."""
+        return self._alt_method("i", method)
+
+    def _call_numeric_op(self, method, args, aug=False):
         from arguments import Arguments
+
+        if aug:
+            i_meth = self._imethod(method)
+            return self.call_attr(i_meth, args)
 
         if self.has_attr(method):
             return self.call_attr(method, args)
@@ -347,17 +362,17 @@ class PyType:
                     raise RuntimeError("No support for {} or {} on types '{}' and '{}'".format(method, r_meth, self, t))
             return results
 
-    def call_add(self, args):
-        return self._call_numeric_op(self.ADD_METHOD, args)
+    def call_add(self, args, **kwargs):
+        return self._call_numeric_op(self.ADD_METHOD, args, **kwargs)
 
-    def call_sub(self, args):
-        return self._call_numeric_op(self.SUB_METHOD, args)
+    def call_sub(self, args, **kwargs):
+        return self._call_numeric_op(self.SUB_METHOD, args, **kwargs)
 
-    def call_mul(self, args):
-        return self._call_numeric_op(self.MUL_METHOD, args)
+    def call_mul(self, args, **kwargs):
+        return self._call_numeric_op(self.MUL_METHOD, args, **kwargs)
 
-    def call_truediv(self, args):
-        return self._call_numeric_op(self.TRUEDIV_METHOD, args)
+    def call_truediv(self, args, **kwargs):
+        return self._call_numeric_op(self.TRUEDIV_METHOD, args, **kwargs)
 
     """
     Iterator types

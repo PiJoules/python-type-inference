@@ -5,6 +5,8 @@ from .sub_method import SubMethod
 from .mul_method import MulMethod
 from .truediv_method import TrueDivMethod
 
+from .iadd_method import IAddMethod
+
 from .iter_method import IterMethod
 from .contains_method import ContainsMethod
 
