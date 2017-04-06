@@ -3,6 +3,7 @@ import class_type
 import instance_type
 
 from generator_type import GENERATOR_CLASS
+from magic_methods import *
 
 
 class TupleType(instance_type.InstanceType):
@@ -80,7 +81,6 @@ class TupleClass(class_type.InstanceWrapperClass):
 
 
 def create_class():
-    from getitem_method import GetItemMethod
     from function_type import BuiltinFunction
     from builtin_types import INT_TYPE
 

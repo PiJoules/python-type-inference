@@ -40,11 +40,11 @@ class ClassType(pytype.PyType):
         self.instance().call_init(args)
         return {self.instance()}
 
-    def instance(self):
+    def instance(self, *args, **kwargs):
         """Getter for getting the instance this class produces without calling init."""
         if self.__inst is None:
             from instance_type import InstanceType
-            self.__inst = InstanceType(self.defined_name(), parents=[self])
+            self.__inst = InstanceType(self.defined_name(), parents=[self], *args, **kwargs)
         return self.__inst
 
     def set_builtin_method(self, method):

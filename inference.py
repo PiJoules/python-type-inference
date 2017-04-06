@@ -161,11 +161,9 @@ class Environment:
         return {BYTES_TYPE}
 
     def eval_list(self, node):
-        from list_type import LIST_CLASS
+        from builtin_types import LIST_CLASS
         return {
-            LIST_CLASS.instance(
-                init_contents=list(map(self.eval, node.elts))
-            )
+            LIST_CLASS.from_list(list(map(self.eval, node.elts)))
         }
 
     def eval_tuple(self, node):

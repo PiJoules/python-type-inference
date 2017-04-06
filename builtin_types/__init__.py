@@ -6,3 +6,5 @@ from .str_type import STR_CLASS, STR_TYPE
 from .file_type import FILE_CLASS, FILE_TYPE
 from .bytes_type import BYTES_CLASS, BYTES_TYPE
 from .slice_type import SLICE_CLASS, SLICE_TYPE
+
+from .list_type import LIST_CLASS

@@ -4,6 +4,7 @@ from pytype import PyType
 from arguments import empty_args
 from generator_type import GENERATOR_CLASS
 from builtin_types import INT_TYPE, BOOL_TYPE
+from magic_methods import *
 
 
 class IntegerInterpetationError(TypeError):
@@ -16,20 +17,14 @@ LIST_NAME = "list"
 
 class ListType(InstanceType):
     def __init__(self, init_contents=None, *args, **kwargs):
+        """
+        Args:
+            init_contents (Optional[set[PyType]])
+        """
         super().__init__(LIST_NAME, *args, **kwargs)
-
-        # Combine all contents into one set. Order will not matter for
-        # indexing lists.
-        init_contents = init_contents or []
-        assert isinstance(init_contents, list)
-        for types in init_contents:
-            assert isinstance(types, set)
-            assert all(isinstance(x, PyType) for x in types)
-
-        contents = set()
-        for types in init_contents:
-            contents |= types
-        self.__contents = contents
+        self.__contents = init_contents or set()
+        assert isinstance(self.__contents, set)
+        assert all(isinstance(x, PyType) for x in self.__contents)
 
     def append(self, item):
         assert isinstance(item, PyType)
@@ -73,24 +68,23 @@ class ListClass(ClassType):
     def instance(self, *args, **kwargs):
         return ListType(parents=[self], *args, **kwargs)
 
-    def inst_from_list(self, lst):
-        return self.instance(init_contents=[lst.contents()])
+    def from_list(self, lst):
+        contents = set()
+        for types in lst:
+            contents |= types
+        return self.instance(init_contents=contents)
 
     def merge_lists(self, *lsts):
         contents = set()
         for lst in lsts:
             contents |= lst.contents()
-        return self.instance(
-            init_contents=[contents]
-        )
+        return self.from_list([contents])
 
 
 def create_class():
     from builtin_types import INT_TYPE
     from builtin_types import NONE_TYPE, SLICE_TYPE
     from function_type import BuiltinFunction
-    from getitem_method import GetItemMethod
-    from magic_methods import AddMethod
 
     cls = ListClass()
 
