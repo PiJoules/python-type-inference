@@ -1,8 +1,8 @@
 from builtin_types import *
 from function_type import BuiltinFunction
+from class_type import *
 from tuple_type import create_tuple_class
-from dict_type import create_dict_class
-from value_error_type import ValueErrorClass
+from dict_type import DictClass
 
 
 class BuiltinsManager:
@@ -10,19 +10,24 @@ class BuiltinsManager:
         self.__create_builtins()
 
     def __create_builtins(self):
-        self.__none = NoneClass(self).instance()
+        self.__none_cls = ClassType.from_name("None", self)
         self.__int_cls = IntClass(self)
         self.__float_cls = FloatClass(self)
         self.__bool_cls = BoolClass(self)
         self.__str_cls = StrClass(self)
         self.__file = FileClass(self).instance()
         self.__tuple_cls = create_tuple_class(self)
-        self.__dict_cls = create_dict_class(self)
+        self.__dict_cls = DictClass(self)
 
-        self.__value_error_cls = ValueErrorClass(self)
+        self.__create_exceptions()
+
+    def __create_exceptions(self):
+        self.__exception_cls = ClassType.from_name("Exception", self)
+        self.__value_error_cls = ClassType.from_name("ValueError", self, parents=[self.exception_cls()])
 
     def exceptions(self):
         return {
+            "Exception": {self.exception_cls()},
             "ValueError": {self.value_error_cls()},
         }
 
@@ -133,6 +138,9 @@ class BuiltinsManager:
     """
     Exceptions
     """
+
+    def exception_cls(self):
+        return self.__exception_cls
 
     def value_error_cls(self):
         return self.__value_error_cls

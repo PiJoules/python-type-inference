@@ -1,4 +1,3 @@
-from .none_type import NoneClass
 from .int_type import IntClass
 from .float_type import FloatClass
 from .bool_type import BoolClass

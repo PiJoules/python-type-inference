@@ -2,7 +2,6 @@ import pytype
 import class_type
 import instance_type
 
-from builtin_types import GENERATOR_CLASS
 from magic_methods import *
 
 
@@ -63,7 +62,7 @@ class TupleType(instance_type.InstanceType):
         return "tuple{}".format(str_contents)
 
 
-class TupleClass(class_type.InstanceWrapperClass):
+class TupleClass(class_type.ClassType):
     def create_tuple(self, **kwargs):
         return TupleType(parents=[self], **kwargs)
 
@@ -82,7 +81,6 @@ class TupleClass(class_type.InstanceWrapperClass):
 
 def create_tuple_class():
     from function_type import BuiltinFunction
-    from builtin_types import INT_TYPE
 
     cls = TupleClass("tuple")
 
@@ -95,7 +93,7 @@ def create_tuple_class():
 
             for self_t in self_types:
                 for key_t in key_types:
-                    if key_t.is_type(INT_TYPE):
+                    if key_t.is_type(self.builtins().int()):
                         # Accessing 1 item in the tuple
                         results |= self_t.all_contents()
                     else:
@@ -118,12 +116,9 @@ def create_tuple_class():
             for self_t in self_types:
                 results |= self_t.all_contents()
 
-            return {GENERATOR_CLASS.instance(yields=results)}
+            return {self.builtins().generator().instance(yields=results)}
 
     cls.set_attr(cls.GETITEM_METHOD, {TupleGetItemMethod()})
     cls.set_attr(cls.ITER_METHOD, {TupleIterMethod()})
 
     return cls
-
-
-TUPLE_CLASS = create_tuple_class()

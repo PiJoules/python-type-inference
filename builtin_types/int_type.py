@@ -38,8 +38,9 @@ class IntLtMethod(LtMethod):
 
 
 class IntClass(ClassType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
+            builtins,
             "int",
             init_methods=(
                 IntAddMethod(),

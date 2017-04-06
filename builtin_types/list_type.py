@@ -92,9 +92,10 @@ class ListGetItemMethod(GetItemMethod):
 
 
 class ListClass(ClassType):
-    def __init__(self):
+    def __init__(self, *args, **kwargs):
         super().__init__(
-            LIST_NAME,
+            *args,
+            defined_name=LIST_NAME,
             init_methods=(
                 ListGetItemMethod(),
             )
@@ -116,10 +117,10 @@ class ListClass(ClassType):
         return self.from_list([contents])
 
 
-def create_list_class():
+def create_list_class(builtins):
     from function_type import BuiltinFunction
 
-    cls = ListClass()
+    cls = ListClass(builtins)
 
     class ListAddMethod(AddMethod):
         def adjusted_call(self, args):
@@ -326,6 +327,3 @@ def create_list_class():
     cls.set_attr("copy", {ListCopyMethod()})
 
     return cls
-
-
-LIST_CLASS = create_list_class()

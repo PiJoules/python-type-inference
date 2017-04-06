@@ -68,8 +68,8 @@ class DictPointer(DictType):
 
 
 class DictClass(class_type.ClassType):
-    def __init__(self):
-        super().__init__("dict")
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, defined_name="dict", **kwargs)
         self.__dict = DictType()
 
     def instance(self):
@@ -111,12 +111,3 @@ class DictClass(class_type.ClassType):
                 else:
                     raise RuntimeError("Expected either mapping or iterable for dict argument")
             return ret_types
-
-
-def create_dict_class():
-    cls = DictClass()
-
-    return cls
-
-
-DICT_CLASS = create_dict_class()
