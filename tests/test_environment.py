@@ -7,7 +7,7 @@ from dict_type import DictType
 from builtin_types import INT_TYPE, STR_TYPE
 
 
-class TestInference(unittest.TestCase):
+class TestEnvironment(unittest.TestCase):
     def first(self, container):
         self.assertEqual(len(container), 1)
         return next(iter(container))

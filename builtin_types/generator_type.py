@@ -1,6 +1,5 @@
 from instance_type import InstanceType
 from class_type import ClassType
-from builtin_types import NONE_TYPE
 
 
 GENERATOR_NAME = "generator"
@@ -11,7 +10,7 @@ class GeneratorType(InstanceType):
         super().__init__("generator", *args, **kwargs)
 
         self.__yields = yields or set()
-        self.__returns = returns or {NONE_TYPE}
+        self.__returns = returns or {self.builtins().none()}
 
     def yields(self):
         return self.__yields
@@ -38,9 +37,10 @@ class GeneratorType(InstanceType):
 
 
 class GeneratorClass(ClassType):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, builtins, *args, **kwargs):
         super().__init__(
-            defined_name=GENERATOR_NAME,
+            builtins,
+            GENERATOR_NAME,
             *args, **kwargs
         )
 
@@ -48,10 +48,10 @@ class GeneratorClass(ClassType):
         return GeneratorType(parents=[self], *args, **kwargs)
 
 
-def create_class():
+def create_generator_class(builtins):
     from function_type import BuiltinFunction
 
-    cls = GeneratorClass()
+    cls = GeneratorClass(builtins)
 
     class GeneratorIterMethod(BuiltinFunction):
         def __init__(self):
@@ -60,9 +60,8 @@ def create_class():
                 pos_args=["self"]
             )
 
-        def adjusted_call(self, args):
-            self.check_pos_args(args)
-            return args.pos_args()[0]
+        def returns(self):
+            return self.env().lookup("self")
 
     class GeneratorNextMethod(BuiltinFunction):
         def __init__(self):
@@ -86,6 +85,3 @@ def create_class():
     cls.set_attr(cls.NEXT_METHOD, {GeneratorNextMethod()})
 
     return cls
-
-
-GENERATOR_CLASS = create_class()

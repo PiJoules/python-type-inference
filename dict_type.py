@@ -113,10 +113,10 @@ class DictClass(class_type.ClassType):
             return ret_types
 
 
-def create_class():
+def create_dict_class():
     cls = DictClass()
 
     return cls
 
 
-DICT_CLASS = create_class()
+DICT_CLASS = create_dict_class()

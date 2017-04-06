@@ -1,12 +1,14 @@
 import ast
 import pytype
 
+from environment import Environment
+
 
 class FunctionType(pytype.PyType):
     """
     Type that can contain code to be executed.
     """
-    def __init__(self, env, node, *args, pos_args=None, keywords=None,
+    def __init__(self, env, node, builtins, *args, pos_args=None, keywords=None,
                  vararg=None, kwonlyargs=None, kwarg=None,
                  keyword_defaults=None, kwonly_defaults=None,
                  defined_name=None,
@@ -28,7 +30,6 @@ class FunctionType(pytype.PyType):
             defined_name (Optional[str]): The name that comes with the definition of a function.
                 If the function is created dynamically at runtime, this may be None.
         """
-        from environment import Environment
         super().__init__("function", *args, **kwargs)
         self.__ref_node = node
 
@@ -154,7 +155,7 @@ and {} variable keyword argument were left unhandled.
         # Empty returns means return None
         returns = returns or {NONE_TYPE}
         if yields:
-            from generator_type import GENERATOR_CLASS
+            from builtin_types import GENERATOR_CLASS
             return {GENERATOR_CLASS.instance(
                 yields=yields,
                 returns=returns
@@ -274,39 +275,8 @@ and {} variable keyword argument were left unhandled.
 
 
 class BuiltinFunction(FunctionType):
-    def __init__(self, defined_name, *args, **kwargs):
-        super().__init__(None, None, *args, defined_name=defined_name, **kwargs)
+    def __init__(self, defined_name, builtins, *args, **kwargs):
+        super().__init__(None, None, builtins, *args, defined_name=defined_name, **kwargs)
 
     def returns(self):
         raise NotImplementedError
-
-    def check_pos_args(self, args):
-        """
-        Assert the number of positional arguments provided matches the number
-        provided.
-        """
-        if not self.vararg():
-            pos_provided = len(args.pos_args())
-            pos_defined = len(self.pos_args())
-            if pos_provided != pos_defined:
-                raise RuntimeError("""
-Function '{}' accepts {} positional arguments. {} were provided.
-Defined positional args: {}
-Provided args: {}
-"""
-.format(
-    self.defined_name(),
-    pos_defined,
-    pos_provided,
-    self.pos_args(),
-    args.pos_args(),
-))
-
-    def check_keyword_args(self, args):
-        if not self.kwarg():
-            kwarg_provided = len(args.keyword_args())
-            kwarg_defined = len(self.keywords()) + len(self.kwonlyargs())
-            if kwarg_provided != kwarg_defined:
-                raise RuntimeError("Function '{}' accepts {} keyword arguments. {} were provided.".format(self.defined_name(), kwarg_defined, kwarg_provided))
-
-

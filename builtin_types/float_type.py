@@ -34,7 +34,3 @@ class FloatClass(ClassType):
                 FloatTrueDivMethod(),
             )
         )
-
-
-FLOAT_CLASS = FloatClass()
-FLOAT_TYPE = FLOAT_CLASS.instance()

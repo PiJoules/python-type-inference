@@ -1,12 +1,14 @@
 import pytype
 
+from function_type import FunctionType
+
 
 class ClassType(pytype.PyType):
-    def __init__(self, defined_name=None, init_methods=None, inst=None, *args, **kwargs):
-        from function_type import FunctionType
-        super().__init__("type", *args, **kwargs)
+    def __init__(self, builtins, defined_name=None, init_methods=None, inst=None, *args, **kwargs):
+        super().__init__("type", builtins, *args, **kwargs)
         self.__inst = inst
         self.__defined_name = inst.name() if inst else defined_name
+        assert self.__defined_name
 
         methods = init_methods or []
         for method in methods:

@@ -1,18 +1,17 @@
 from class_type import ClassType
 from function_type import BuiltinFunction
 from magic_methods import *
-from generator_type import GENERATOR_CLASS
 
 from builtin_types import *
 
 
 class StrStripMethod(BuiltinFunction):
-    def __init__(self, chars_def):
+    def __init__(self):
         super().__init__(
             "strip",
             pos_args=["self"],
             keywords=["chars"],
-            keyword_defaults=[chars_def],
+            keyword_defaults=[self.builtins().str()],
         )
 
     def returns(self):
@@ -50,12 +49,12 @@ class StrGetItemMethod(GetItemMethod):
 
 class StrIterMethod(IterMethod):
     def returns(self):
-        return {GENERATOR_CLASS.instance(yields=self.env().lookup("self"))}
+        return {self.generator().instance(yields=self.env().lookup("self"))}
 
 
 class StrContainsMethod(ContainsMethod):
     def returns(self):
-        return {BOOL_TYPE}
+        return {self.builtins().bool()}
 
 
 class StrIAddMethod(IAddMethod):
@@ -68,6 +67,7 @@ class StrClass(ClassType):
         super().__init__(
             "str",
             init_methods=(
+                StrStripMethod(),
                 StrFormatMethod(),
                 StrGetItemMethod(),
                 StrLowerMethod(),
@@ -76,9 +76,3 @@ class StrClass(ClassType):
                 StrIAddMethod(),
             )
         )
-
-        self.set_builtin_method(StrStripMethod({self}))
-
-
-STR_CLASS = StrClass()
-STR_TYPE = STR_CLASS.instance()

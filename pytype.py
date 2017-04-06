@@ -36,7 +36,7 @@ class PyType:
 
     IADD_METHOD = "__iadd__"
 
-    def __init__(self, name, init_attrs=None, parents=None):
+    def __init__(self, name, builtins, init_attrs=None, parents=None):
         """
         Args:
             name (str)
@@ -46,8 +46,12 @@ class PyType:
         assert isinstance(name, str)
 
         self.__name = name
+        self.__builtins = builtins
         self.__attrs = init_attrs or {}  # dict[str, set[PyType]]
         self.__parents = parents or []
+
+    def builtins(self):
+        return self.__builtins
 
     def parents(self):
         return self.__parents
@@ -203,15 +207,13 @@ class PyType:
         """
         Called once when a class is defined.
         """
-        from builtin_types import NONE_TYPE
-        return self._optional_call(self.NEW_METHOD, NONE_TYPE, args)
+        return self._optional_call(self.NEW_METHOD, self.builtins().none(), args)
 
     def call_init(self, args):
         """
         Only call this method if it is defined. Otherwise is does nothing.
         """
-        from builtin_types import NONE_TYPE
-        return self._optional_call(self.INIT_METHOD, NONE_TYPE, args)
+        return self._optional_call(self.INIT_METHOD, self.builtins().none(), args)
 
     def call_del(self, args):
         return self.call_attr(self.DEL_METHOD, args)
@@ -256,12 +258,10 @@ class PyType:
         return self.call_attr(self.LE_METHOD, args)
 
     def call_eq(self, args):
-        from builtin_types import BOOL_TYPE
-        return self._optional_call(self.EQ_METHOD, BOOL_TYPE, args)
+        return self._optional_call(self.EQ_METHOD, self.builtins().bool(), args)
 
     def call_ne(self, args):
-        from builtin_types import BOOL_TYPE
-        return self._optional_call(self.NE_METHOD, BOOL_TYPE, args)
+        return self._optional_call(self.NE_METHOD, self.builtins().bool(), args)
 
     def call_gt(self, args):
         return self.call_attr(self.GT_METHOD, args)
@@ -270,12 +270,10 @@ class PyType:
         return self.call_attr(self.GE_METHOD, args)
 
     def call_hash(self, args):
-        from builtin_types import INT_TYPE
-        return self._call_and_check_return(self.HASH_METHOD, INT_TYPE, args)
+        return self._call_and_check_return(self.HASH_METHOD, self.builtins().int(), args)
 
     def call_bool(self, args):
-        from builtin_types import BOOL_TYPE
-        return self._call_and_check_return(self.BOOL_METHOD, BOOL_TYPE, args)
+        return self._call_and_check_return(self.BOOL_METHOD, self.builtins().bool(), args)
 
     """
     Attribute access

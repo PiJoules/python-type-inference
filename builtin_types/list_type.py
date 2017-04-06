@@ -2,7 +2,6 @@ from instance_type import InstanceType
 from class_type import ClassType
 from pytype import PyType
 from arguments import empty_args
-from generator_type import GENERATOR_CLASS
 from builtin_types import *
 from magic_methods import *
 
@@ -65,10 +64,10 @@ class ListGetItemMethod(GetItemMethod):
         results = set()
         for self_t in self_types:
             for key_t in key_types:
-                if key_t.is_type(INT_TYPE):
+                if key_t.is_type(self.builtins().int()):
                     # Accessing 1 item in the tuple
                     results |= self_t.contents()
-                elif key_t.is_type(SLICE_TYPE):
+                elif key_t.is_type(self.builtins().slice()):
                     results.add(self_t)
                 else:
                     raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
@@ -117,9 +116,7 @@ class ListClass(ClassType):
         return self.from_list([contents])
 
 
-def create_class():
-    from builtin_types import INT_TYPE
-    from builtin_types import NONE_TYPE, SLICE_TYPE
+def create_list_class():
     from function_type import BuiltinFunction
 
     cls = ListClass()
@@ -156,7 +153,7 @@ def create_class():
                 for val_t in val_types:
                     self_t.append(val_t)
 
-            return {NONE_TYPE}
+            return {self.builtins().none()}
 
     class ListExtendMethod(BuiltinFunction):
         def __init__(self):
@@ -174,7 +171,7 @@ def create_class():
                 for iterable_t in iterable_types:
                     self_t.extend(iterable_t)
 
-            return {NONE_TYPE}
+            return {self.builtins().none()}
 
     class ListIterMethod(BuiltinFunction):
         def __init__(self):
@@ -191,7 +188,7 @@ def create_class():
             for self_t in self_types:
                 results |= self_t.contents()
 
-            return {GENERATOR_CLASS.instance(yields=results)}
+            return {self.builtins().generator().instance(yields=results)}
 
 
     class ListInsertMethod(BuiltinFunction):
@@ -207,12 +204,12 @@ def create_class():
 
             for self_t in self_types:
                 for i_t in i_types:
-                    if not i_t.is_type(INT_TYPE):
+                    if not i_t.is_type(self.builtins().int()):
                         raise IntegerInterpetationError(i_t)
                     for x_t in x_types:
                         self_t.append(x_t)
 
-            return {NONE_TYPE}
+            return {self.builtins().int()}
 
 
     class ListRemoveMethod(BuiltinFunction):
@@ -223,7 +220,7 @@ def create_class():
             )
 
         def adjusted_call(self, args):
-            return {NONE_TYPE}
+            return {self.builtins().none()}
 
 
     class ListPopMethod(BuiltinFunction):
@@ -232,7 +229,7 @@ def create_class():
                 defined_name="pop",
                 pos_args=["self"],
                 keywords=["i"],
-                keyword_defaults=[{INT_TYPE}],
+                keyword_defaults=[{self.builtins().int()}],
             )
 
         def returns(self):
@@ -244,7 +241,7 @@ def create_class():
 
             for self_t in self_types:
                 for i_t in i_types:
-                    if not i_t.is_type(INT_TYPE):
+                    if not i_t.is_type(self.builtins().int()):
                         raise IntegerInterpetationError(i_t)
                     else:
                         results |= self_t.contents()
@@ -260,7 +257,7 @@ def create_class():
 
         def adjusted_call(self, args):
             self.check_pos_args(args)
-            return {NONE_TYPE}
+            return {self.builtins().none()}
 
 
     class ListIndexMethod(BuiltinFunction):
@@ -269,7 +266,7 @@ def create_class():
                 defined_name="index",
                 pos_args=["self", "x"],
                 keywords=["start", "end"],
-                keyword_defaults=[{INT_TYPE}, {INT_TYPE}]
+                keyword_defaults=[{self.builtins().int()}, {self.builtins().int()}]
             )
 
         def returns(self):
@@ -286,11 +283,11 @@ def create_class():
                 defined_name="sort",
                 pos_args=["self"],
                 keywords=["key", "reverse"],
-                keyword_defaults=[{NONE_TYPE}, {BOOL_TYPE}]
+                keyword_defaults=[{self.builtins().none()}, {self.builtins().bool()}]
             )
 
         def returns(self):
-            return {NONE_TYPE}
+            return {self.builtins().none()}
 
 
     class ListReverseMethod(BuiltinFunction):
@@ -301,7 +298,7 @@ def create_class():
             )
 
         def returns(self):
-            return {NONE_TYPE}
+            return {self.builtins().none()}
 
 
     class ListCopyMethod(BuiltinFunction):
@@ -331,4 +328,4 @@ def create_class():
     return cls
 
 
-LIST_CLASS = create_class()
+LIST_CLASS = create_list_class()

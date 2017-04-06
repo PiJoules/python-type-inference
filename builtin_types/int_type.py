@@ -20,14 +20,13 @@ class IntMulMethod(MulMethod):
 
 class IntTrueDivMethod(TrueDivMethod):
     def returns(self):
-        from builtin_types import FLOAT_TYPE
         others = self.env().lookup("other")
         results = set()
         for other_t in others:
-            if other_t.is_type(INT_TYPE):
-                results.add(FLOAT_TYPE)
-            elif other_t.is_type(FLOAT_TYPE):
-                results.add(FLOAT_TYPE)
+            if other_t.is_type(self.builtins().int()):
+                results.add(self.builtins().float())
+            elif other_t.is_type(self.builtins().float()):
+                results.add(self.builtins().float())
             else:
                 raise RuntimeError("Unable to divide int by {}".format(other_t))
         return results
@@ -35,8 +34,7 @@ class IntTrueDivMethod(TrueDivMethod):
 
 class IntLtMethod(LtMethod):
     def returns(self):
-        from builtin_types import BOOL_TYPE
-        return {BOOL_TYPE}
+        return {self.builtins().bool()}
 
 
 class IntClass(ClassType):
@@ -51,7 +49,3 @@ class IntClass(ClassType):
                 IntLtMethod(),
             )
         )
-
-
-INT_CLASS = IntClass()
-INT_TYPE = INT_CLASS.instance()

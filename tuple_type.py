@@ -2,7 +2,7 @@ import pytype
 import class_type
 import instance_type
 
-from generator_type import GENERATOR_CLASS
+from builtin_types import GENERATOR_CLASS
 from magic_methods import *
 
 
@@ -80,7 +80,7 @@ class TupleClass(class_type.InstanceWrapperClass):
         return self.create_tuple(*args, **kwargs)
 
 
-def create_class():
+def create_tuple_class():
     from function_type import BuiltinFunction
     from builtin_types import INT_TYPE
 
@@ -126,4 +126,4 @@ def create_class():
     return cls
 
 
-TUPLE_CLASS = create_class()
+TUPLE_CLASS = create_tuple_class()
