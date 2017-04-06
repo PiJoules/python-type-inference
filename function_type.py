@@ -145,14 +145,14 @@ and {} variable keyword argument were left unhandled.
         Returns:
             set[PyType] x3: Return types and yielded types.
         """
-        from none_type import NONE_CLASS
+        from builtin_types import NONE_TYPE
 
         self.env().parse_sequence(self.__ref_node.body)
         returns = self.env().returns()
         yields = self.env().yields()
 
         # Empty returns means return None
-        returns = returns or {NONE_CLASS.instance()}
+        returns = returns or {NONE_TYPE}
         if yields:
             from generator_type import GENERATOR_CLASS
             return {GENERATOR_CLASS.instance(

@@ -143,22 +143,22 @@ class Environment:
     """
 
     def eval_num(self, node):
+        from builtin_types import INT_TYPE, FLOAT_TYPE
         n = node.n
         if isinstance(n, int):
-            from int_type import INT_CLASS
-            return {INT_CLASS.instance()}
+            return {INT_TYPE}
         elif isinstance(n, float):
-            from float_type import FLOAT_CLASS
-            return {FLOAT_CLASS.instance()}
+            return {FLOAT_TYPE}
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
     def eval_str(self, node):
-        from str_type import STR_CLASS
-        return {STR_CLASS.instance()}
+        from builtin_types import STR_TYPE
+        return {STR_TYPE}
 
     def eval_bytes(self, node):
-        return {BYTES_CLASS.instance()}
+        from builtin_types import BYTES_TYPE
+        return {BYTES_TYPE}
 
     def eval_list(self, node):
         from list_type import LIST_CLASS
@@ -306,8 +306,8 @@ class Environment:
 
     def eval_slice(self, node):
         """Create a slice type."""
-        from slice_type import SLICE_CLASS
-        return {SLICE_CLASS.instance()}
+        from builtin_types import SLICE_TYPE
+        return {SLICE_TYPE}
 
     def eval_ext_slice(self, node):
         raise NotImplementedError
@@ -328,19 +328,18 @@ class Environment:
             from bool_type import BOOL_CLASS
             return {BOOL_CLASS.instance()}
         elif isinstance(operation, ast.Invert):
-            from int_type import INT_CLASS
-            return {INT_CLASS.instance()}
+            from builtin_types import INT_TYPE
+            return {INT_TYPE}
         else:
             raise RuntimeError("Unknown unary operation {}".format(operation))
 
     def eval_name_constant(self, node):
+        from builtin_types import NONE_TYPE, BOOL_TYPE
         value = node.value
         if value is None:
-            from none_type import NONE_CLASS
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
         else:
-            from bool_type import BOOL_CLASS
-            return {BOOL_CLASS.instance()}
+            return {BOOL_TYPE}
 
     def eval(self, node):
         if isinstance(node, ast.Num):
@@ -377,8 +376,8 @@ class Environment:
             if node.value:
                 return self.eval(node.value)
             else:
-                from none_type import NONE_CLASS
-                return {NONE_CLASS.instance()}
+                from builtin_types import NONE_TYPE
+                return {NONE_TYPE}
         elif isinstance(node, ast.Expr):
             return self.eval(node.value)
         elif isinstance(node, ast.NameConstant):

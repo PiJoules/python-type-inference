@@ -6,10 +6,5 @@ class SliceClass(ClassType):
         super().__init__("slice")
 
 
-def create_class():
-    cls = SliceClass()
-
-    return cls
-
-
-SLICE_CLASS = create_class()
+SLICE_CLASS = SliceClass()
+SLICE_TYPE = SLICE_CLASS.instance()

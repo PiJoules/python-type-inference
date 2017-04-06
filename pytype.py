@@ -203,15 +203,15 @@ class PyType:
         """
         Called once when a class is defined.
         """
-        from none_type import NONE_CLASS
-        return self._optional_call(self.NEW_METHOD, NONE_CLASS.instance(), args)
+        from builtin_types import NONE_TYPE
+        return self._optional_call(self.NEW_METHOD, NONE_TYPE, args)
 
     def call_init(self, args):
         """
         Only call this method if it is defined. Otherwise is does nothing.
         """
-        from none_type import NONE_CLASS
-        return self._optional_call(self.INIT_METHOD, NONE_CLASS.instance(), args)
+        from builtin_types import NONE_TYPE
+        return self._optional_call(self.INIT_METHOD, NONE_TYPE, args)
 
     def call_del(self, args):
         return self.call_attr(self.DEL_METHOD, args)
@@ -256,12 +256,12 @@ class PyType:
         return self.call_attr(self.LE_METHOD, args)
 
     def call_eq(self, args):
-        from bool_type import BOOL_CLASS
-        return self._optional_call(self.EQ_METHOD, BOOL_CLASS.instance(), args)
+        from builtin_types import BOOL_TYPE
+        return self._optional_call(self.EQ_METHOD, BOOL_TYPE, args)
 
     def call_ne(self, args):
-        from bool_type import BOOL_CLASS
-        return self._optional_call(self.NE_METHOD, BOOL_CLASS.instance(), args)
+        from builtin_types import BOOL_TYPE
+        return self._optional_call(self.NE_METHOD, BOOL_TYPE, args)
 
     def call_gt(self, args):
         return self.call_attr(self.GT_METHOD, args)
@@ -270,12 +270,12 @@ class PyType:
         return self.call_attr(self.GE_METHOD, args)
 
     def call_hash(self, args):
-        from int_type import INT_CLASS
-        return self._call_and_check_return(self.HASH_METHOD, INT_CLASS.instance(), args)
+        from builtin_types import INT_TYPE
+        return self._call_and_check_return(self.HASH_METHOD, INT_TYPE, args)
 
     def call_bool(self, args):
-        from bool_type import BOOL_CLASS
-        return self._call_and_check_return(self.BOOL_METHOD, BOOL_CLASS.instance(), args)
+        from builtin_types import BOOL_TYPE
+        return self._call_and_check_return(self.BOOL_METHOD, BOOL_TYPE, args)
 
     """
     Attribute access
@@ -398,10 +398,9 @@ class PyType:
 
 
 def load_buultin_constants():
-    from str_type import STR_CLASS
-
+    from builtin_types import STR_TYPE
     return {
-        "__name__": {STR_CLASS.instance()},
+        "__name__": {STR_TYPE},
     }
 
 
@@ -410,12 +409,10 @@ def load_builtin_vars():
     from instance_type import InstanceType
     from tuple_type import TUPLE_CLASS
     from dict_type import DICT_CLASS
-    from float_type import FLOAT_CLASS
-    from int_type import INT_CLASS
-    from bool_type import BOOL_CLASS
-    from none_type import NONE_CLASS
-    from str_type import STR_CLASS
-    from file_type import FILE_CLASS
+    from builtin_types import (
+        INT_CLASS, FLOAT_CLASS, BOOL_CLASS, STR_CLASS, FILE_CLASS,
+        NONE_TYPE, INT_TYPE, FILE_TYPE, BOOL_TYPE, STR_TYPE
+    )
 
     from value_error_type import VALUE_ERROR_CLASS
 
@@ -430,15 +427,15 @@ def load_builtin_vars():
                 vararg="objects",
                 kwonlyargs=["sep", "end", "file", "flush"],
                 kwonly_defaults=[
-                    {STR_CLASS.instance()},
-                    {STR_CLASS.instance()},
-                    {FILE_CLASS.instance()},
-                    {BOOL_CLASS.instance()},
+                    {STR_TYPE},
+                    {STR_TYPE},
+                    {FILE_TYPE},
+                    {BOOL_TYPE},
                 ]
             )
 
         def call(self, args):
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
     print_func = PrintFunction()
 
 
@@ -447,10 +444,10 @@ def load_builtin_vars():
             super().__init__(
                 "input",
                 keywords=["prompt"],
-                keyword_defaults=[{STR_CLASS.instance()}],
+                keyword_defaults=[{STR_TYPE}],
             )
         def call(self, args):
-            return {STR_CLASS.instance()}
+            return {STR_TYPE}
     input_func = InputFunction()
 
     builtins = {

@@ -1,8 +1,5 @@
 from class_type import ClassType
 from magic_methods import *
-from str_type import STR_CLASS
-from float_type import FLOAT_CLASS
-from bool_type import BOOL_CLASS
 
 class IntAddMethod(AddMethod):
     def returns(self):
@@ -23,13 +20,14 @@ class IntMulMethod(MulMethod):
 
 class IntTrueDivMethod(TrueDivMethod):
     def returns(self):
+        from builtin_types import FLOAT_TYPE
         others = self.env().lookup("other")
         results = set()
         for other_t in others:
             if other_t.is_type(INT_TYPE):
-                results.add(FLOAT_CLASS.instance())
-            elif other_t.is_type(FLOAT_CLASS.instance()):
-                results.add(FLOAT_CLASS.instance())
+                results.add(FLOAT_TYPE)
+            elif other_t.is_type(FLOAT_TYPE):
+                results.add(FLOAT_TYPE)
             else:
                 raise RuntimeError("Unable to divide int by {}".format(other_t))
         return results
@@ -37,7 +35,8 @@ class IntTrueDivMethod(TrueDivMethod):
 
 class IntLtMethod(LtMethod):
     def returns(self):
-        return {BOOL_CLASS.instance()}
+        from builtin_types import BOOL_TYPE
+        return {BOOL_TYPE}
 
 
 class IntClass(ClassType):

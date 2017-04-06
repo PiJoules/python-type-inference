@@ -2,8 +2,8 @@ import unittest
 
 from inference import ModuleEnv
 from generator_type import GENERATOR_CLASS
-from int_type import INT_CLASS
-from none_type import NONE_CLASS
+from builtin_types import INT_TYPE
+from builtin_types import NONE_TYPE
 
 
 class TestGeneratorType(unittest.TestCase):
@@ -23,7 +23,7 @@ x = func()
         env.parse_code(code)
 
         expected = {GENERATOR_CLASS.instance(
-            yields={INT_CLASS.instance(), NONE_CLASS.instance()}
+            yields={INT_TYPE, NONE_TYPE}
         )}
 
         self.assertSetEqual(

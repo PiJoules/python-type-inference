@@ -3,8 +3,7 @@ from class_type import ClassType
 from pytype import PyType
 from arguments import empty_args
 from generator_type import GENERATOR_CLASS
-from int_type import INT_CLASS
-from bool_type import BOOL_CLASS
+from builtin_types import INT_TYPE, BOOL_TYPE
 
 
 class IntegerInterpetationError(TypeError):
@@ -87,12 +86,11 @@ class ListClass(ClassType):
 
 
 def create_class():
-    from int_type import INT_CLASS
-    from slice_type import SLICE_CLASS
-    from none_type import NONE_CLASS
+    from builtin_types import INT_TYPE
+    from builtin_types import NONE_TYPE, SLICE_TYPE
     from function_type import BuiltinFunction
     from getitem_method import GetItemMethod
-    from add_method import AddMethod
+    from magic_methods import AddMethod
 
     cls = ListClass()
 
@@ -105,10 +103,10 @@ def create_class():
 
             for self_t in self_types:
                 for key_t in key_types:
-                    if key_t.is_type(INT_CLASS.instance()):
+                    if key_t.is_type(INT_TYPE):
                         # Accessing 1 item in the tuple
                         results |= self_t.contents()
-                    elif key_t.is_type(SLICE_CLASS.instance()):
+                    elif key_t.is_type(SLICE_TYPE):
                         results.add(self_t)
                     else:
                         raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
@@ -147,7 +145,7 @@ def create_class():
                 for val_t in val_types:
                     self_t.append(val_t)
 
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
     class ListExtendMethod(BuiltinFunction):
         def __init__(self):
@@ -165,7 +163,7 @@ def create_class():
                 for iterable_t in iterable_types:
                     self_t.extend(iterable_t)
 
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
     class ListIterMethod(BuiltinFunction):
         def __init__(self):
@@ -198,12 +196,12 @@ def create_class():
 
             for self_t in self_types:
                 for i_t in i_types:
-                    if not i_t.is_type(INT_CLASS.instance()):
+                    if not i_t.is_type(INT_TYPE):
                         raise IntegerInterpetationError(i_t)
                     for x_t in x_types:
                         self_t.append(x_t)
 
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
 
     class ListRemoveMethod(BuiltinFunction):
@@ -214,7 +212,7 @@ def create_class():
             )
 
         def adjusted_call(self, args):
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
 
     class ListPopMethod(BuiltinFunction):
@@ -223,7 +221,7 @@ def create_class():
                 defined_name="pop",
                 pos_args=["self"],
                 keywords=["i"],
-                keyword_defaults=[{INT_CLASS.instance()}],
+                keyword_defaults=[{INT_TYPE}],
             )
 
         def returns(self):
@@ -235,7 +233,7 @@ def create_class():
 
             for self_t in self_types:
                 for i_t in i_types:
-                    if not i_t.is_type(INT_CLASS.instance()):
+                    if not i_t.is_type(INT_TYPE):
                         raise IntegerInterpetationError(i_t)
                     else:
                         results |= self_t.contents()
@@ -251,7 +249,7 @@ def create_class():
 
         def adjusted_call(self, args):
             self.check_pos_args(args)
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
 
     class ListIndexMethod(BuiltinFunction):
@@ -260,7 +258,7 @@ def create_class():
                 defined_name="index",
                 pos_args=["self", "x"],
                 keywords=["start", "end"],
-                keyword_defaults=[{INT_CLASS.instance()}, {INT_CLASS.instance()}]
+                keyword_defaults=[{INT_TYPE}, {INT_TYPE}]
             )
 
         def returns(self):
@@ -277,11 +275,11 @@ def create_class():
                 defined_name="sort",
                 pos_args=["self"],
                 keywords=["key", "reverse"],
-                keyword_defaults=[{NONE_CLASS.instance()}, {BOOL_CLASS.instance()}]
+                keyword_defaults=[{NONE_TYPE}, {BOOL_TYPE}]
             )
 
         def returns(self):
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
 
     class ListReverseMethod(BuiltinFunction):
@@ -292,7 +290,7 @@ def create_class():
             )
 
         def returns(self):
-            return {NONE_CLASS.instance()}
+            return {NONE_TYPE}
 
 
     class ListCopyMethod(BuiltinFunction):

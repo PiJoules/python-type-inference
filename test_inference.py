@@ -4,8 +4,7 @@ from inference import ModuleEnv
 from pytype import *
 from tuple_type import TUPLE_CLASS
 from dict_type import DictType
-from int_type import INT_CLASS
-from str_type import STR_CLASS
+from builtin_types import INT_TYPE, STR_TYPE
 
 
 class TestInference(unittest.TestCase):
@@ -25,7 +24,7 @@ x = 2
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
     def test_free_function_call(self):
@@ -42,20 +41,20 @@ x = func(5)
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         # Function
         func = self.first(env.lookup("func"))
         self.assertSetEqual(
             func.returns(),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         # Function env
         self.assertSetEqual(
             func.env().exclusive_lookup("a"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
     def test_function_recursion(self):
@@ -75,20 +74,20 @@ x = fib(5)
         # Stored var
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         # Function env
         func = self.first(env.exclusive_lookup("fib"))
         self.assertSetEqual(
             func.env().exclusive_lookup("n"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         # Function return type
         self.assertSetEqual(
             func.returns(),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         # fib() not in func env
@@ -125,7 +124,7 @@ y = x.func()
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         # Class functions
@@ -133,7 +132,7 @@ y = x.func()
         init_func = self.first(cls.get_attr("__init__"))
         self.assertSetEqual(
             init_func.env().exclusive_lookup("a"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         self.assertSetEqual(
             init_func.env().exclusive_lookup("self"),
@@ -145,7 +144,7 @@ y = x.func()
         inst = self.first(env.exclusive_lookup("x"))
         self.assertSetEqual(
             inst.get_attr("_a"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
     def test_keyword_args(self):
@@ -161,17 +160,17 @@ y = func("b")
 
         self.assertSetEqual(
             env.lookup("x"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         self.assertSetEqual(
             env.lookup("y"),
-            {STR_CLASS.instance(), INT_CLASS.instance()}
+            {STR_TYPE, INT_TYPE}
         )
 
         func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("a"),
-            {STR_CLASS.instance(), INT_CLASS.instance()}
+            {STR_TYPE, INT_TYPE}
         )
 
     def test_vararg(self):
@@ -187,12 +186,12 @@ y = func2(1, "a")
         env = ModuleEnv()
         env.parse_code(code)
 
-        tup = {TUPLE_CLASS.create_tuple(init_contents=({INT_CLASS.instance()}, {STR_CLASS.instance()}))}
+        tup = {TUPLE_CLASS.create_tuple(init_contents=({INT_TYPE}, {STR_TYPE}))}
 
         # Stored vars
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
@@ -207,7 +206,7 @@ y = func2(1, "a")
         )
         self.assertSetEqual(
             func.returns(),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
 
         # func2
@@ -234,21 +233,21 @@ y = func(a=2, b=2)
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
         func = self.first(env.exclusive_lookup("func"))
         self.assertSetEqual(
             func.env().exclusive_lookup("a"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         self.assertSetEqual(
             func.env().exclusive_lookup("b"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
     def test_kwarg(self):
@@ -268,29 +267,29 @@ b = func2(a="str")
 
         d_types ={
             DictType(
-                key_types={STR_CLASS.instance()},
-                value_types={INT_CLASS.instance()}
+                key_types={STR_TYPE},
+                value_types={INT_TYPE}
             ),
             DictType(
-                key_types={STR_CLASS.instance()},
-                value_types={STR_CLASS.instance()}
+                key_types={STR_TYPE},
+                value_types={STR_TYPE}
             )
         }
 
         # Stored values
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
         self.assertSetEqual(
             env.exclusive_lookup("a"),
             {DictType(
-                key_types={STR_CLASS.instance()},
-                value_types={INT_CLASS.instance()}
+                key_types={STR_TYPE},
+                value_types={INT_TYPE}
             )}
         )
         self.assertSetEqual(
@@ -306,7 +305,7 @@ b = func2(a="str")
         )
         self.assertSetEqual(
             func.returns(),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
 
         # func2()
@@ -355,7 +354,7 @@ x.b = 2
         init_func = self.first(cls.get_attr("__init__"))
         self.assertSetEqual(
             init_func.env().exclusive_lookup("a"),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
         self.assertSetEqual(
             init_func.env().exclusive_lookup("self"),
@@ -367,29 +366,29 @@ x.b = 2
         x_inst = self.first(env.exclusive_lookup("x"))
         self.assertSetEqual(
             x_inst.get_attr("_a"),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
         self.assertSetEqual(
             x_inst.get_attr("b"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         y_inst = self.first(env.exclusive_lookup("y"))
         self.assertSetEqual(
             y_inst.get_attr("_a"),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
         self.assertSetEqual(
             y_inst.get_attr("b"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
         z_inst = self.first(env.exclusive_lookup("z"))
         self.assertSetEqual(
             z_inst.get_attr("_a"),
-            {INT_CLASS.instance(), STR_CLASS.instance()}
+            {INT_TYPE, STR_TYPE}
         )
         self.assertSetEqual(
             z_inst.get_attr("b"),
-            {INT_CLASS.instance()}
+            {INT_TYPE}
         )
 
 

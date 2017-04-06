@@ -1,6 +1,6 @@
 from instance_type import InstanceType
 from class_type import ClassType
-from none_type import NONE_CLASS
+from builtin_types import NONE_TYPE
 
 
 GENERATOR_NAME = "generator"
@@ -11,7 +11,7 @@ class GeneratorType(InstanceType):
         super().__init__("generator", *args, **kwargs)
 
         self.__yields = yields or set()
-        self.__returns = returns or {NONE_CLASS.instance()}
+        self.__returns = returns or {NONE_TYPE}
 
     def yields(self):
         return self.__yields

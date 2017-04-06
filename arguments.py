@@ -34,7 +34,7 @@ class Arguments:
         """
         from tuple_type import TUPLE_CLASS
         from dict_type import DICT_CLASS
-        from str_type import STR_CLASS
+        from builtin_types import STR_TYPE
 
         self.__pos_args = pos_args or []
         self.__keyword_args = keyword_args or {}
@@ -52,7 +52,7 @@ class Arguments:
         assert isinstance(self.__kwarg, type(DICT_CLASS.instance()))
         for types in self.__kwarg.key_types():
             assert isinstance(types, set)
-            assert all(x == STR_CLASS.instance() for x in types)
+            assert all(x.is_type(STR_TYPE) for x in types)
 
     def pos_args(self):
         return self.__pos_args
@@ -176,7 +176,7 @@ class Arguments:
             env.bind(arg, kw_args.pop(arg, kwonlw_defs[i]))
 
     def unpack_kwargs(self, func):
-        from str_type import STR_CLASS
+        from builtin_types import STR_TYPE
         from dict_type import DICT_CLASS
 
         value_types = set()
@@ -184,7 +184,7 @@ class Arguments:
             value_types |= types
 
         d = DICT_CLASS.instance().new_container(
-            key_types={STR_CLASS.instance()},
+            key_types={STR_TYPE},
             value_types=value_types | self.kwarg().value_types()
         )
         func.env().bind(func.kwarg(), {d})

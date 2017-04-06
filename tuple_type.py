@@ -82,7 +82,7 @@ class TupleClass(class_type.InstanceWrapperClass):
 def create_class():
     from getitem_method import GetItemMethod
     from function_type import BuiltinFunction
-    from int_type import INT_CLASS
+    from builtin_types import INT_TYPE
 
     cls = TupleClass("tuple")
 
@@ -95,7 +95,7 @@ def create_class():
 
             for self_t in self_types:
                 for key_t in key_types:
-                    if key_t == INT_CLASS.instance():
+                    if key_t.is_type(INT_TYPE):
                         # Accessing 1 item in the tuple
                         results |= self_t.all_contents()
                     else:

@@ -2,15 +2,12 @@ import unittest
 
 from inference import ModuleEnv
 from list_type import LIST_CLASS
-from int_type import INT_CLASS
-from str_type import STR_CLASS
-from float_type import FLOAT_CLASS
-from none_type import NONE_CLASS
+from builtin_types import *
 
 
 class TestListType(unittest.TestCase):
     NON_EMPTY_LIST = LIST_CLASS.instance(
-        init_contents=[{INT_CLASS.instance()}]
+        init_contents=[{INT_TYPE}]
     )
 
     def test_empty_list_creation(self):
@@ -41,9 +38,9 @@ x = [1, 3.0, "a"]
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {LIST_CLASS.instance(init_contents=[
-                {STR_CLASS.instance()},
-                {FLOAT_CLASS.instance()},
-                {INT_CLASS.instance()},
+                {STR_TYPE},
+                {FLOAT_TYPE},
+                {INT_TYPE},
             ])}
         )
 
@@ -52,34 +49,34 @@ x = [1, 3.0, "a"]
         # Multiple types of each contents
         self.assertSetEqual(
             {LIST_CLASS.instance(init_contents=[
-                {STR_CLASS.instance()},
+                {STR_TYPE},
             ])},
             {LIST_CLASS.instance(init_contents=[
-                {STR_CLASS.instance()},
-                {STR_CLASS.instance()},
+                {STR_TYPE},
+                {STR_TYPE},
             ])}
         )
 
         # Order shouldn't matter
         self.assertSetEqual(
             {LIST_CLASS.instance(init_contents=[
-                {STR_CLASS.instance()},
-                {INT_CLASS.instance()},
+                {STR_TYPE},
+                {INT_TYPE},
             ])},
             {LIST_CLASS.instance(init_contents=[
-                {INT_CLASS.instance()},
-                {STR_CLASS.instance()},
+                {INT_TYPE},
+                {STR_TYPE},
             ])}
         )
 
         # Elements could be a combination of different types
         self.assertSetEqual(
             {LIST_CLASS.instance(init_contents=[
-                {INT_CLASS.instance()},
-                {STR_CLASS.instance()},
+                {INT_TYPE},
+                {STR_TYPE},
             ])},
             {LIST_CLASS.instance(init_contents=[
-                {INT_CLASS.instance(), STR_CLASS.instance()}
+                {INT_TYPE, STR_TYPE}
             ])}
         )
 
@@ -94,7 +91,7 @@ y = x[0]
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {INT_CLASS.instance(), FLOAT_CLASS.instance()}
+            {INT_TYPE, FLOAT_TYPE}
         )
 
     def test_list_slicing(self):
@@ -109,8 +106,8 @@ y = x[0:1]
         self.assertSetEqual(
             env.exclusive_lookup("y"),
             {LIST_CLASS.instance(init_contents=[
-                {INT_CLASS.instance()},
-                {FLOAT_CLASS.instance()}
+                {INT_TYPE},
+                {FLOAT_TYPE}
             ])}
         )
 
@@ -125,7 +122,7 @@ x = [1] + [3.0]
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {LIST_CLASS.instance(init_contents=[
-                {INT_CLASS.instance(), FLOAT_CLASS.instance()}
+                {INT_TYPE, FLOAT_TYPE}
             ])}
         )
 
@@ -147,13 +144,13 @@ z = x.append(2)
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {LIST_CLASS.instance(init_contents=[
-                {INT_CLASS.instance()}
+                {INT_TYPE}
             ])}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z"),
-            {NONE_CLASS.instance()}
+            {NONE_TYPE}
         )
 
     def test_list_extend(self):
@@ -167,12 +164,12 @@ y = x.extend([1])
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_CLASS.instance()}
+            {NONE_TYPE}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.instance(init_contents=[{INT_CLASS.instance()}])}
+            {LIST_CLASS.instance(init_contents=[{INT_TYPE}])}
         )
 
     def test_list_insert(self):
@@ -186,13 +183,13 @@ y = x.insert(1, "a")
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_CLASS.instance()}
+            {NONE_TYPE}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {LIST_CLASS.instance(init_contents=[{
-                FLOAT_CLASS.instance(), STR_CLASS.instance(),
+                FLOAT_TYPE, STR_TYPE,
             }])}
         )
 
@@ -207,13 +204,13 @@ y = x.remove(2.0)
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_CLASS.instance()}
+            {NONE_TYPE}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {LIST_CLASS.instance(init_contents=[{
-                FLOAT_CLASS.instance()
+                FLOAT_TYPE
             }])}
         )
 
@@ -229,12 +226,12 @@ z = x.pop(1)
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {FLOAT_CLASS.instance()}
+            {FLOAT_TYPE}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z"),
-            {FLOAT_CLASS.instance()}
+            {FLOAT_TYPE}
         )
 
     def test_list_clear(self):
@@ -248,12 +245,12 @@ y = x.clear()
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+            {LIST_CLASS.instance(init_contents=[{FLOAT_TYPE}])}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_CLASS.instance()}
+            {NONE_TYPE}
         )
 
     def test_list_clear(self):
@@ -269,17 +266,17 @@ z2 = x.index(0, 1, 3)
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {FLOAT_CLASS.instance()}
+            {FLOAT_TYPE}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z"),
-            {FLOAT_CLASS.instance()}
+            {FLOAT_TYPE}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z2"),
-            {FLOAT_CLASS.instance()}
+            {FLOAT_TYPE}
         )
 
     def test_list_sort(self):
@@ -296,7 +293,7 @@ x.sort(key=2, reverse=True)
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+            {LIST_CLASS.instance(init_contents=[{FLOAT_TYPE}])}
         )
 
     def test_list_reverse(self):
@@ -310,7 +307,7 @@ x.reverse()
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+            {LIST_CLASS.instance(init_contents=[{FLOAT_TYPE}])}
         )
 
     def test_list_copy(self):
@@ -324,7 +321,7 @@ y = x.copy()
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.instance(init_contents=[{FLOAT_CLASS.instance()}])}
+            {LIST_CLASS.instance(init_contents=[{FLOAT_TYPE}])}
         )
 
         self.assertSetEqual(

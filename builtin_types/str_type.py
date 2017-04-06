@@ -3,7 +3,7 @@ from function_type import BuiltinFunction
 from magic_methods import *
 from generator_type import GENERATOR_CLASS
 
-from bool_type import BOOL_TYPE
+from builtin_types import *
 
 
 class StrStripMethod(BuiltinFunction):
