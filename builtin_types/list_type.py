@@ -3,7 +3,7 @@ from class_type import ClassType
 from pytype import PyType
 from arguments import empty_args
 from generator_type import GENERATOR_CLASS
-from builtin_types import INT_TYPE, BOOL_TYPE
+from builtin_types import *
 from magic_methods import *
 
 
@@ -58,11 +58,47 @@ class ListType(InstanceType):
         return "{}{}".format(self.name(), str_contents)
 
 
+class ListGetItemMethod(GetItemMethod):
+    def adjusted_call(self, args):
+        self.check_pos_args(args)
+        self_types, key_types = args.pos_args()
+        results = set()
+        for self_t in self_types:
+            for key_t in key_types:
+                if key_t.is_type(INT_TYPE):
+                    # Accessing 1 item in the tuple
+                    results |= self_t.contents()
+                elif key_t.is_type(SLICE_TYPE):
+                    results.add(self_t)
+                else:
+                    raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
+
+        return results
+
+    #def returns(self):
+    #    self_types = self.env().lookup("self")
+    #    key_types = self.env().lookup("key")
+    #    results = set()
+    #    for self_t in self_types:
+    #        for key_t in key_types:
+    #            if key_t.is_type(INT_TYPE):
+    #                # Accessing 1 item in the tuple
+    #                results |= self_t.contents()
+    #            elif key_t.is_type(SLICE_TYPE):
+    #                results.add(self_t)
+    #            else:
+    #                raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
+
+    #    return results
+
+
 class ListClass(ClassType):
-    def __init__(self, *args, **kwargs):
+    def __init__(self):
         super().__init__(
-            defined_name=LIST_NAME,
-            *args, **kwargs
+            LIST_NAME,
+            init_methods=(
+                ListGetItemMethod(),
+            )
         )
 
     def instance(self, *args, **kwargs):
@@ -87,25 +123,6 @@ def create_class():
     from function_type import BuiltinFunction
 
     cls = ListClass()
-
-    class ListGetItemMethod(GetItemMethod):
-        def adjusted_call(self, args):
-            self.check_pos_args(args)
-
-            results = set()
-            self_types, key_types = args.pos_args()
-
-            for self_t in self_types:
-                for key_t in key_types:
-                    if key_t.is_type(INT_TYPE):
-                        # Accessing 1 item in the tuple
-                        results |= self_t.contents()
-                    elif key_t.is_type(SLICE_TYPE):
-                        results.add(self_t)
-                    else:
-                        raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
-
-            return results
 
     class ListAddMethod(AddMethod):
         def adjusted_call(self, args):
@@ -298,7 +315,6 @@ def create_class():
             return self.env().lookup("self")
 
 
-    cls.set_attr(cls.GETITEM_METHOD, {ListGetItemMethod()})
     cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
     cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
     cls.set_attr("append", {ListAppendMethod()})

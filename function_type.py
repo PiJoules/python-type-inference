@@ -167,7 +167,9 @@ and {} variable keyword argument were left unhandled.
         The args passed to this method are adjusted to include self as the
         first positional argument if called by an instance.
         """
+        print(self.env().variables())
         self.update_env(args)
+        print(self.env().variables())
         return self.returns()
 
     def call(self, args):
@@ -175,6 +177,7 @@ and {} variable keyword argument were left unhandled.
         Call this function, update its environment based on the arguments,
         and return possible return types of this function.
         """
+        print(args)
         if self.is_bound_method():
             args.prepend_owner(self.owner())
 
