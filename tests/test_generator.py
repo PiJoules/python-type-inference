@@ -1,6 +1,6 @@
 import unittest
 
-from inference import ModuleEnv
+from environment import ModuleEnv
 from generator_type import GENERATOR_CLASS
 from builtin_types import INT_TYPE
 from builtin_types import NONE_TYPE

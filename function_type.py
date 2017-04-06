@@ -28,7 +28,7 @@ class FunctionType(pytype.PyType):
             defined_name (Optional[str]): The name that comes with the definition of a function.
                 If the function is created dynamically at runtime, this may be None.
         """
-        from inference import Environment
+        from environment import Environment
         super().__init__("function", *args, **kwargs)
         self.__ref_node = node
 
@@ -199,7 +199,7 @@ and {} variable keyword argument were left unhandled.
             node (ast.FunctionDef)
             parent_env (inference.Environment)
         """
-        from inference import Environment
+        from environment import Environment
 
         env = Environment(node.name, parent_env=parent_env)
 

@@ -1,6 +1,6 @@
 import unittest
 
-from inference import ModuleEnv
+from environment import ModuleEnv
 from builtin_types import *
 
 

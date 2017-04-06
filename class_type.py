@@ -21,7 +21,7 @@ class ClassType(pytype.PyType):
         Interperet the contents of the class and add any assignments as
         attributes of the class.
         """
-        from inference import Environment
+        from environment import Environment
 
         # Create an env to find assigned variables
         env = Environment(node.name, parent_env=parent_env)

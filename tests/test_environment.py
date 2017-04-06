@@ -1,6 +1,6 @@
 import unittest
 
-from inference import ModuleEnv
+from environment import ModuleEnv
 from pytype import *
 from tuple_type import TUPLE_CLASS
 from dict_type import DictType
