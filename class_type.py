@@ -26,8 +26,9 @@ class ClassType(PyType):
         raise NotImplementedError
 
     def call(self, args):
-        self.instance().call_init(args)
-        return {self.instance()}
+        inst = self.instance()
+        inst.call_init(args)
+        return {inst}
 
     def instance(self, *args, **kwargs):
         """Getter for getting the instance this class produces without calling init."""
@@ -68,13 +69,13 @@ class StaticClassType(ClassType):
         attributes of the class.
         """
         # Create an env to find assigned variables
-        env = Environment(node.name, parent_env=parent_env)
+        env = Environment(node.name, parent_env.builtins(), parent_env=parent_env)
 
         # Parse the class body
         env.parse_sequence(node.body)
 
         # Convert all saved variables to attributes
-        return cls.from_name(node.name, env.builtins(), init_attrs=env.variables())
+        return cls(node.name, env.builtins(), init_attrs=env.variables())
 
 
 class DynamicClassType(ClassType):
@@ -96,4 +97,4 @@ class DynamicClassType(ClassType):
         return self.__inst_cls.__name__
 
     def instance(self, *args, **kwargs):
-        return self.__inst_cls(*args, parents=[self], **kwargs)
+        return self.__inst_cls(self.builtins(), *args, parents=[self], **kwargs)

@@ -182,7 +182,7 @@ class UserDefinedFunction(FunctionType):
             node (ast.FunctionDef)
             parent_env (environment.Environment)
         """
-        env = environment.Environment(node.name, builtins, parent_env=parent_env)
+        env = environment.Environment(node.name, parent_env.builtins(), parent_env=parent_env)
 
         # Add the arguments as variables
         env.parse_arguments(node.args)
@@ -253,7 +253,7 @@ class UserDefinedFunction(FunctionType):
         # Empty returns means return None
         returns = returns or {self.builtins().none()}
         if yields:
-            return {self.builtins().generator().instance(
+            return {self.builtins().generator_cls().instance(
                 yields=yields,
                 returns=returns
             )}

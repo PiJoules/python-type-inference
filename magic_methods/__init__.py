@@ -11,3 +11,12 @@ from .iter_method import IterMethod
 from .contains_method import ContainsMethod
 
 from .getitem_method import GetItemMethod
+
+
+from function_type import FunctionType
+class NextMethod(FunctionType):
+    def __init__(self, builtins):
+        super().__init__(
+            self.NEXT_METHOD, builtins,
+            pos_args=["self"]
+        )

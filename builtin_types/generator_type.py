@@ -1,13 +1,14 @@
 from instance_type import InstanceType
-from class_type import ClassType
+from class_type import DynamicClassType
+from magic_methods import *
 
 
 GENERATOR_NAME = "generator"
 
 
 class GeneratorType(InstanceType):
-    def __init__(self, yields=None, returns=None, *args, **kwargs):
-        super().__init__("generator", *args, **kwargs)
+    def __init__(self, builtins, yields=None, returns=None, **kwargs):
+        super().__init__(GENERATOR_NAME, builtins, **kwargs)
 
         self.__yields = yields or set()
         self.__returns = returns or {self.builtins().none()}
@@ -36,52 +37,29 @@ class GeneratorType(InstanceType):
         )
 
 
-class GeneratorClass(ClassType):
-    def __init__(self, builtins, *args, **kwargs):
+class GeneratorIterMethod(IterMethod):
+    def returns(self):
+        return self.env().lookup("self")
+
+
+class GeneratorNextMethod(NextMethod):
+    def returns(self):
+        self_types = self.env().lookup("self")
+        results = set()
+
+        for self_t in self_types:
+            results |= self_t.yields()
+
+        return results
+
+
+class GeneratorClass(DynamicClassType):
+    def __init__(self, builtins, **kwargs):
         super().__init__(
-            builtins,
-            GENERATOR_NAME,
-            *args, **kwargs
+            builtins, GeneratorType,
+            init_methods=(
+                GeneratorIterMethod(builtins),
+                GeneratorNextMethod(builtins),
+            ),
+            **kwargs
         )
-
-    def instance(self, *args, **kwargs):
-        return GeneratorType(parents=[self], *args, **kwargs)
-
-
-def create_generator_class(builtins):
-    from function_type import FunctionType
-
-    cls = GeneratorClass(builtins)
-
-    class GeneratorIterMethod(FunctionType):
-        def __init__(self):
-            super().__init__(
-                defined_name=self.ITER_METHOD,
-                pos_args=["self"]
-            )
-
-        def returns(self):
-            return self.env().lookup("self")
-
-    class GeneratorNextMethod(FunctionType):
-        def __init__(self):
-            super().__init__(
-                defined_name=self.NEXT_METHOD,
-                pos_args=["self"]
-            )
-
-        def adjusted_call(self, args):
-            self.check_pos_args(args)
-
-            self_types = args.pos_args()[0]
-            results = set()
-
-            for self_t in self_types:
-                results |= self_t.yields()
-
-            return results
-
-    cls.set_attr(cls.ITER_METHOD, {GeneratorIterMethod()})
-    cls.set_attr(cls.NEXT_METHOD, {GeneratorNextMethod()})
-
-    return cls

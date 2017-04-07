@@ -1,7 +1,6 @@
 import unittest
 
 from environment import ModuleEnv
-from builtin_types import *
 
 
 class TestGeneratorType(unittest.TestCase):
@@ -20,8 +19,8 @@ x = func()
         env = ModuleEnv()
         env.parse_code(code)
 
-        expected = {GENERATOR_CLASS.instance(
-            yields={INT_TYPE, NONE_TYPE}
+        expected = {env.builtins().generator_cls().instance(
+            yields={env.builtins().int(), env.builtins().none()}
         )}
 
         self.assertSetEqual(

@@ -24,7 +24,7 @@ class Arguments:
     so the ast combines keywords and keyword only args into the same field.
     """
 
-    def __init__(self, pos_args=None, keyword_args=None, vararg=None, kwarg=None):
+    def __init__(self, builtins, pos_args=None, keyword_args=None, vararg=None, kwarg=None):
         """
         Args:
             pos_args (Optional[list[set[pytype.PyType]]])
@@ -32,14 +32,11 @@ class Arguments:
             vararg (Optional[pytype.PyType])
             kwarg (Optional[pytype.PyType])
         """
-        from tuple_type import TUPLE_CLASS
-        from dict_type import DICT_CLASS
-        from builtin_types import STR_TYPE
-
+        self.__builtins = builtins
         self.__pos_args = pos_args or []
         self.__keyword_args = keyword_args or {}
-        self.__vararg = vararg or TUPLE_CLASS.instance()
-        self.__kwarg = kwarg or DICT_CLASS.instance().new_container()
+        self.__vararg = vararg or builtins.tuple_cls().instance()
+        self.__kwarg = kwarg or builtins.dict_cls().instance()
 
         # Type checks
         assert isinstance(self.__pos_args, list)
@@ -48,11 +45,18 @@ class Arguments:
         assert isinstance(self.__keyword_args, dict)
         assert all(isinstance(x, set) for x in self.__keyword_args.values())
 
-        assert isinstance(self.__vararg, type(TUPLE_CLASS.instance()))
-        assert isinstance(self.__kwarg, type(DICT_CLASS.instance()))
+        assert self.__vararg.is_type(builtins.tuple_cls().instance())
+        assert self.__kwarg.is_type(builtins.dict_cls().instance())
         for types in self.__kwarg.key_types():
             assert isinstance(types, set)
-            assert all(x.is_type(STR_TYPE) for x in types)
+            assert all(x.is_type(builtins().str()) for x in types)
+
+    @classmethod
+    def empty(cls, builtins):
+        return cls(builtins)
+
+    def builtins(self):
+        return self.__builtins
 
     def pos_args(self):
         return self.__pos_args
@@ -104,7 +108,7 @@ class Arguments:
                 # Kwargs
                 kwarg = ref_env.eval(val)
 
-        return cls(pos_args, keyword_args, vararg=vararg, kwarg=kwarg)
+        return cls(ref_env.builtins(), pos_args, keyword_args, vararg=vararg, kwarg=kwarg)
 
     @classmethod
     def from_call_node(cls, node, ref_env):
@@ -158,15 +162,13 @@ class Arguments:
         """
         Add any remaining positional arguments then the unpacked vararg.
         """
-        from tuple_type import TUPLE_CLASS
-
         pos_args = self.pos_args()
-        tup = TUPLE_CLASS.create_tuple(
+        tup = self.builtins().tuple_cls().instance(
             init_contents=tuple(pos_args) + self.vararg().contents()
         )
         func.env().bind(func.vararg(), {tup})
         self.__pos_args.clear()
-        self.__vararg = TUPLE_CLASS.create_tuple()
+        self.__vararg = self.builtins().tuple_cls().instance()
 
     def unpack_kwonly_args(self, func):
         kw_args = self.keyword_args()
@@ -176,20 +178,17 @@ class Arguments:
             env.bind(arg, kw_args.pop(arg, kwonlw_defs[i]))
 
     def unpack_kwargs(self, func):
-        from builtin_types import STR_TYPE
-        from dict_type import DICT_CLASS
-
         value_types = set()
         for types in self.keyword_args().values():
             value_types |= types
 
-        d = DICT_CLASS.instance().new_container(
-            key_types={STR_TYPE},
+        d = self.builtins().dict_cls().instance(
+            key_types={self.builtins().str()},
             value_types=value_types | self.kwarg().value_types()
         )
         func.env().bind(func.kwarg(), {d})
         self.__keyword_args.clear()
-        self.__kwarg = DICT_CLASS.instance()
+        self.__kwarg = self.builtins().dict_cls().instance()
 
     def prepend_owner(self, owner):
         """
@@ -208,9 +207,3 @@ class Arguments:
             self.vararg(),
             self.kwarg()
         )
-
-
-def empty_args():
-    return Arguments([], {})
-
-

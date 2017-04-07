@@ -1,12 +1,9 @@
 import unittest
 
 from environment import ModuleEnv
-from builtin_types import *
 
 
 class TestListType(unittest.TestCase):
-    NON_EMPTY_LIST = LIST_CLASS.from_list([{INT_TYPE}])
-
     def test_empty_list_creation(self):
         """Test that I can make an emptylist."""
         code = """
@@ -18,10 +15,6 @@ x = []
         self.assertSetEqual(
             env.exclusive_lookup("x"),
             {LIST_CLASS.instance()}
-        )
-        self.assertNotEqual(
-            env.exclusive_lookup("x"),
-            {self.NON_EMPTY_LIST}
         )
 
     def test_list_initial_contents(self):

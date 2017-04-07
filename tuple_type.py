@@ -1,24 +1,23 @@
-import pytype
-import class_type
-import instance_type
-
+from pytype import PyType
+from instance_type import InstanceType
+from class_type import DynamicClassType
 from magic_methods import *
 
 
-class TupleType(instance_type.InstanceType):
-    def __init__(self, *args, init_contents=None, **kwargs):
+class TupleType(InstanceType):
+    def __init__(self, builtins, init_contents=None, **kwargs):
         """
         Args:
             init_contents (Optional[tuple[set[pytype.PyType]]])
         """
-        super().__init__("tuple", *args, **kwargs)
+        super().__init__("tuple", builtins, **kwargs)
 
         self.__contents = init_contents or tuple()
 
         assert isinstance(self.__contents, tuple)
         for types in self.__contents:
             assert isinstance(types, set)
-            assert all(isinstance(x, pytype.PyType) for x in types)
+            assert all(isinstance(x, PyType) for x in types)
 
     def contents(self):
         return self.__contents
@@ -62,63 +61,65 @@ class TupleType(instance_type.InstanceType):
         return "tuple{}".format(str_contents)
 
 
-class TupleClass(class_type.ClassType):
-    def create_tuple(self, **kwargs):
-        return TupleType(parents=[self], **kwargs)
+class TupleGetItemMethod(GetItemMethod):
+    def returns(self):
+        results = set()
+        self_types = self.env().lookup("self")
+        key_types = self.env().lookup("key")
 
-    def call(self, args):
-        if args:
-            if len(args.pos_args()) != 1:
-                raise RuntimeError("Tuple only accepts up to 1 argument.")
-            types = args.pos_args()[0]
-            return {self.create_tuple(init_contents=t.contents()) for t in types}
-        else:
-            return {self.create_tuple()}
+        for self_t in self_types:
+            for key_t in key_types:
+                if key_t.is_type(self.builtins().int()):
+                    # Accessing 1 item in the tuple
+                    results |= self_t.all_contents()
+                else:
+                    raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
 
-    def instance(self, *args, **kwargs):
-        return self.create_tuple(*args, **kwargs)
+        return results
 
 
-def create_tuple_class():
-    from function_type import FunctionType
+class TupleIterMethod(IterMethod):
+    def returns(self):
+        results = set()
+        self_types = self.env().lookup("self")
 
-    cls = TupleClass("tuple")
+        for self_t in self_types:
+            results |= self_t.all_contents()
 
-    class TupleGetItemMethod(GetItemMethod):
-        def adjusted_call(self, args):
-            self.check_pos_args(args)
+        return {self.builtins().generator().instance(yields=results)}
 
-            results = set()
-            self_types, key_types = args.pos_args()
 
-            for self_t in self_types:
-                for key_t in key_types:
-                    if key_t.is_type(self.builtins().int()):
-                        # Accessing 1 item in the tuple
-                        results |= self_t.all_contents()
-                    else:
-                        raise RuntimeError("Unable to index {} with key {}".format(self_t, key_t))
+class TupleClass(DynamicClassType):
+    #def create_tuple(self, **kwargs):
+    #    return TupleType(parents=[self], **kwargs)
 
-            return results
+    #def call(self, args):
+    #    if args:
+    #        if len(args.pos_args()) != 1:
+    #            raise RuntimeError("Tuple only accepts up to 1 argument.")
+    #        types = args.pos_args()[0]
+    #        return {self.create_tuple(init_contents=t.contents()) for t in types}
+    #    else:
+    #        return {self.create_tuple()}
 
-    class TupleIterMethod(FunctionType):
-        def __init__(self):
-            super().__init__(
-                defined_name=self.ITER_METHOD,
-                pos_args=["self"]
-            )
+    #def instance(self, *args, **kwargs):
+    #    return self.create_tuple(*args, **kwargs)
+    def __init__(self, builtins, **kwargs):
+        super().__init__(
+            builtins, TupleType,
+            init_methods=(
+                TupleGetItemMethod(builtins),
+                TupleIterMethod(builtins),
+            ),
+            **kwargs
+        )
 
-        def adjusted_call(self, args):
-            self.check_pos_args(args)
-            results = set()
-            self_types = args.pos_args()[0]
 
-            for self_t in self_types:
-                results |= self_t.all_contents()
-
-            return {self.builtins().generator().instance(yields=results)}
-
-    cls.set_attr(cls.GETITEM_METHOD, {TupleGetItemMethod()})
-    cls.set_attr(cls.ITER_METHOD, {TupleIterMethod()})
-
-    return cls
+#def create_tuple_class(builtins):
+#    cls = TupleClass(builtins)
+#
+#
+#    cls.set_attr(cls.GETITEM_METHOD, {TupleGetItemMethod()})
+#    cls.set_attr(cls.ITER_METHOD, {TupleIterMethod()})
+#
+#    return cls

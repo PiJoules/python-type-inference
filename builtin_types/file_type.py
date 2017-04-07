@@ -1,6 +1,6 @@
-from class_type import ClassType
+from class_type import StaticClassType
 
 
-class FileClass(ClassType):
-    def __init__(self):
-        super().__init__("file")
+class FileClass(StaticClassType):
+    def __init__(self, builtins):
+        super().__init__("file", builtins)

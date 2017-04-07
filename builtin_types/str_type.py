@@ -4,18 +4,13 @@ from instance_type import InstanceType
 from magic_methods import *
 
 
-class StrInst(InstanceType):
-    def __init__(self, defined_name, builtins, str_cls):
-        super().__init__(defined_name, builtins, parents=[str_cls])
-
-
 class StrStripMethod(FunctionType):
-    def __init__(self, builtins):
+    def __init__(self, builtins, str_inst):
         super().__init__(
             "strip", builtins,
             pos_args=["self"],
             keywords=["chars"],
-            keyword_defaults=[builtins.str()],
+            keyword_defaults=[{str_inst}],
         )
 
     def returns(self):
@@ -70,7 +65,6 @@ class StrClass(StaticClassType):
     def __init__(self, builtins):
         super().__init__(
             "str", builtins,
-            inst=StrInst("str", builtins, self),
             init_methods=(
                 StrFormatMethod(builtins),
                 StrGetItemMethod(builtins),
@@ -80,4 +74,4 @@ class StrClass(StaticClassType):
                 StrIAddMethod(builtins),
             )
         )
-        self.set_builtin_method(StrStripMethod(builtins))
+        self.set_builtin_method(StrStripMethod(builtins, self.instance()))

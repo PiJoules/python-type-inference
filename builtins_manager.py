@@ -2,7 +2,7 @@ from builtin_types import *
 from class_type import *
 from module_type import *
 
-import function_type
+from function_type import FunctionType
 import tuple_type
 import dict_type
 
@@ -11,6 +11,24 @@ class NoneClass(StaticClassType):
     def __init__(self, builtins):
         super().__init__(
             "None", builtins,
+        )
+
+
+class ExceptionClass(StaticClassType):
+    def __init__(self, builtins, **kwargs):
+        super().__init__(
+            "Exception",
+            builtins,
+            **kwargs
+        )
+
+
+class ValueErrorClass(StaticClassType):
+    def __init__(self, builtins, **kwargs):
+        super().__init__(
+            "ValueError", builtins,
+            parents=[builtins.exception_cls()],
+            **kwargs
         )
 
 
@@ -24,22 +42,59 @@ class BuiltinsManager:
         self.__float_cls = FloatClass(self)
         self.__bool_cls = BoolClass(self)
         self.__str_cls = StrClass(self)
-        self.__str = self.str_cls().instance()
         self.__file = FileClass(self).instance()
-        self.__tuple_cls = tuple_type.create_tuple_class(self)
+        self.__tuple_cls = tuple_type.TupleClass(self)
         self.__dict_cls = dict_type.DictClass(self)
+        self.__list_cls = ListClass(self)
+
+        self.__generator_cls = GeneratorClass(self)
+
 
         self.__create_exceptions()
-
+        self.__create_free_functions()
         self.__initialize_modules()
 
+    def __create_free_functions(self):
+        class PrintFunction(FunctionType):
+            def __init__(self, builtins):
+                super().__init__(
+                    "print", builtins,
+                    vararg="objects",
+                    kwonlyargs=["sep", "end", "file", "flush"],
+                    kwonly_defaults=[
+                        {builtins.str()},
+                        {builtins.str()},
+                        {builtins.file()},
+                        {builtins.bool()},
+                    ]
+                )
+
+            def returns(self):
+                return {self.builtins().none()}
+
+        self.__print_func = PrintFunction(self)
+
+
+        class InputFunction(FunctionType):
+            def __init__(self, builtins):
+                super().__init__(
+                    "input", builtins,
+                    keywords=["prompt"],
+                    keyword_defaults=[{builtins.str()}],
+                )
+
+            def returns(self):
+                return {self.builtins().str()}
+
+        self.__input_func = InputFunction(self)
+
     def __create_exceptions(self):
-        self.__exception_cls = ClassType.from_name("Exception", self)
-        self.__value_error_cls = ClassType.from_name("ValueError", self, parents=[self.exception_cls()])
+        self.__exception_cls = ExceptionClass(self)
+        self.__value_error_cls = ValueErrorClass(self)
 
     def __initialize_modules(self):
         """Modules will only be built if imported."""
-        self.__math_mod = MathModuleType()
+        self.__math_mod = MathModuleType(self)
         self.__loaded_mods = {}
 
     def exceptions(self):
@@ -135,7 +190,7 @@ class BuiltinsManager:
         return self.__str_cls
 
     def str(self):
-        return self.__str
+        return self.str_cls().instance()
 
     def file(self):
         return self.__file
@@ -146,43 +201,21 @@ class BuiltinsManager:
     def dict_cls(self):
         return self.__dict_cls
 
+    def list_cls(self):
+        return self.__list_cls
+
+    def generator_cls(self):
+        return self.__generator_cls
+
     """
     Functions
     """
 
     def print_func(self):
-        class PrintFunction(function_type.FunctionType):
-            def __init__(self, builtins):
-                super().__init__(
-                    "print",
-                    vararg="objects",
-                    kwonlyargs=["sep", "end", "file", "flush"],
-                    kwonly_defaults=[
-                        {builtins().str()},
-                        {builtins().str()},
-                        {builtins().file()},
-                        {builtins().bool()},
-                    ]
-                )
-
-            def returns(self):
-                return {self.builtins().none()}
-
-        return PrintFunction(self)
+        return self.__print_func
 
     def input_func(self):
-        class InputFunction(function_type.FunctionType):
-            def __init__(self, builtins):
-                super().__init__(
-                    "input",
-                    keywords=["prompt"],
-                    keyword_defaults=[{builtins.str()}],
-                )
-
-            def returns(self):
-                return {self.builtins().str()}
-
-        return InputFunction(self)
+        return self.__input_func
 
     """
     Exceptions

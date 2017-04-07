@@ -8,7 +8,7 @@ import pytype
 import function_type
 import class_type
 
-from arguments import Arguments, empty_args
+from arguments import Arguments
 
 
 class Environment:
@@ -205,16 +205,16 @@ class Environment:
         results = set()
         if isinstance(op, ast.Add):
             for t in left:
-                results |= t.call_add(Arguments([right]), aug=aug)
+                results |= t.call_add(Arguments(self.builtins(), [right]), aug=aug)
         elif isinstance(op, ast.Sub):
             for t in left:
-                results |= t.call_sub(Arguments([right]), aug=aug)
+                results |= t.call_sub(Arguments(self.builtins(), [right]), aug=aug)
         elif isinstance(op, ast.Mult):
             for t in left:
-                results |= t.call_mul(Arguments([right]), aug=aug)
+                results |= t.call_mul(Arguments(self.builtins(), [right]), aug=aug)
         elif isinstance(op, ast.Div):
             for t in left:
-                results |= t.call_truediv(Arguments([right]), aug=aug)
+                results |= t.call_truediv(Arguments(self.builtins(), [right]), aug=aug)
         else:
             raise NotImplementedError("No logic for handling operation {}".format(op))
 
@@ -236,13 +236,13 @@ class Environment:
         right_types = self.eval(right)
         if isinstance(op, ast.Eq):
             for t in left_types:
-                results |= t.call_eq(Arguments([right_types]))
+                results |= t.call_eq(Arguments(self.builtins(), [right_types]))
         elif isinstance(op, ast.Lt):
             for t in left_types:
-                results |= t.call_lt(Arguments([right_types]))
+                results |= t.call_lt(Arguments(self.builtins(), [right_types]))
         elif isinstance(op, ast.In):
             for t in left_types:
-                results |= t.call_contains(Arguments([right_types]))
+                results |= t.call_contains(Arguments(self.builtins(), [right_types]))
         else:
             raise NotImplementedError("No logic for comparing with operation {}".format(op))
         return results
@@ -273,7 +273,7 @@ class Environment:
         for i in range(len(comp_results)-1):
             result_types = comp_results[i]  # set[pytype.Pytype]
             for t in result_types:
-                results |= t.call_and(Arguments([comp_results[i+1]]))
+                results |= t.call_and(Arguments(self.builtins(), [comp_results[i+1]]))
 
         return results
 
@@ -296,7 +296,7 @@ class Environment:
 
         ret_types = set()
         for value in values:
-            args = Arguments([key_types])
+            args = Arguments(self.builtins(), [key_types])
             ret_types |= value.call_getitem(args)
         return ret_types
 
@@ -484,10 +484,10 @@ class Environment:
         contents = set()
         for t in iter_types:
             #contents |= t.all_contents()
-            iterator_types = t.call_iter(empty_args())  # iterator
+            iterator_types = t.call_iter(Arguments.empty(self.builtins()))  # iterator
             for iter_t in iterator_types:
                 # The next value
-                contents |= iter_t.call_next(empty_args())
+                contents |= iter_t.call_next(Arguments.empty(self.builtins()))
         self.unpack_assign(target, contents)
 
         # Parse both the body and orelse
@@ -585,10 +585,11 @@ class ModuleEnv(Environment):
     def __init__(self, module_location=None):
         from builtins_manager import BuiltinsManager
 
+        builtins = BuiltinsManager()
+
         super().__init__(
-            "__main__",
-            BuiltinsManager(),
-            init_vars=pytype.load_builtin_vars(),
+            "__main__", builtins,
+            init_vars=builtins.variables(),
             module_location=module_location)
 
         # Also add this location to the pythonpath
