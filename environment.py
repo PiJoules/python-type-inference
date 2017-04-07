@@ -16,7 +16,15 @@ class Environment:
                  module_location=None):
         self.__name = name
         self.__builtins = builtins
+
+
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
+        for k, v in self.__variables.items():
+            assert isinstance(k, str)
+            assert isinstance(v, set), "'{}' is not a set".format(v)
+            assert all(isinstance(x, pytype.PyType) for x in v)
+
+
         self.__parent = parent_env
         if self.__parent:
             self.__call_stack = self.__parent.call_stack()
@@ -84,6 +92,9 @@ class Environment:
             node (ast.Attribute)
             types (set[pytype.PyType])
         """
+        assert isinstance(types, set)
+        assert all(isinstance(t, pytype.PyType) for t in types)
+
         value = node.value
         attr = node.attr
 
@@ -170,7 +181,7 @@ class Environment:
 
     def eval_tuple(self, node):
         return {
-            self.builtins().tuple_cls().create_tuple(
+            self.builtins().tuple_cls().instance(
                 init_contents=tuple(self.eval(n) for n in node.elts)
             )
         }

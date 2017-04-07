@@ -48,7 +48,7 @@ class StrGetItemMethod(GetItemMethod):
 
 class StrIterMethod(IterMethod):
     def returns(self):
-        return {self.builtins().generator().instance(yields=self.env().lookup("self"))}
+        return {self.builtins().generator_cls().instance(yields=self.env().lookup("self"))}
 
 
 class StrContainsMethod(ContainsMethod):

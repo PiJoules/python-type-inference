@@ -86,7 +86,7 @@ class TupleIterMethod(IterMethod):
         for self_t in self_types:
             results |= self_t.all_contents()
 
-        return {self.builtins().generator().instance(yields=results)}
+        return {self.builtins().generator_cls().instance(yields=results)}
 
 
 class TupleClass(DynamicClassType):

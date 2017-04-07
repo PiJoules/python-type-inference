@@ -1,11 +1,7 @@
 import unittest
 
 from environment import ModuleEnv
-from tuple_type import TUPLE_CLASS
 from module_type import *
-from pytype import *
-from builtin_types import *
-from function_type import FunctionType
 
 
 class TestSamples(unittest.TestCase):
@@ -27,18 +23,18 @@ class TestSamples(unittest.TestCase):
         main = self.first(env.exclusive_lookup("main"))
         self.assertSetEqual(
             main.returns(),
-            {INT_TYPE}
+            {env.builtins().int()}
         )
 
         # fib()
         fib = self.first(env.exclusive_lookup("fib"))
         self.assertSetEqual(
             fib.env().exclusive_lookup("n"),
-            {INT_TYPE}
+            {env.builtins().int()}
         )
         self.assertSetEqual(
             fib.returns(),
-            {INT_TYPE}
+            {env.builtins().int()}
         )
 
     def test_degrees(self):
@@ -48,102 +44,102 @@ class TestSamples(unittest.TestCase):
         # math module
         self.assertSetEqual(
             env.exclusive_lookup("math"),
-            {MathModuleType()}
+            {MathModuleType(env.builtins())}
         )
 
         # Conversion functions
         d2r_env = self.first(env.exclusive_lookup("degrees_to_radians")).env()
         self.assertSetEqual(
             d2r_env.exclusive_lookup("degrees"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         r2d_env = self.first(env.exclusive_lookup("radians_to_degrees")).env()
         self.assertSetEqual(
             r2d_env.exclusive_lookup("radians"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         f2c_env = self.first(env.exclusive_lookup("fahrenheit_to_celsius")).env()
         self.assertSetEqual(
             f2c_env.exclusive_lookup("f"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         c2f_env = self.first(env.exclusive_lookup("celsius_to_fahrenheit")).env()
         self.assertSetEqual(
             c2f_env.exclusive_lookup("c"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         c2k_env = self.first(env.exclusive_lookup("celsius_to_kelvin")).env()
         self.assertSetEqual(
             c2k_env.exclusive_lookup("c"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         k2c_env = self.first(env.exclusive_lookup("kelvin_to_celsius")).env()
         self.assertSetEqual(
             k2c_env.exclusive_lookup("k"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
 
         # read_input()
         read_input_env = self.first(env.exclusive_lookup("read_input")).env()
         self.assertSetEqual(
             read_input_env.exclusive_lookup("input_line"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
         self.assertSetEqual(
             read_input_env.exclusive_lookup("output_line"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         # parse_input_line()
         pil_env = self.first(env.exclusive_lookup("parse_input_line")).env()
         self.assertSetEqual(
             pil_env.exclusive_lookup("value"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         self.assertSetEqual(
             pil_env.exclusive_lookup("units"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         # convert()
         convert_env = self.first(env.exclusive_lookup("convert")).env()
         self.assertSetEqual(
             convert_env.exclusive_lookup("value"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         self.assertSetEqual(
             convert_env.exclusive_lookup("units"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         # process_line()
         pl_env = self.first(env.exclusive_lookup("process_line")).env()
         self.assertSetEqual(
             pl_env.exclusive_lookup("value"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("units"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
         self.assertSetEqual(
             pl_env.exclusive_lookup("result_units"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         # Variables under the if __name__ == "__main__"
-        tup = TUPLE_CLASS.create_tuple(init_contents=tuple([{STR_TYPE}, {STR_TYPE}]))
+        tup = env.builtins().tuple_cls().instance(init_contents=tuple([{env.builtins().str()}, {env.builtins().str()}]))
         self.assertSetEqual(
             env.exclusive_lookup("input_lines"),
             {tup}
         )
         self.assertSetEqual(
             env.exclusive_lookup("line"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
         self.assertSetEqual(
             env.exclusive_lookup("e"),
@@ -156,41 +152,41 @@ class TestSamples(unittest.TestCase):
 
         self.assertSetEqual(
             env.exclusive_lookup("__name__"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("words"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("words"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         disemv_func = self.first(env.exclusive_lookup("disemvowel"))
         func_env = disemv_func.env()
         self.assertSetEqual(
             disemv_func.returns(),
-            {TUPLE_CLASS.instance(init_contents=(
-                {STR_TYPE}, {STR_TYPE}
+            {env.builtins().tuple_cls().instance(init_contents=(
+                {env.builtins().str()}, {env.builtins().str()}
             ))}
         )
 
         self.assertSetEqual(
             func_env.exclusive_lookup("vowels"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         self.assertSetEqual(
             func_env.exclusive_lookup("consonants"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
         self.assertSetEqual(
             func_env.exclusive_lookup("c"),
-            {STR_TYPE}
+            {env.builtins().str()}
         )
 
 

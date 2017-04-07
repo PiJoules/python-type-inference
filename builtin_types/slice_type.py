@@ -1,6 +1,6 @@
-from class_type import ClassType
+from class_type import StaticClassType
 
 
-class SliceClass(ClassType):
-    def __init__(self):
-        super().__init__("slice")
+class SliceClass(StaticClassType):
+    def __init__(self, builtins):
+        super().__init__("slice", builtins)

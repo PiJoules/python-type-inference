@@ -41,6 +41,7 @@ class BuiltinsManager:
         self.__int_cls = IntClass(self)
         self.__float_cls = FloatClass(self)
         self.__bool_cls = BoolClass(self)
+        self.__slice_cls = SliceClass(self)
         self.__str_cls = StrClass(self)
         self.__file = FileClass(self).instance()
         self.__tuple_cls = tuple_type.TupleClass(self)
@@ -95,7 +96,7 @@ class BuiltinsManager:
     def __initialize_modules(self):
         """Modules will only be built if imported."""
         self.__math_mod = MathModuleType(self)
-        self.__loaded_mods = {}
+        self.__loaded_modules = {}
 
     def exceptions(self):
         return {
@@ -106,7 +107,7 @@ class BuiltinsManager:
     def constants(self):
         """Builtin constants"""
         return {
-            "__name__": self.str(),
+            "__name__": {self.str()},
         }
 
     def functions(self):
@@ -130,7 +131,7 @@ class BuiltinsManager:
         return builtins
 
     def loaded_modules(self):
-        return self.__loaded_mods
+        return self.__loaded_modules
 
     def builtin_modules(self):
         return {
@@ -150,16 +151,20 @@ class BuiltinsManager:
         if mod:
             return mod
         elif name in self.builtin_modules():
-            return self.builtin_modules()["name"]
+            return self.builtin_modules()[name]
         else:
             raise RuntimeError("The module '{}' is probably implemented in C and does not have a python implementation. This module should have a pre-built ModuleType.".format(name))
 
     def load_module(self, name):
-        """Lookup a module and save it."""
-        # Check any already loaded modules
+        """
+        Lookup a module and save it.
+
+        Returns:
+            ModuleType
+        """
         if name not in self.loaded_modules():
-            self.__loaded_mods[name] = self.__lookup_mod(name)
-        return self.loaded_mods()[name]
+            self.__loaded_modules[name] = self.__lookup_mod(name)
+        return self.loaded_modules()[name]
 
     """
     Getters
@@ -204,8 +209,18 @@ class BuiltinsManager:
     def list_cls(self):
         return self.__list_cls
 
+    def list(self):
+        """Creates empty list type."""
+        return self.list_cls().instance()
+
     def generator_cls(self):
         return self.__generator_cls
+
+    def slice_cls(self):
+        return self.__slice_cls
+
+    def slice(self):
+        return self.slice_cls().instance()
 
     """
     Functions

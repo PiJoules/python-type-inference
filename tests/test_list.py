@@ -1,6 +1,7 @@
 import unittest
 
 from environment import ModuleEnv
+from builtins_manager import BuiltinsManager
 
 
 class TestListType(unittest.TestCase):
@@ -14,7 +15,7 @@ x = []
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.instance()}
+            {env.builtins().list_cls().instance()}
         )
 
     def test_list_initial_contents(self):
@@ -27,46 +28,48 @@ x = [1, 3.0, "a"]
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([
-                {STR_TYPE},
-                {FLOAT_TYPE},
-                {INT_TYPE},
+            {env.builtins().list_cls().from_list([
+                {env.builtins().str()},
+                {env.builtins().float()},
+                {env.builtins().int()},
             ])}
         )
 
     def test_list_equality(self):
         """Test various lists are equal."""
         # Multiple types of each contents
+        builtins = BuiltinsManager()
+
         self.assertSetEqual(
-            {LIST_CLASS.from_list([
-                {STR_TYPE},
+            {builtins.list_cls().from_list([
+                {builtins.str()},
             ])},
-            {LIST_CLASS.from_list([
-                {STR_TYPE},
-                {STR_TYPE},
+            {builtins.list_cls().from_list([
+                {builtins.str()},
+                {builtins.str()},
             ])}
         )
 
         # Order shouldn't matter
         self.assertSetEqual(
-            {LIST_CLASS.from_list([
-                {STR_TYPE},
-                {INT_TYPE},
+            {builtins.list_cls().from_list([
+                {builtins.str()},
+                {builtins.int()},
             ])},
-            {LIST_CLASS.from_list([
-                {INT_TYPE},
-                {STR_TYPE},
+            {builtins.list_cls().from_list([
+                {builtins.int()},
+                {builtins.str()},
             ])}
         )
 
         # Elements could be a combination of different types
         self.assertSetEqual(
-            {LIST_CLASS.from_list([
-                {INT_TYPE},
-                {STR_TYPE},
+            {builtins.list_cls().from_list([
+                {builtins.int()},
+                {builtins.str()},
             ])},
-            {LIST_CLASS.from_list([
-                {INT_TYPE, STR_TYPE}
+            {builtins.list_cls().from_list([
+                {builtins.int(), builtins.str()}
             ])}
         )
 
@@ -81,7 +84,7 @@ y = x[0]
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {INT_TYPE, FLOAT_TYPE}
+            {env.builtins().int(), env.builtins().float()}
         )
 
     def test_list_slicing(self):
@@ -95,9 +98,9 @@ y = x[0:1]
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {LIST_CLASS.from_list([
-                {INT_TYPE},
-                {FLOAT_TYPE}
+            {env.builtins().list_cls().from_list([
+                {env.builtins().int()},
+                {env.builtins().float()}
             ])}
         )
 
@@ -111,8 +114,8 @@ x = [1] + [3.0]
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([
-                {INT_TYPE, FLOAT_TYPE}
+            {env.builtins().list_cls().from_list([
+                {env.builtins().int(), env.builtins().float()}
             ])}
         )
 
@@ -133,14 +136,14 @@ z = x.append(2)
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([
-                {INT_TYPE}
+            {env.builtins().list_cls().from_list([
+                {env.builtins().int()}
             ])}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z"),
-            {NONE_TYPE}
+            {env.builtins().none()}
         )
 
     def test_list_extend(self):
@@ -154,12 +157,12 @@ y = x.extend([1])
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_TYPE}
+            {env.builtins().none()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{INT_TYPE}])}
+            {env.builtins().list_cls().from_list([{env.builtins().int()}])}
         )
 
     def test_list_insert(self):
@@ -173,13 +176,13 @@ y = x.insert(1, "a")
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_TYPE}
+            {env.builtins().none()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{
-                FLOAT_TYPE, STR_TYPE,
+            {env.builtins().list_cls().from_list([{
+                env.builtins().float(), env.builtins().str(),
             }])}
         )
 
@@ -194,13 +197,13 @@ y = x.remove(2.0)
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_TYPE}
+            {env.builtins().none()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{
-                FLOAT_TYPE
+            {env.builtins().list_cls().from_list([{
+                env.builtins().float()
             }])}
         )
 
@@ -216,12 +219,12 @@ z = x.pop(1)
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
 
     def test_list_clear(self):
@@ -235,12 +238,12 @@ y = x.clear()
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{FLOAT_TYPE}])}
+            {env.builtins().list_cls().from_list([{env.builtins().float()}])}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {NONE_TYPE}
+            {env.builtins().none()}
         )
 
     def test_list_clear(self):
@@ -256,17 +259,17 @@ z2 = x.index(0, 1, 3)
 
         self.assertSetEqual(
             env.exclusive_lookup("y"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
 
         self.assertSetEqual(
             env.exclusive_lookup("z2"),
-            {FLOAT_TYPE}
+            {env.builtins().float()}
         )
 
     def test_list_sort(self):
@@ -283,7 +286,7 @@ x.sort(key=2, reverse=True)
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{FLOAT_TYPE}])}
+            {env.builtins().list_cls().from_list([{env.builtins().float()}])}
         )
 
     def test_list_reverse(self):
@@ -297,7 +300,7 @@ x.reverse()
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{FLOAT_TYPE}])}
+            {env.builtins().list_cls().from_list([{env.builtins().float()}])}
         )
 
     def test_list_copy(self):
@@ -311,7 +314,7 @@ y = x.copy()
 
         self.assertSetEqual(
             env.exclusive_lookup("x"),
-            {LIST_CLASS.from_list([{FLOAT_TYPE}])}
+            {env.builtins().list_cls().from_list([{env.builtins().float()}])}
         )
 
         self.assertSetEqual(

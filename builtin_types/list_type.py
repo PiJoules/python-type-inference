@@ -83,24 +83,23 @@ class ListAddMethod(AddMethod):
 
         for self_t in self_types:
             for other_t in other_types:
-                if other_t.is_type(cls.instance()):
-                    results.add(cls.merge_lists(self_t, other_t))
+                if other_t.is_type(self.builtins().list()):
+                    results.add(self.builtins().list_cls().merge_lists(self_t, other_t))
                 else:
                     raise RuntimeError("Unable to concatenate list with {}".format(other_t))
 
         return results
 
 class ListAppendMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="append",
+            "append", builtins,
             pos_args=["self", "x"],
         )
 
-    def adjusted_call(self, args):
-        self.check_pos_args(args)
-
-        self_types, val_types = args.pos_args()
+    def returns(self):
+        self_types = self.env().lookup("self")
+        val_types = self.env().lookup("x")
 
         for self_t in self_types:
             for val_t in val_types:
@@ -109,16 +108,15 @@ class ListAppendMethod(FunctionType):
         return {self.builtins().none()}
 
 class ListExtendMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="extend",
+            "extend", builtins,
             pos_args=["self", "iterable"]
         )
 
-    def adjusted_call(self, args):
-        self.check_pos_args(args)
-
-        self_types, iterable_types = args.pos_args()
+    def returns(self):
+        self_types = self.env().lookup("self")
+        iterable_types = self.env().lookup("iterable")
 
         for self_t in self_types:
             for iterable_t in iterable_types:
@@ -126,34 +124,28 @@ class ListExtendMethod(FunctionType):
 
         return {self.builtins().none()}
 
-class ListIterMethod(FunctionType):
-    def __init__(self):
-        super().__init__(
-            defined_name=self.ITER_METHOD,
-            pos_args=["self"]
-        )
-
-    def adjusted_call(self, args):
-        self.check_pos_args(args)
+class ListIterMethod(IterMethod):
+    def returns(self):
         results = set()
-        self_types = args.pos_args()[0]
+        self_types = self.env().lookup("self")
 
         for self_t in self_types:
             results |= self_t.contents()
 
-        return {self.builtins().generator().instance(yields=results)}
+        return {self.builtins().generator_cls().instance(yields=results)}
 
 
 class ListInsertMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="insert",
+            "insert", builtins,
             pos_args=["self", "i", "x"]
         )
 
-    def adjusted_call(self, args):
-        self.check_pos_args(args)
-        self_types, i_types, x_types = args.pos_args()
+    def returns(self):
+        self_types = self.env().lookup("self")
+        i_types = self.env().lookup("i")
+        x_types = self.env().lookup("x")
 
         for self_t in self_types:
             for i_t in i_types:
@@ -162,27 +154,27 @@ class ListInsertMethod(FunctionType):
                 for x_t in x_types:
                     self_t.append(x_t)
 
-        return {self.builtins().int()}
+        return {self.builtins().none()}
 
 
 class ListRemoveMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="remove",
+            "remove", builtins,
             pos_args=["self", "x"]
         )
 
-    def adjusted_call(self, args):
+    def returns(self):
         return {self.builtins().none()}
 
 
 class ListPopMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="pop",
+            "pop", builtins,
             pos_args=["self"],
             keywords=["i"],
-            keyword_defaults=[{self.builtins().int()}],
+            keyword_defaults=[{builtins.int()}],
         )
 
     def returns(self):
@@ -202,24 +194,23 @@ class ListPopMethod(FunctionType):
         return results
 
 class ListClearMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="clear",
+            "clear", builtins,
             pos_args=["self"]
         )
 
-    def adjusted_call(self, args):
-        self.check_pos_args(args)
+    def returns(self):
         return {self.builtins().none()}
 
 
 class ListIndexMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="index",
+            "index", builtins,
             pos_args=["self", "x"],
             keywords=["start", "end"],
-            keyword_defaults=[{self.builtins().int()}, {self.builtins().int()}]
+            keyword_defaults=[{builtins.int()}, {builtins.int()}]
         )
 
     def returns(self):
@@ -231,12 +222,12 @@ class ListIndexMethod(FunctionType):
 
 
 class ListSortMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="sort",
+            "sort", builtins,
             pos_args=["self"],
             keywords=["key", "reverse"],
-            keyword_defaults=[{self.builtins().none()}, {self.builtins().bool()}]
+            keyword_defaults=[{builtins.none()}, {builtins.bool()}]
         )
 
     def returns(self):
@@ -244,9 +235,9 @@ class ListSortMethod(FunctionType):
 
 
 class ListReverseMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="reverse",
+            "reverse", builtins,
             pos_args=["self"]
         )
 
@@ -255,9 +246,9 @@ class ListReverseMethod(FunctionType):
 
 
 class ListCopyMethod(FunctionType):
-    def __init__(self):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name="copy",
+            "copy", builtins,
             pos_args=["self"]
         )
 
@@ -271,11 +262,21 @@ class ListClass(DynamicClassType):
             builtins, ListType,
             init_methods=(
                 ListGetItemMethod(builtins),
-            )
+                ListAddMethod(builtins),
+                ListIterMethod(builtins),
+                ListAppendMethod(builtins),
+                ListExtendMethod(builtins),
+                ListInsertMethod(builtins),
+                ListRemoveMethod(builtins),
+                ListPopMethod(builtins),
+                ListClearMethod(builtins),
+                ListIndexMethod(builtins),
+                ListSortMethod(builtins),
+                ListReverseMethod(builtins),
+                ListCopyMethod(builtins),
+            ),
+            **kwargs
         )
-
-    #def instance(self, *args, **kwargs):
-    #    return ListType(parents=[self], *args, **kwargs)
 
     def from_list(self, lst):
         contents = set()
@@ -283,31 +284,8 @@ class ListClass(DynamicClassType):
             contents |= types
         return self.instance(init_contents=contents)
 
-    #def merge_lists(self, *lsts):
-    #    contents = set()
-    #    for lst in lsts:
-    #        contents |= lst.contents()
-    #    return self.from_list([contents])
-
-
-def create_list_class(builtins):
-    from function_type import FunctionType
-
-    cls = ListClass(builtins)
-
-
-
-    cls.set_attr(cls.ADD_METHOD, {ListAddMethod()})
-    cls.set_attr(cls.ITER_METHOD, {ListIterMethod()})
-    cls.set_attr("append", {ListAppendMethod()})
-    cls.set_attr("extend", {ListExtendMethod()})
-    cls.set_attr("insert", {ListInsertMethod()})
-    cls.set_attr("remove", {ListRemoveMethod()})
-    cls.set_attr("pop", {ListPopMethod()})
-    cls.set_attr("clear", {ListClearMethod()})
-    cls.set_attr("index", {ListIndexMethod()})
-    cls.set_attr("sort", {ListSortMethod()})
-    cls.set_attr("reverse", {ListReverseMethod()})
-    cls.set_attr("copy", {ListCopyMethod()})
-
-    return cls
+    def merge_lists(self, *lsts):
+        contents = set()
+        for lst in lsts:
+            contents |= lst.contents()
+        return self.from_list([contents])
