@@ -3,6 +3,16 @@ from function_type import FunctionType
 from environment import Environment
 from instance_type import InstanceType
 
+"""
+Types of classes:
+- Class that returns the same instance. Values associated with this type at
+  runtime do not influence the type of the object. Classes like this include
+  some builtin types like str() or int(), or custom user defined types in
+  program space since these classes use the builtins.
+- Class that creates instances which depend on types at runtime. Examples of
+  this type of class include
+"""
+
 
 class ClassType(PyType):
     def __init__(self, defined_name, builtins, init_methods=None, **kwargs):
@@ -73,5 +83,8 @@ class DynamicClassType(ClassType):
         super().__init__(builtins, **kwargs)
         self.__inst_cls = inst_cls
 
+    def defined_name(self):
+        return self.instance().name()
+
     def instance(self, *args, **kwargs):
-        return self.__inst_cls(*args, **kwargs)
+        return self.__inst_cls(*args, parents=[self], **kwargs)

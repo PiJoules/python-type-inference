@@ -5,12 +5,19 @@ from tuple_type import create_tuple_class
 from dict_type import DictClass
 
 
+class NoneClass(ClassType):
+    def __init__(self, builtins):
+        super().__init__(
+            "None", builtins,
+        )
+
+
 class BuiltinsManager:
     def __init__(self):
         self.__create_builtins()
 
     def __create_builtins(self):
-        self.__none_cls = ClassType.from_name("None", self)
+        self.__none_cls = NoneClass(self)
         self.__int_cls = IntClass(self)
         self.__float_cls = FloatClass(self)
         self.__bool_cls = BoolClass(self)
@@ -62,7 +69,7 @@ class BuiltinsManager:
     """
 
     def none(self):
-        return self.__none
+        return self.__none_cls.instance()
 
     def int(self):
         return self.int_cls().instance()

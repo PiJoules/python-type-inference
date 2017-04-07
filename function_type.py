@@ -280,3 +280,7 @@ class BuiltinFunction(FunctionType):
 
     def returns(self):
         raise NotImplementedError
+
+
+class UserDefinedFunction(FunctionType):
+    pass
