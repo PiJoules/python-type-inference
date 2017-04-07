@@ -118,7 +118,7 @@ class ListClass(ClassType):
 
 
 def create_list_class(builtins):
-    from function_type import BuiltinFunction
+    from function_type import FunctionType
 
     cls = ListClass(builtins)
 
@@ -138,7 +138,7 @@ def create_list_class(builtins):
 
             return results
 
-    class ListAppendMethod(BuiltinFunction):
+    class ListAppendMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="append",
@@ -156,7 +156,7 @@ def create_list_class(builtins):
 
             return {self.builtins().none()}
 
-    class ListExtendMethod(BuiltinFunction):
+    class ListExtendMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="extend",
@@ -174,7 +174,7 @@ def create_list_class(builtins):
 
             return {self.builtins().none()}
 
-    class ListIterMethod(BuiltinFunction):
+    class ListIterMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name=self.ITER_METHOD,
@@ -192,7 +192,7 @@ def create_list_class(builtins):
             return {self.builtins().generator().instance(yields=results)}
 
 
-    class ListInsertMethod(BuiltinFunction):
+    class ListInsertMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="insert",
@@ -213,7 +213,7 @@ def create_list_class(builtins):
             return {self.builtins().int()}
 
 
-    class ListRemoveMethod(BuiltinFunction):
+    class ListRemoveMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="remove",
@@ -224,7 +224,7 @@ def create_list_class(builtins):
             return {self.builtins().none()}
 
 
-    class ListPopMethod(BuiltinFunction):
+    class ListPopMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="pop",
@@ -249,7 +249,7 @@ def create_list_class(builtins):
 
             return results
 
-    class ListClearMethod(BuiltinFunction):
+    class ListClearMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="clear",
@@ -261,7 +261,7 @@ def create_list_class(builtins):
             return {self.builtins().none()}
 
 
-    class ListIndexMethod(BuiltinFunction):
+    class ListIndexMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="index",
@@ -278,7 +278,7 @@ def create_list_class(builtins):
             return results
 
 
-    class ListSortMethod(BuiltinFunction):
+    class ListSortMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="sort",
@@ -291,7 +291,7 @@ def create_list_class(builtins):
             return {self.builtins().none()}
 
 
-    class ListReverseMethod(BuiltinFunction):
+    class ListReverseMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="reverse",
@@ -302,7 +302,7 @@ def create_list_class(builtins):
             return {self.builtins().none()}
 
 
-    class ListCopyMethod(BuiltinFunction):
+    class ListCopyMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name="copy",

@@ -1,9 +1,9 @@
-from function_type import BuiltinFunction
+from function_type import FunctionType
 
 
-class LtMethod(BuiltinFunction):
-    def __init__(self):
+class LtMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name=self.LT_METHOD,
+            self.LT_METHOD, builtins,
             pos_args=["self", "other"],
         )

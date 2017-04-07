@@ -1,5 +1,4 @@
-from class_type import ClassType
-from function_type import BuiltinFunction
+from class_type import StaticClassType
 from magic_methods import *
 
 
@@ -23,14 +22,15 @@ class FloatTrueDivMethod(TrueDivMethod):
         return self.env().lookup("self")
 
 
-class FloatClass(ClassType):
-    def __init__(self):
+class FloatClass(StaticClassType):
+    def __init__(self, builtins):
         super().__init__(
             "float",
+            builtins,
             init_methods=(
-                FloatAddMethod(),
-                FloatSubMethod(),
-                FloatMulMethod(),
-                FloatTrueDivMethod(),
+                FloatAddMethod(builtins),
+                FloatSubMethod(builtins),
+                FloatMulMethod(builtins),
+                FloatTrueDivMethod(builtins),
             )
         )

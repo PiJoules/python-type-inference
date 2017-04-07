@@ -1,8 +1,8 @@
-import pytype
 import astor
 import pkgutil
 import sys
 
+from pytype import PyType
 from importlib.machinery import SourceFileLoader
 
 
@@ -49,32 +49,27 @@ def load_module(name):
         raise RuntimeError("The module '{}' is probably implemented in C and does not have a python implementation. This module should have a pre-built ModuleType.".format(name))
 
 
-class ModuleType(pytype.PyType):
-    def __init__(self, ref_node, *args, **kwargs):
-        super().__init__("module", *args, **kwargs)
-        self.__ref_node = ref_node
+class ModuleType(PyType):
+    def __init__(self, defined_name, builtins, **kwargs):
+        super().__init__("module", builtins, **kwargs)
+        self.__defined_name = defined_name
+
+    def defined_name(self):
+        return self.__defined_name
 
 
 class MathModuleType(ModuleType):
-    def __init__(self):
-        super().__init__(None)
+    def __init__(self, builtins):
+        super().__init__(
+            "math",
+            builtins,
+            init_attrs={
+                "pi": {builtins.float()},
+            }
+        )
 
     def __hash__(self):
         return hash(self.name())
 
     def __eq__(self, other):
         return isinstance(other, type(self)) and hash(self) == hash(other)
-
-
-def load_builtin_modules():
-    from builtin_types import FLOAT_TYPE
-
-    math_mod = MathModuleType()
-    math_mod.set_attr("pi", {FLOAT_TYPE})
-
-    return {
-        "math": math_mod,
-    }
-
-
-BUILTIN_MODULES = load_builtin_modules()

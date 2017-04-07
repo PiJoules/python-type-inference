@@ -1,11 +1,9 @@
-from function_type import BuiltinFunction
+from function_type import FunctionType
 
 
-class GetItemMethod(BuiltinFunction):
-    def __init__(self, *args, **kwargs):
+class GetItemMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            *args,
-            defined_name=self.GETITEM_METHOD,
+            self.GETITEM_METHOD, builtins,
             pos_args=["self", "key"],
-            **kwargs
         )

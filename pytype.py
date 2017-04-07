@@ -403,7 +403,7 @@ def load_buultin_constants():
 
 
 def load_builtin_vars():
-    from function_type import BuiltinFunction
+    from function_type import FunctionType
     from instance_type import InstanceType
     from tuple_type import TUPLE_CLASS
     from dict_type import DICT_CLASS
@@ -418,7 +418,7 @@ def load_builtin_vars():
     """
     Builtin functions
     """
-    class PrintFunction(BuiltinFunction):
+    class PrintFunction(FunctionType):
         def __init__(self):
             super().__init__(
                 "print",
@@ -437,7 +437,7 @@ def load_builtin_vars():
     print_func = PrintFunction()
 
 
-    class InputFunction(BuiltinFunction):
+    class InputFunction(FunctionType):
         def __init__(self):
             super().__init__(
                 "input",

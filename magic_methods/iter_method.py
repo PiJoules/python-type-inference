@@ -1,9 +1,9 @@
-from function_type import BuiltinFunction
+from function_type import FunctionType
 
 
-class IterMethod(BuiltinFunction):
-    def __init__(self):
+class IterMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name=self.ITER_METHOD,
+            self.ITER_METHOD, builtins,
             pos_args=["self"],
         )

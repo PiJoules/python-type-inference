@@ -48,9 +48,9 @@ class ClassType(PyType):
 
 
 class StaticClassType(ClassType):
-    def __init__(self, defined_name, builtins, **kwargs):
+    def __init__(self, defined_name, builtins, inst=None, **kwargs):
         super().__init__(builtins, **kwargs)
-        self.__inst = InstanceType(defined_name, self.builtins(), parents=[self])
+        self.__inst = inst or InstanceType(defined_name, self.builtins(), parents=[self])
 
     def defined_name(self):
         return self.instance().name()
@@ -59,7 +59,7 @@ class StaticClassType(ClassType):
         return self.__inst
 
     @classmethod
-    def from_node(cls, node, parent_env):
+    def from_node_and_env(cls, node, parent_env):
         """
         This method is used for creating from a cusotm class defined in
         python code.

@@ -80,7 +80,7 @@ class TupleClass(class_type.ClassType):
 
 
 def create_tuple_class():
-    from function_type import BuiltinFunction
+    from function_type import FunctionType
 
     cls = TupleClass("tuple")
 
@@ -101,7 +101,7 @@ def create_tuple_class():
 
             return results
 
-    class TupleIterMethod(BuiltinFunction):
+    class TupleIterMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name=self.ITER_METHOD,

@@ -1,6 +1,8 @@
-import class_type
+from class_type import StaticClassType
 
 
-class BoolClass(class_type.ClassType):
-    def __init__(self):
-        super().__init__("bool")
+class BoolClass(StaticClassType):
+    def __init__(self, builtins):
+        super().__init__(
+            "bool", builtins,
+        )

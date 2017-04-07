@@ -1,4 +1,4 @@
-from class_type import ClassType
+from class_type import StaticClassType
 from magic_methods import *
 
 class IntAddMethod(AddMethod):
@@ -37,16 +37,16 @@ class IntLtMethod(LtMethod):
         return {self.builtins().bool()}
 
 
-class IntClass(ClassType):
+class IntClass(StaticClassType):
     def __init__(self, builtins):
         super().__init__(
-            builtins,
             "int",
+            builtins,
             init_methods=(
-                IntAddMethod(),
-                IntSubMethod(),
-                IntMulMethod(),
-                IntTrueDivMethod(),
-                IntLtMethod(),
+                IntAddMethod(builtins),
+                IntSubMethod(builtins),
+                IntMulMethod(builtins),
+                IntTrueDivMethod(builtins),
+                IntLtMethod(builtins),
             )
         )

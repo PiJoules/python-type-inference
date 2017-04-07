@@ -1,11 +1,11 @@
 import ast
-import pytype
+import environment
+import instance_type
 
-from environment import Environment
-from instance_type import InstanceType
+from pytype import PyType
 
 
-class FunctionType(pytype.PyType):
+class FunctionType(PyType):
     """
     Type that can contain code to be executed.
     """
@@ -18,7 +18,7 @@ class FunctionType(pytype.PyType):
         Args:
             defined_name (str)
             builtins (BuiltinsManager)
-            env (Optional[inference.Environment])
+            env (Optional[inference.environment.Environment])
             pos_args (Optional[list[str]])
             keywords (Optional[list[str]])  # List to retain positional args unpacked into keyword args
             vararg (Optional[str])
@@ -30,7 +30,7 @@ class FunctionType(pytype.PyType):
         super().__init__("function", builtins, **kwargs)
 
         self.__defined_name = defined_name
-        self.__env = env or Environment(defined_name)
+        self.__env = env or environment.Environment(defined_name, builtins)
 
         self.__pos_args = pos_args or []
         self.__keywords = keywords or []
@@ -48,10 +48,10 @@ class FunctionType(pytype.PyType):
 
         assert all(isinstance(x, set) for x in self.__keyword_defaults)
         for default in self.__keyword_defaults:
-            assert all(isinstance(x, pytype.PyType) for x in default)
+            assert all(isinstance(x, PyType) for x in default)
         assert all(isinstance(x, set) for x in self.__kwonly_defaults)
         for default in self.__kwonly_defaults:
-            assert all(isinstance(x, pytype.PyType) for x in default)
+            assert all(isinstance(x, PyType) for x in default)
 
     """
     Getters
@@ -154,7 +154,7 @@ and {} variable keyword argument were left unhandled.
         return self.__env
 
     def bind_method(self, owner):
-        assert isinstance(owner, InstanceType)
+        assert isinstance(owner, instance_type.InstanceType)
         self.__owner = owner
 
     def unbind_method(self):
@@ -174,15 +174,15 @@ class UserDefinedFunction(FunctionType):
         self.__ref_node = ref_node
 
     @classmethod
-    def from_node_and_env(cls, node, parent_env, builtins, **kwargs):
+    def from_node_and_env(cls, node, parent_env, **kwargs):
         """
         TODO: Handle remaining properties
 
         Args:
             node (ast.FunctionDef)
-            parent_env (inference.Environment)
+            parent_env (environment.Environment)
         """
-        env = Environment(node.name, parent_env=parent_env)
+        env = environment.Environment(node.name, builtins, parent_env=parent_env)
 
         # Add the arguments as variables
         env.parse_arguments(node.args)
@@ -226,7 +226,7 @@ class UserDefinedFunction(FunctionType):
         if args_node.kwarg:
             kwarg = args_node.kwarg.arg
 
-        return cls(node, builtins,
+        return cls(node, env.builtins(),
                    env=env,
                    pos_args=pos_args,
                    keywords=keywords,

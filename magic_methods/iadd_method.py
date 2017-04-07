@@ -1,9 +1,9 @@
-from function_type import BuiltinFunction
+from function_type import FunctionType
 
 
-class IAddMethod(BuiltinFunction):
-    def __init__(self):
+class IAddMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name=self.IADD_METHOD,
+            self.IADD_METHOD, builtins,
             pos_args=["self", "other"],
         )

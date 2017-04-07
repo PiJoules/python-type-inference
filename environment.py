@@ -5,14 +5,17 @@ import sys
 import os
 import astor
 import pytype
+import function_type
+import class_type
 
 from arguments import Arguments, empty_args
 
 
 class Environment:
-    def __init__(self, name, init_vars=None, parent_env=None,
+    def __init__(self, name, builtins, init_vars=None, parent_env=None,
                  module_location=None):
         self.__name = name
+        self.__builtins = builtins
         self.__variables = dict(init_vars or {})  # dict[str, set[pytype.PyType]]
         self.__parent = parent_env
         if self.__parent:
@@ -26,6 +29,9 @@ class Environment:
 
         # Modules
         self.__module_location = module_location
+
+    def builtins(self):
+        return self.__builtins
 
     def returns(self):
         return self.__returns
@@ -143,33 +149,28 @@ class Environment:
     """
 
     def eval_num(self, node):
-        from builtin_types import INT_TYPE, FLOAT_TYPE
         n = node.n
         if isinstance(n, int):
-            return {INT_TYPE}
+            return {self.builtins().int()}
         elif isinstance(n, float):
-            return {FLOAT_TYPE}
+            return {self.builtins().float()}
         else:
             raise NotImplementedError("Unknown type for num '{}'".format(type(n)))
 
     def eval_str(self, node):
-        from builtin_types import STR_TYPE
-        return {STR_TYPE}
+        return {self.builtins().str()}
 
     def eval_bytes(self, node):
-        from builtin_types import BYTES_TYPE
-        return {BYTES_TYPE}
+        return {self.builtins().bytes()}
 
     def eval_list(self, node):
-        from builtin_types import LIST_CLASS
         return {
-            LIST_CLASS.from_list(list(map(self.eval, node.elts)))
+            self.builtins().list_cls().from_list(list(map(self.eval, node.elts)))
         }
 
     def eval_tuple(self, node):
-        from tuple_type import TUPLE_CLASS
         return {
-            TUPLE_CLASS.create_tuple(
+            self.builtins().tuple_cls().create_tuple(
                 init_contents=tuple(self.eval(n) for n in node.elts)
             )
         }
@@ -304,8 +305,7 @@ class Environment:
 
     def eval_slice(self, node):
         """Create a slice type."""
-        from builtin_types import SLICE_TYPE
-        return {SLICE_TYPE}
+        return {self.builtins().slice()}
 
     def eval_ext_slice(self, node):
         raise NotImplementedError
@@ -323,21 +323,18 @@ class Environment:
         if isinstance(operation, (ast.UAdd, ast.USub)):
             return self.eval(node.operand)
         elif isinstance(operation, ast.Not):
-            from bool_type import BOOL_CLASS
-            return {BOOL_CLASS.instance()}
+            return {self.builtins().bool()}
         elif isinstance(operation, ast.Invert):
-            from builtin_types import INT_TYPE
-            return {INT_TYPE}
+            return {self.builtins().int()}
         else:
             raise RuntimeError("Unknown unary operation {}".format(operation))
 
     def eval_name_constant(self, node):
-        from builtin_types import NONE_TYPE, BOOL_TYPE
         value = node.value
         if value is None:
-            return {NONE_TYPE}
+            return {self.builtins().none()}
         else:
-            return {BOOL_TYPE}
+            return {self.builtins().bool()}
 
     def eval(self, node):
         if isinstance(node, ast.Num):
@@ -374,8 +371,7 @@ class Environment:
             if node.value:
                 return self.eval(node.value)
             else:
-                from builtin_types import NONE_TYPE
-                return {NONE_TYPE}
+                return {self.builtins().none()}
         elif isinstance(node, ast.Expr):
             return self.eval(node.value)
         elif isinstance(node, ast.NameConstant):
@@ -439,13 +435,11 @@ class Environment:
         """
         Add a function type to the variables.
         """
-        from function_type import FunctionType
-        func_type = FunctionType.from_node_and_env(node, self)
+        func_type = function_type.UserDefinedFunction.from_node_and_env(node, self)
         self.bind(node.name, {func_type})
 
     def parse_class_def(self, node):
-        from class_type import ClassType
-        cls_type = ClassType.from_node_and_env(node, self)
+        cls_type = class_type.StaticClassType.from_node_and_env(node, self)
         self.bind(node.name, {cls_type})
 
     def parse_if(self, node):
@@ -466,10 +460,9 @@ class Environment:
         Parse the imported module and make all variable assignments attributes
         of a new module type.
         """
-        from module_type import load_module
         name = node.name
         asname = node.asname or name
-        mod_t = load_module(name)
+        mod_t = self.builtins().load_module(name)
         self.bind(asname, {mod_t})
 
     def parse_import(self, node):
@@ -590,8 +583,11 @@ class Environment:
 
 class ModuleEnv(Environment):
     def __init__(self, module_location=None):
+        from builtins_manager import BuiltinsManager
+
         super().__init__(
             "__main__",
+            BuiltinsManager(),
             init_vars=pytype.load_builtin_vars(),
             module_location=module_location)
 

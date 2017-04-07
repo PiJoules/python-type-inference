@@ -1,8 +1,10 @@
 from builtin_types import *
-from function_type import BuiltinFunction
 from class_type import *
-from tuple_type import create_tuple_class
-from dict_type import DictClass
+from module_type import *
+
+import function_type
+import tuple_type
+import dict_type
 
 
 class NoneClass(StaticClassType):
@@ -22,15 +24,23 @@ class BuiltinsManager:
         self.__float_cls = FloatClass(self)
         self.__bool_cls = BoolClass(self)
         self.__str_cls = StrClass(self)
+        self.__str = self.str_cls().instance()
         self.__file = FileClass(self).instance()
-        self.__tuple_cls = create_tuple_class(self)
-        self.__dict_cls = DictClass(self)
+        self.__tuple_cls = tuple_type.create_tuple_class(self)
+        self.__dict_cls = dict_type.DictClass(self)
 
         self.__create_exceptions()
+
+        self.__initialize_modules()
 
     def __create_exceptions(self):
         self.__exception_cls = ClassType.from_name("Exception", self)
         self.__value_error_cls = ClassType.from_name("ValueError", self, parents=[self.exception_cls()])
+
+    def __initialize_modules(self):
+        """Modules will only be built if imported."""
+        self.__math_mod = MathModuleType()
+        self.__loaded_mods = {}
 
     def exceptions(self):
         return {
@@ -52,8 +62,8 @@ class BuiltinsManager:
             "str": {self.str_cls()},
             "tuple": {self.tuple_cls()},
             "dict": {self.dict_cls()},
-            "print": {self.print()},
-            "input": {self.input()},
+            "print": {self.print_func()},
+            "input": {self.input_func()},
         }
 
     def variables(self):
@@ -63,6 +73,38 @@ class BuiltinsManager:
         builtins.update(self.constants())
         builtins.update(self.exceptions())
         return builtins
+
+    def loaded_modules(self):
+        return self.__loaded_mods
+
+    def builtin_modules(self):
+        return {
+            "math": self.math_mod(),
+        }
+
+    def __create_mod(self, name):
+        mod_location = module_path_from_name(name)
+        if mod_location:
+            mod_node = module_node_from_path(mod_location)
+            if mod_node:
+                return ModuleType.from_node(mod_node)
+        return None
+
+    def __lookup_mod(self, name):
+        mod = self.__create_mod(name)
+        if mod:
+            return mod
+        elif name in self.builtin_modules():
+            return self.builtin_modules()["name"]
+        else:
+            raise RuntimeError("The module '{}' is probably implemented in C and does not have a python implementation. This module should have a pre-built ModuleType.".format(name))
+
+    def load_module(self, name):
+        """Lookup a module and save it."""
+        # Check any already loaded modules
+        if name not in self.loaded_modules():
+            self.__loaded_mods[name] = self.__lookup_mod(name)
+        return self.loaded_mods()[name]
 
     """
     Getters
@@ -93,7 +135,7 @@ class BuiltinsManager:
         return self.__str_cls
 
     def str(self):
-        return self.str_cls().instance()
+        return self.__str
 
     def file(self):
         return self.__file
@@ -108,18 +150,18 @@ class BuiltinsManager:
     Functions
     """
 
-    def print(self):
-        class PrintFunction(BuiltinFunction):
-            def __init__(self):
+    def print_func(self):
+        class PrintFunction(function_type.FunctionType):
+            def __init__(self, builtins):
                 super().__init__(
                     "print",
                     vararg="objects",
                     kwonlyargs=["sep", "end", "file", "flush"],
                     kwonly_defaults=[
-                        {self.builtins().str()},
-                        {self.builtins().str()},
-                        {self.builtins().file()},
-                        {self.builtins().bool()},
+                        {builtins().str()},
+                        {builtins().str()},
+                        {builtins().file()},
+                        {builtins().bool()},
                     ]
                 )
 
@@ -128,13 +170,13 @@ class BuiltinsManager:
 
         return PrintFunction(self)
 
-    def input(self):
-        class InputFunction(BuiltinFunction):
-            def __init__(self):
+    def input_func(self):
+        class InputFunction(function_type.FunctionType):
+            def __init__(self, builtins):
                 super().__init__(
                     "input",
                     keywords=["prompt"],
-                    keyword_defaults=[{self.builtins().str()}],
+                    keyword_defaults=[{builtins.str()}],
                 )
 
             def returns(self):
@@ -152,3 +194,9 @@ class BuiltinsManager:
     def value_error_cls(self):
         return self.__value_error_cls
 
+    """
+    Modules
+    """
+
+    def math_mod(self):
+        return self.__math_mod

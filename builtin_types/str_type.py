@@ -1,27 +1,31 @@
-from class_type import ClassType
-from function_type import BuiltinFunction
+from class_type import StaticClassType
+from function_type import FunctionType
+from instance_type import InstanceType
 from magic_methods import *
 
-from builtin_types import *
+
+class StrInst(InstanceType):
+    def __init__(self, defined_name, builtins, str_cls):
+        super().__init__(defined_name, builtins, parents=[str_cls])
 
 
-class StrStripMethod(BuiltinFunction):
-    def __init__(self):
+class StrStripMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            "strip",
+            "strip", builtins,
             pos_args=["self"],
             keywords=["chars"],
-            keyword_defaults=[self.builtins().str()],
+            keyword_defaults=[builtins.str()],
         )
 
     def returns(self):
         return self.env().lookup("self")
 
 
-class StrFormatMethod(BuiltinFunction):
-    def __init__(self):
+class StrFormatMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            "format",
+            "format", builtins,
             pos_args=["self"],
             vararg="args",
             kwarg="kwargs",
@@ -31,10 +35,10 @@ class StrFormatMethod(BuiltinFunction):
         return self.env().lookup("self")
 
 
-class StrLowerMethod(BuiltinFunction):
-    def __init__(self):
+class StrLowerMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            "lower",
+            "lower", builtins,
             pos_args=["self"],
         )
 
@@ -49,7 +53,7 @@ class StrGetItemMethod(GetItemMethod):
 
 class StrIterMethod(IterMethod):
     def returns(self):
-        return {self.generator().instance(yields=self.env().lookup("self"))}
+        return {self.builtins().generator().instance(yields=self.env().lookup("self"))}
 
 
 class StrContainsMethod(ContainsMethod):
@@ -62,17 +66,18 @@ class StrIAddMethod(IAddMethod):
         return self.env().lookup("self")
 
 
-class StrClass(ClassType):
-    def __init__(self):
+class StrClass(StaticClassType):
+    def __init__(self, builtins):
         super().__init__(
-            "str",
+            "str", builtins,
+            inst=StrInst("str", builtins, self),
             init_methods=(
-                StrStripMethod(),
-                StrFormatMethod(),
-                StrGetItemMethod(),
-                StrLowerMethod(),
-                StrIterMethod(),
-                StrContainsMethod(),
-                StrIAddMethod(),
+                StrFormatMethod(builtins),
+                StrGetItemMethod(builtins),
+                StrLowerMethod(builtins),
+                StrIterMethod(builtins),
+                StrContainsMethod(builtins),
+                StrIAddMethod(builtins),
             )
         )
+        self.set_builtin_method(StrStripMethod(builtins))

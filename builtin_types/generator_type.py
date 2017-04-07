@@ -49,11 +49,11 @@ class GeneratorClass(ClassType):
 
 
 def create_generator_class(builtins):
-    from function_type import BuiltinFunction
+    from function_type import FunctionType
 
     cls = GeneratorClass(builtins)
 
-    class GeneratorIterMethod(BuiltinFunction):
+    class GeneratorIterMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name=self.ITER_METHOD,
@@ -63,7 +63,7 @@ def create_generator_class(builtins):
         def returns(self):
             return self.env().lookup("self")
 
-    class GeneratorNextMethod(BuiltinFunction):
+    class GeneratorNextMethod(FunctionType):
         def __init__(self):
             super().__init__(
                 defined_name=self.NEXT_METHOD,

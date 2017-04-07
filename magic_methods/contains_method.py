@@ -1,9 +1,9 @@
-from function_type import BuiltinFunction
+from function_type import FunctionType
 
 
-class ContainsMethod(BuiltinFunction):
-    def __init__(self):
+class ContainsMethod(FunctionType):
+    def __init__(self, builtins):
         super().__init__(
-            defined_name=self.CONTAINS_METHOD,
+            self.CONTAINS_METHOD, builtins,
             pos_args=["self", "item"],
         )
