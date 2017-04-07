@@ -296,8 +296,6 @@ class Environment:
         ret_types = set()
         for value in values:
             args = Arguments([key_types])
-            print(args)
-            print(value)
             ret_types |= value.call_getitem(args)
         return ret_types
 

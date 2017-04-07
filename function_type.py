@@ -2,44 +2,35 @@ import ast
 import pytype
 
 from environment import Environment
+from instance_type import InstanceType
 
 
 class FunctionType(pytype.PyType):
     """
     Type that can contain code to be executed.
     """
-    def __init__(self, env, node, builtins, *args, pos_args=None, keywords=None,
+    def __init__(self, defined_name, builtins, env=None,
+                 pos_args=None, keywords=None,
                  vararg=None, kwonlyargs=None, kwarg=None,
                  keyword_defaults=None, kwonly_defaults=None,
-                 defined_name=None,
                  **kwargs):
         """
         Args:
-            name (str)
-            env (inference.Environment)
-            node (ast.FunctionDef)
-            args (tuple)
+            defined_name (str)
+            builtins (BuiltinsManager)
+            env (Optional[inference.Environment])
             pos_args (Optional[list[str]])
             keywords (Optional[list[str]])  # List to retain positional args unpacked into keyword args
             vararg (Optional[str])
             kwonlyargs (Optional[list[str]])
             kwarg (Optional[str])
-            kwargs (dict)
             keyword_defaults (Optional[list[set[pytype.PyType]]])
             kwonly_defaults (Optional[list[set[pytype.PyType]]])
-            defined_name (Optional[str]): The name that comes with the definition of a function.
-                If the function is created dynamically at runtime, this may be None.
         """
-        super().__init__("function", *args, **kwargs)
-        self.__ref_node = node
+        super().__init__("function", builtins, **kwargs)
 
-        if defined_name:
-            self.__defined_name = defined_name
-        elif node:
-            self.__defined_name = node.name
-        else:
-            self.__defined_name = None
-        self.__env = env or Environment(self.__defined_name)
+        self.__defined_name = defined_name
+        self.__env = env or Environment(defined_name)
 
         self.__pos_args = pos_args or []
         self.__keywords = keywords or []
@@ -61,7 +52,6 @@ class FunctionType(pytype.PyType):
         assert all(isinstance(x, set) for x in self.__kwonly_defaults)
         for default in self.__kwonly_defaults:
             assert all(isinstance(x, pytype.PyType) for x in default)
-
 
     """
     Getters
@@ -138,51 +128,23 @@ and {} variable keyword argument were left unhandled.
 
     def returns(self):
         """
-        Returns all values returned and yielded
-        by this function.
-
-        TODO: Update to perhaps include yieldfrom and raise
+        Gets the set of all types returned by this type of function.
 
         Returns:
-            set[PyType] x3: Return types and yielded types.
+            set[PyType]
         """
-        from builtin_types import NONE_TYPE
-
-        self.env().parse_sequence(self.__ref_node.body)
-        returns = self.env().returns()
-        yields = self.env().yields()
-
-        # Empty returns means return None
-        returns = returns or {NONE_TYPE}
-        if yields:
-            from builtin_types import GENERATOR_CLASS
-            return {GENERATOR_CLASS.instance(
-                yields=yields,
-                returns=returns
-            )}
-        else:
-            return returns
-
-    def adjusted_call(self, args):
-        """
-        The args passed to this method are adjusted to include self as the
-        first positional argument if called by an instance.
-        """
-        print(self.env().variables())
-        self.update_env(args)
-        print(self.env().variables())
-        return self.returns()
+        raise NotImplementedError
 
     def call(self, args):
         """
         Call this function, update its environment based on the arguments,
         and return possible return types of this function.
         """
-        print(args)
         if self.is_bound_method():
             args.prepend_owner(self.owner())
 
-        results = self.adjusted_call(args)
+        self.update_env(args)
+        results = self.returns()
 
         if self.is_bound_method():
             self.unbind_method()
@@ -191,8 +153,28 @@ and {} variable keyword argument were left unhandled.
     def env(self):
         return self.__env
 
+    def bind_method(self, owner):
+        assert isinstance(owner, InstanceType)
+        self.__owner = owner
+
+    def unbind_method(self):
+        self.__owner = None
+
+    def is_bound_method(self):
+        return self.__owner is not None
+
+    def owner(self):
+        return self.__owner
+
+
+class UserDefinedFunction(FunctionType):
+    """Function created from a definition in python code."""
+    def __init__(self, ref_node, builtins, **kwargs):
+        super().__init__(ref_node.name, builtins, **kwargs)
+        self.__ref_node = ref_node
+
     @classmethod
-    def from_node_and_env(cls, node, parent_env):
+    def from_node_and_env(cls, node, parent_env, builtins, **kwargs):
         """
         TODO: Handle remaining properties
 
@@ -200,8 +182,6 @@ and {} variable keyword argument were left unhandled.
             node (ast.FunctionDef)
             parent_env (inference.Environment)
         """
-        from environment import Environment
-
         env = Environment(node.name, parent_env=parent_env)
 
         # Add the arguments as variables
@@ -246,41 +226,36 @@ and {} variable keyword argument were left unhandled.
         if args_node.kwarg:
             kwarg = args_node.kwarg.arg
 
-        func = cls(env, node,
+        return cls(node, builtins,
+                   env=env,
                    pos_args=pos_args,
                    keywords=keywords,
                    vararg=vararg,
                    kwonlyargs=kwonlyargs,
                    kwarg=kwarg,
                    keyword_defaults=keyword_defaults,
-                   kwonly_defaults=kwonly_defaults)
-        return func
+                   kwonly_defaults=kwonly_defaults,
+                   **kwargs)
 
     def ref_node(self):
         return self.__ref_node
 
-    def bind_method(self, owner):
-        from instance_type import InstanceType
-        assert isinstance(owner, InstanceType)
-        self.__owner = owner
-
-    def unbind_method(self):
-        self.__owner = None
-
-    def is_bound_method(self):
-        return self.__owner is not None
-
-    def owner(self):
-        return self.__owner
-
-
-class BuiltinFunction(FunctionType):
-    def __init__(self, defined_name, builtins, *args, **kwargs):
-        super().__init__(None, None, builtins, *args, defined_name=defined_name, **kwargs)
-
     def returns(self):
-        raise NotImplementedError
+        """
+        Returns all values returned and yielded by this function.
 
+        In the case the function yields, a generator is returned.
+        """
+        self.env().parse_sequence(self.ref_node().body)
+        returns = self.env().returns()
+        yields = self.env().yields()
 
-class UserDefinedFunction(FunctionType):
-    pass
+        # Empty returns means return None
+        returns = returns or {self.builtins().none()}
+        if yields:
+            return {self.builtins().generator().instance(
+                yields=yields,
+                returns=returns
+            )}
+        else:
+            return returns

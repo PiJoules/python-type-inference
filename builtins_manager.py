@@ -5,7 +5,7 @@ from tuple_type import create_tuple_class
 from dict_type import DictClass
 
 
-class NoneClass(ClassType):
+class NoneClass(StaticClassType):
     def __init__(self, builtins):
         super().__init__(
             "None", builtins,
