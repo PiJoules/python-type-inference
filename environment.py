@@ -136,18 +136,11 @@ class Environment:
         elif isinstance(target, ast.Attribute):
             self.bind_attr(target, types)
         elif isinstance(target, ast.Tuple):
-            # Iterate through each tuple value and set the nth content to
-            # the nth target
+            contents = set()
             for t in types:
-                assert len(target.elts) == len(t.contents())
-
-            src_types = [set() for i in target.elts]
-            for t in types:
-                for i in range(len(src_types)):
-                    src_types[i] |= t.contents()[i]
-
+                contents |= t.contents()
             for i, elt in enumerate(target.elts):
-                self.unpack_assign(elt, src_types[i])
+                self.unpack_assign(elt, contents)
         else:
             raise NotImplementedError("Unable to assign to target node '{}'".format(target))
 
@@ -181,8 +174,8 @@ class Environment:
 
     def eval_tuple(self, node):
         return {
-            self.builtins().tuple_cls().instance(
-                init_contents=tuple(self.eval(n) for n in node.elts)
+            self.builtins().tuple_cls().from_tuple(
+                tuple(self.eval(n) for n in node.elts)
             )
         }
 

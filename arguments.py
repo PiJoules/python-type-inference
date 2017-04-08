@@ -163,8 +163,8 @@ class Arguments:
         Add any remaining positional arguments then the unpacked vararg.
         """
         pos_args = self.pos_args()
-        tup = self.builtins().tuple_cls().instance(
-            init_contents=tuple(pos_args) + self.vararg().contents()
+        tup = self.builtins().tuple_cls().from_tuple(
+            tuple(pos_args + [self.vararg().contents()])
         )
         func.env().bind(func.vararg(), {tup})
         self.__pos_args.clear()

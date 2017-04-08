@@ -182,8 +182,9 @@ y = func2(1, "a")
         env = ModuleEnv()
         env.parse_code(code)
 
-        tup = {env.builtins().tuple_cls().instance(
-            init_contents=({env.builtins().int()}, {env.builtins().str()}))}
+        tup = {env.builtins().tuple_cls().from_tuple(
+            ({env.builtins().int()}, {env.builtins().str()})
+        )}
 
         # Stored vars
         self.assertSetEqual(
