@@ -36,6 +36,23 @@ class TupleType(InstanceType):
         return "tuple{}".format(str_contents)
 
 
+class StaticTupleType(InstanceType):
+    def __init__(self, builtins, init_tup=None, **kwargs):
+        super().__init__("tuple", builtins, **kwargs)
+        self.__tup = init_tup or tuple()
+        assert isinstance(self.__tup, tuple)
+        assert all(isinstance(x, PyType) for x in self.__tup)
+
+    def contents(self):
+        contents = set()
+        for item in self.__tup:
+            contents |= item
+        return contents
+
+    def __hash__(self):
+        return hash(self.name())
+
+
 class TupleGetItemMethod(GetItemMethod):
     def returns(self):
         results = set()
