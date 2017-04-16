@@ -85,20 +85,19 @@ class TreeEditor(ast.NodeTransformer):
         self.__name = name
         self.__vars = {}
 
-    def visit_seq(self, seq):
-        for node in seq:
-            self.visit(node)
+    def _visit_seq(self, seq):
+        return list(map(self.visit, seq))
 
     def visit_Module(self, node):
-        for child in node.body:
-            self.visit(child)
+        new_body = self._visit_seq(node.body)
         return ast.Module(
-            body=[create_type_tracker()] + node.body
+            body=[create_type_tracker()] + new_body
         )
 
     def visit_FunctionDef(self, node):
         func = UserDefinedFunction(node)
         self.__vars[node.name] = func
+        return node
 
     def visit_If(self, node):
         test = node.test
@@ -106,16 +105,18 @@ class TreeEditor(ast.NodeTransformer):
         orelse = node.orelse
 
         self.visit(test)
-        self.visit_seq(body)
-        self.visit_seq(orelse)
+        self._visit_seq(body)
+        self._visit_seq(orelse)
 
-    def visit_Call(self, node):
-        func = node.func  # ast node
+        return ast.Continue()
 
-        if not is_ge_v3_5():
-            raise NotImplementedError("Need to implement logic for call in v3.4 or earlier")
+    #def visit_Call(self, node):
+    #    func = node.func  # ast node
 
-        raise NotImplementedError
+    #    if not is_ge_v3_5():
+    #        raise NotImplementedError("Need to implement logic for call in v3.4 or earlier")
+
+    #    raise NotImplementedError
 
 
 def main():
